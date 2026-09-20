@@ -2,8 +2,9 @@
 
 OpenHall is not yet production-ready. Do not deploy it with real student data until
 authorization enforcement, workflow policy, and security review milestones are complete.
-OIDC login, opaque session management, CSRF/origin protection, operator bootstrap, and
-break-glass recovery are implemented (see ADR 0012 and ADR 0013).
+OIDC login, opaque session management, CSRF/origin protection, operator bootstrap,
+break-glass recovery, and deny-by-default relationship/capability authorization with
+concealed user school context are implemented (see ADR 0012, ADR 0013, and ADR 0014).
 
 Report suspected vulnerabilities privately to the maintainers rather than opening a public issue.
 Include affected versions, impact, reproduction steps, and any known mitigations. Do not include
