@@ -71,6 +71,9 @@ export function registerBootstrapRoutes(
         tags: ['bootstrap'],
         description:
           'Validates tenant/school/admin details plus the OIDC provider (live discovery), stores the encrypted draft, and starts the bootstrap OIDC flow. The operator credential travels in the Authorization header, never query or ambient cookies.',
+        // Operator endpoints take the one-time credential in the
+        // Authorization header (`Bootstrap <token>` here), never query.
+        security: [{ operatorCredential: [] as string[] }],
         body: BootstrapPrepareSchema,
         response: {
           200: BootstrapPrepareResponseSchema,
@@ -92,7 +95,9 @@ export function registerBootstrapRoutes(
           },
         },
       },
-      config: { rateLimit: { max: 10, timeWindow: '1 minute', groupId: 'operator-token' } },
+      // The limiter keeps per-route counters, so each operator-token route
+      // allows half of the combined 10-attempts-per-minute shared budget.
+      config: { rateLimit: { max: 5, timeWindow: '1 minute', groupId: 'operator-token' } },
     },
     async (request, reply) => {
       const token = bootstrapToken(request.headers.authorization);

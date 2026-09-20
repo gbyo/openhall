@@ -273,7 +273,11 @@ function decodeOperatorToken(raw: string): Uint8Array {
   if (raw.length === 0) {
     throw new AuthenticationError('bootstrap_token_invalid');
   }
-  return fromBase64Url(raw);
+  try {
+    return fromBase64Url(raw);
+  } catch {
+    throw new AuthenticationError('bootstrap_token_invalid');
+  }
 }
 
 function decodeBinding(raw: string): Uint8Array {

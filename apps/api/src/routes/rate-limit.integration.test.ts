@@ -86,9 +86,11 @@ describe('rate limiting', () => {
     providerScopes: ['openid', 'email'],
   };
 
+  // The limiter keeps per-route counters, so each operator-token route allows
+  // 5 attempts per minute: together the shared groupId budget stays at 10.
   it('answers 429 with a safe problem body once the prepare budget is spent', async () => {
     const statuses: number[] = [];
-    for (let attempt = 0; attempt < 11; attempt += 1) {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/bootstrap/prepare',
@@ -96,7 +98,7 @@ describe('rate limiting', () => {
         payload: preparePayload,
       });
       statuses.push(response.statusCode);
-      if (attempt === 10) {
+      if (attempt === 5) {
         expect(response.statusCode).toBe(429);
         expect(response.json()).toMatchObject({
           code: 'rate_limited',
@@ -105,12 +107,12 @@ describe('rate limiting', () => {
         });
       }
     }
-    expect(statuses.slice(0, 10)).toEqual(new Array<number>(10).fill(401));
+    expect(statuses.slice(0, 5)).toEqual(new Array<number>(5).fill(401));
   });
 
   it('answers 429 once the recovery budget is spent', async () => {
     const statuses: number[] = [];
-    for (let attempt = 0; attempt < 11; attempt += 1) {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
       const response = await app.inject({
         method: 'POST',
         url: '/api/v1/auth/recovery',
@@ -118,7 +120,7 @@ describe('rate limiting', () => {
       });
       statuses.push(response.statusCode);
     }
-    expect(statuses.slice(0, 10)).toEqual(new Array<number>(10).fill(401));
-    expect(statuses[10]).toBe(429);
+    expect(statuses.slice(0, 5)).toEqual(new Array<number>(5).fill(401));
+    expect(statuses[5]).toBe(429);
   });
 });

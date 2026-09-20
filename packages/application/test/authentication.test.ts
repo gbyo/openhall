@@ -6,21 +6,28 @@ import {
   completeOidcLogin,
   logoutAllSessions,
   logoutSession,
+  prepareBootstrap,
   resolveSession,
   SESSION_POLICY,
   sessionExpiry,
   toBase64Url,
 } from '../src/authentication/index.js';
 import type {
+  PrepareBootstrapDependencies,
+  PrepareBootstrapInput,
+} from '../src/authentication/index.js';
+import type {
   AccountRecord,
   AuditWriter,
   AuthIdentityRecord,
+  BootstrapRepository,
   CredentialDigester,
   IdentityDirectory,
   IdentityProviderRecord,
   OidcProtocolAdapter,
   OidcTransactionRecord,
   OidcTransactionStore,
+  OperatorGrantStore,
   PersonRecord,
   SecretProtector,
   SecureRandomSource,
@@ -28,9 +35,15 @@ import type {
   SessionRecord,
   SessionRepository,
   Sha256Hasher,
+  TenantDirectory,
   TenantRecord,
 } from '../src/authentication/ports.js';
-import type { TenantTransactionContext, TenantTransactionRunner } from '../src/persistence.js';
+import type {
+  SystemTransactionContext,
+  SystemTransactionRunner,
+  TenantTransactionContext,
+  TenantTransactionRunner,
+} from '../src/persistence.js';
 import type { ResolvedSession } from '../src/authentication/sessions.js';
 
 const T0 = Temporal.Instant.from('2026-09-20T12:00:00Z');
@@ -600,5 +613,118 @@ describe('completeOidcLogin canonical lookup', () => {
     expect(completed.sessionToken.length).toBeGreaterThan(0);
     expect(created).toHaveLength(1);
     expect(created[0]?.accountSessionRevision).toBe(1n);
+  });
+});
+
+describe('prepareBootstrap operator token', () => {
+  function operatorDependencies(): PrepareBootstrapDependencies {
+    const grants: OperatorGrantStore = {
+      create: () => Promise.reject(new Error('not used')),
+      findValidByTokenDigest: () => Promise.resolve(undefined),
+      consumeByTokenDigest: () => Promise.reject(new Error('not used')),
+      consumeById: () => Promise.reject(new Error('not used')),
+    };
+    const tenants: TenantDirectory = {
+      findById: () => Promise.reject(new Error('not used')),
+      findBySlug: () => Promise.reject(new Error('not used')),
+      listForDiscovery: () => Promise.reject(new Error('not used')),
+      countCanonical: () => Promise.reject(new Error('not used')),
+    };
+    const transactions: OidcTransactionStore = {
+      create: () => Promise.reject(new Error('not used')),
+      claimByStateDigest: () => Promise.reject(new Error('not used')),
+      peekByStateDigest: () => Promise.reject(new Error('not used')),
+      markFailed: () => Promise.reject(new Error('not used')),
+      consume: () => Promise.reject(new Error('not used')),
+    };
+    const drafts: BootstrapRepository = {
+      findByGrantId: () => Promise.reject(new Error('not used')),
+      findBySetupId: () => Promise.reject(new Error('not used')),
+      createDraft: () => Promise.reject(new Error('not used')),
+      updateDraft: () => Promise.reject(new Error('not used')),
+    };
+    const adapter: OidcProtocolAdapter = {
+      validateProviderConfiguration: () => Promise.reject(new Error('not used')),
+      buildAuthorizationUrl: () => Promise.reject(new Error('not used')),
+      exchangeCode: () => Promise.reject(new Error('not used')),
+    };
+    const protector: SecretProtector = {
+      keyId: 'test-key-1',
+      protect: () => {
+        throw new Error('not used');
+      },
+      reveal: () => {
+        throw new Error('not used');
+      },
+    };
+    const random: SecureRandomSource = {
+      randomBytes: (byteLength) => new Uint8Array(byteLength).fill(9),
+    };
+    const hasher: Sha256Hasher = {
+      hash: (data) => data,
+    };
+    const runner: SystemTransactionRunner = {
+      run: (operation) => operation({ system: 'system-bootstrap' } as SystemTransactionContext),
+    };
+    return {
+      grants,
+      random,
+      digester,
+      clock: manualClock(T0),
+      drafts,
+      transactions,
+      tenants,
+      adapter,
+      protector,
+      hasher,
+      redirectUri: 'https://openhall.example/api/v1/auth/oidc/callback',
+      allowInsecureHttp: false,
+      runner,
+    };
+  }
+
+  function operatorInput(operatorToken: string): PrepareBootstrapInput {
+    return {
+      operatorToken,
+      tenantName: 'Greenwood',
+      tenantSlug: 'greenwood',
+      schoolName: 'Greenwood High',
+      schoolSlug: 'greenwood-high',
+      schoolTimeZone: 'America/Chicago',
+      adminGivenName: 'Ada',
+      adminFamilyName: 'Admin',
+      adminDisplayName: 'Ada Admin',
+      providerKey: 'workspace',
+      providerDisplayName: 'Workspace',
+      providerIssuer: 'https://provider.example',
+      providerClientId: 'test-client',
+      providerClientSecret: 'test-client-secret',
+      providerAuthMethod: 'client_secret_basic',
+      providerScopes: ['openid', 'email'],
+      browserBinding: toBase64Url(bytes('test-binding')),
+    };
+  }
+
+  it('remaps malformed operator encodings to bootstrap_token_invalid', async () => {
+    expect(await errorCode(prepareBootstrap(operatorInput('!!!'), operatorDependencies()))).toBe(
+      'bootstrap_token_invalid',
+    );
+  });
+
+  it('rejects empty operator tokens', async () => {
+    expect(await errorCode(prepareBootstrap(operatorInput(''), operatorDependencies()))).toBe(
+      'bootstrap_token_invalid',
+    );
+  });
+
+  it('decodes well-formed encodings and fails closed on unknown grants', async () => {
+    expect(
+      await errorCode(
+        prepareBootstrap(
+          operatorInput(toBase64Url(bytes('unknown-operator-token'))),
+          operatorDependencies(),
+        ),
+      ),
+    ).toBe('bootstrap_token_invalid');
   });
 });

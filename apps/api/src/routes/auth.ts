@@ -60,13 +60,15 @@ const CallbackQuerySchema = Type.Object(
 /**
  * Redirect-only success contract. Description and headers document the 302
  * without a body schema, so runtime response validation is unaffected while
- * the generated OpenAPI names the status and headers deliberately.
+ * the generated OpenAPI names the status and headers deliberately. Header
+ * entries are plain schemas: @fastify/swagger wraps each entry in `schema`
+ * itself, so a pre-wrapped entry would render a doubled schema wrapper.
  */
 const RedirectFoundSchema = (description: string, setCookie: string) => ({
   description,
   headers: {
-    Location: { description: 'Redirect target', schema: { type: 'string' } },
-    'Set-Cookie': { description: setCookie, schema: { type: 'string' } },
+    Location: { description: 'Redirect target', type: 'string' },
+    'Set-Cookie': { description: setCookie, type: 'string' },
   },
 });
 
@@ -84,6 +86,9 @@ const CSRF_SECURITY = [{ cookieAuth: [] as string[], csrfHeader: [] as string[] 
 // GET /auth/session is anonymously callable: anonymous callers receive
 // {authenticated:false}. The empty requirement documents that alternative.
 const OPTIONAL_SESSION_SECURITY = [{}, { cookieAuth: [] as string[] }];
+// Operator endpoints take the one-time credential in the Authorization
+// header (`Recovery <token>` here), never query or ambient cookies.
+const OPERATOR_SECURITY = [{ operatorCredential: [] as string[] }];
 
 function bearerToken(header: string | undefined, scheme: string): string | undefined {
   if (typeof header !== 'string') {
@@ -509,6 +514,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
         tags: ['auth'],
         description:
           'Consumes a one-time recovery grant from the Authorization header (never query) and creates a short-lived recovery session.',
+        security: OPERATOR_SECURITY,
         response: {
           200: RecoveryResponseSchema,
           401: {
@@ -521,7 +527,9 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
           },
         },
       },
-      config: { rateLimit: { max: 10, timeWindow: '1 minute', groupId: 'operator-token' } },
+      // The limiter keeps per-route counters, so each operator-token route
+      // allows half of the combined 10-attempts-per-minute shared budget.
+      config: { rateLimit: { max: 5, timeWindow: '1 minute', groupId: 'operator-token' } },
     },
     async (request, reply) => {
       const d = id();

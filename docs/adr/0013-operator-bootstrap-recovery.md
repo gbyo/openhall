@@ -37,7 +37,7 @@ session and redirects to `/`.
 
 Recovery consumes the grant into a short-lived session (15-minute idle,
 30-minute absolute) with `authentication_method: 'recovery'`, audited as
-`auth.recovery_consumed`. Recovery sessions authenticate the same `/me`
+`auth.recovery_session_created`. Recovery sessions authenticate the same `/me`
 surface; elevation policy beyond that belongs to later phases.
 
 Operator surfaces (bootstrap prepare/status, recovery consume) travel in

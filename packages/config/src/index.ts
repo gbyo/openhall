@@ -28,6 +28,37 @@ export class ConfigError extends Error {
 }
 
 /**
+ * Development-only fallback shared by .env.example and compose.yaml. It is
+ * published in the repository, so production validation must reject it below.
+ */
+const DEVELOPMENT_DATA_ENCRYPTION_KEY_HEX =
+  'd1891fe393da7c992d51a8f99ec6ee3ea4646b3aa574d3fd1fa37be90725f01d';
+
+const DEVELOPMENT_DATA_ENCRYPTION_KEY_BYTES = (() => {
+  const bytes = new Uint8Array(32);
+  for (let index = 0; index < 32; index += 1) {
+    bytes[index] = Number.parseInt(
+      DEVELOPMENT_DATA_ENCRYPTION_KEY_HEX.slice(index * 2, index * 2 + 2),
+      16,
+    );
+  }
+  return bytes;
+})();
+
+function isDevelopmentKey(bytes: Uint8Array): boolean {
+  if (bytes.length !== DEVELOPMENT_DATA_ENCRYPTION_KEY_BYTES.length) {
+    return false;
+  }
+  let difference = 0;
+  for (let index = 0; index < bytes.length; index += 1) {
+    const actual = bytes[index] ?? 0;
+    const expected = DEVELOPMENT_DATA_ENCRYPTION_KEY_BYTES[index] ?? 0;
+    difference |= actual ^ expected;
+  }
+  return difference === 0;
+}
+
+/**
  * Parses DATA_ENCRYPTION_KEY as exactly 256 random bits in a documented
  * encoding: 64 hexadecimal characters, or base64/base64url encoding 32 bytes.
  */
@@ -130,6 +161,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     issues.push('DATA_ENCRYPTION_KEY_ID must be a production key id in production');
   }
   const dataEncryptionKey = parseDataEncryptionKey(environment, issues);
+  if (nodeEnv === 'production' && isDevelopmentKey(dataEncryptionKey)) {
+    issues.push('DATA_ENCRYPTION_KEY must be a fresh production key in production');
+  }
 
   const trustProxyValue = environment.TRUST_PROXY?.trim() ?? 'false';
   if (trustProxyValue !== 'true' && trustProxyValue !== 'false') {

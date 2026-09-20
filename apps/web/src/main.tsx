@@ -257,13 +257,19 @@ function AuthenticatedView({ recovery }: { recovery: boolean }) {
   }, []);
   const logout = useCallback(async (all: boolean) => {
     if (!csrfTokenMemory) {
-      await fetch('/api/v1/auth/session').then((response) => json<SessionInfo>(response));
+      const session = await fetch('/api/v1/auth/session').then((response) =>
+        json<SessionInfo>(response),
+      );
+      csrfTokenMemory = session.csrfToken;
     }
-    await fetch(all ? '/api/v1/auth/logout-all' : '/api/v1/auth/logout', {
+    const response = await fetch(all ? '/api/v1/auth/logout-all' : '/api/v1/auth/logout', {
       method: 'POST',
       headers: { 'X-CSRF-Token': csrfTokenMemory ?? '' },
     });
     csrfTokenMemory = undefined;
+    if (!response.ok) {
+      return;
+    }
     window.location.href = '/';
   }, []);
   return (

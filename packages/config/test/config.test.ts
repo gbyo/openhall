@@ -48,6 +48,25 @@ describe('loadConfig', () => {
     ).toThrow(/must not include a query or fragment/);
   });
 
+  it('rejects the published development key in production but allows it elsewhere', () => {
+    const publishedHex = 'd1891fe393da7c992d51a8f99ec6ee3ea4646b3aa574d3fd1fa37be90725f01d';
+    expect(() => loadConfig({ ...validEnvironment, DATA_ENCRYPTION_KEY: publishedHex })).toThrow(
+      /fresh production key/,
+    );
+    const publishedBase64 = Buffer.from(publishedHex, 'hex').toString('base64');
+    expect(() => loadConfig({ ...validEnvironment, DATA_ENCRYPTION_KEY: publishedBase64 })).toThrow(
+      /fresh production key/,
+    );
+    const development = loadConfig({
+      ...validEnvironment,
+      NODE_ENV: 'development',
+      APP_BASE_URL: 'http://localhost:3000',
+      DATA_ENCRYPTION_KEY: publishedHex,
+      DATA_ENCRYPTION_KEY_ID: 'development-only-key-1',
+    });
+    expect(development.dataEncryptionKey.length).toBe(32);
+  });
+
   it('requires exactly 256 bits of data-encryption key material', () => {
     const key = loadConfig(validEnvironment).dataEncryptionKey;
     expect(key.length).toBe(32);

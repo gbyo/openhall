@@ -33,6 +33,12 @@ function flagValue(args: readonly string[], flag: string): string | undefined {
   return args[index + 1];
 }
 
+// Tenant ids are UUIDs. A non-UUID tenantRef can only match by slug, so the
+// id lookup below must be skipped: Postgres would reject the comparison
+// against the uuid column instead of returning no match.
+const UUID_PATTERN =
+  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
   if (args[0] !== 'operator') {
@@ -79,7 +85,8 @@ async function main(): Promise<number> {
         return 2;
       }
       const tenant =
-        (await tenants.findBySlug(tenantRef.toLowerCase())) ?? (await tenants.findById(tenantRef));
+        (await tenants.findBySlug(tenantRef.toLowerCase())) ??
+        (UUID_PATTERN.test(tenantRef) ? await tenants.findById(tenantRef) : undefined);
       if (tenant === undefined) {
         process.stderr.write('No matching active tenant for recovery grant.\n');
         return 1;

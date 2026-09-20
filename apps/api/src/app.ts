@@ -147,6 +147,13 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
             name: 'X-CSRF-Token',
             description: 'Per-session CSRF token from GET /api/v1/auth/session.',
           },
+          operatorCredential: {
+            type: 'apiKey',
+            in: 'header',
+            name: 'Authorization',
+            description:
+              'One-time operator credential: `Bootstrap <token>` on bootstrap prepare, `Recovery <token>` on recovery consume. Never sent in query or cookies.',
+          },
         },
       },
     },
