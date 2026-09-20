@@ -1,5 +1,5 @@
 import type { Temporal } from '@js-temporal/polyfill';
-import type { AccountId, OrganizationId, PersonId, TenantId } from '@openhall/domain';
+import type { AccountId, PersonId, TenantId } from '@openhall/domain';
 import type { SystemTransactionContext, TenantTransactionContext } from '../persistence.js';
 
 /** At least 256 bits of cryptographically secure randomness per credential. */
@@ -353,24 +353,7 @@ export interface OidcProtocolAdapter {
   }): Promise<VerifiedExternalIdentity>;
 }
 
-export type AuditOutcome = 'success' | 'denied' | 'failure';
-
-export interface AuditEventInput {
-  readonly action: string;
-  readonly actorKind: 'account' | 'integration' | 'system';
-  readonly actorId?: string;
-  readonly organizationId?: OrganizationId;
-  readonly targetKind: string;
-  readonly targetId?: string;
-  readonly outcome: AuditOutcome;
-  readonly occurredAt: Temporal.Instant;
-  readonly requestId: string;
-  readonly metadata?: Readonly<Record<string, string>>;
-}
-
-export interface AuditWriter {
-  append(context: TenantTransactionContext, event: AuditEventInput): Promise<void>;
-}
+export type { AuditEventInput, AuditOutcome, AuditWriter } from '../auditing/audit.js';
 
 export type OperatorGrantPurpose = 'bootstrap' | 'recovery';
 

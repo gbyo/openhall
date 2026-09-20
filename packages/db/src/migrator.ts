@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Kysely } from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
 
-export const EXPECTED_MIGRATION = '004_authorization_relationships';
+export const EXPECTED_MIGRATION = '005_pass_command_core';
 
 export function createMigrator<Database>(database: Kysely<Database>) {
   return new Migrator({

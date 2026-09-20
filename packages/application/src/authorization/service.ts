@@ -95,6 +95,8 @@ function isUsableTimeZone(timeZone: string): boolean {
 function capabilityAllowsResourceKind(capability: Capability, kind: string): boolean {
   switch (capability) {
     case 'self.read':
+    case 'pass.view.self':
+    case 'pass.cancel.self':
       return kind === 'self';
     case 'organization.context.read':
     case 'pass.view.school_live':
@@ -253,8 +255,15 @@ export class RelationshipAuthorizationService {
       return deny('no_applicable_grant');
     }
 
-    // Self capability (OIDC): every authenticated principal for themselves.
-    if (capability === 'self.read') {
+    // Self capabilities (OIDC): any authenticated principal may operate on
+    // their own pass data; the pass command verifies exact pass ownership.
+    // pass.request.self is intentionally absent here: requesting still
+    // requires active student affiliation through Phase 4 below.
+    if (
+      capability === 'self.read' ||
+      capability === 'pass.view.self' ||
+      capability === 'pass.cancel.self'
+    ) {
       return { allowed: true, basis: { kind: 'self' } };
     }
 

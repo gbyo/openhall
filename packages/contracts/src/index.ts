@@ -169,6 +169,8 @@ export const CapabilitySchema = Type.Union(
     Type.Literal('self.read'),
     Type.Literal('organization.context.read'),
     Type.Literal('pass.request.self'),
+    Type.Literal('pass.view.self'),
+    Type.Literal('pass.cancel.self'),
     Type.Literal('pass.create.student'),
     Type.Literal('pass.approve.section'),
     Type.Literal('pass.view.section_live'),
@@ -352,3 +354,89 @@ export const MyOrganizationContextSchema = Type.Object(
   },
   { $id: 'MyOrganizationContext', additionalProperties: false },
 );
+
+/** POST /api/v1/me/passes and POST /api/v1/students/:studentId/passes body. */
+export const PassRequestBodySchema = Type.Object(
+  { destinationId: UuidSchema },
+  { $id: 'PassRequestBody', additionalProperties: false },
+);
+
+const PassOriginBlockSchema = Type.Object(
+  {
+    id: UuidSchema,
+    code: Type.String(),
+    displayName: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+const PassOriginSectionSchema = Type.Object(
+  {
+    id: UuidSchema,
+    code: Type.Union([Type.String(), Type.Null()]),
+    title: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+const PassOriginLocationSchema = Type.Object(
+  {
+    id: UuidSchema,
+    name: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+/**
+ * Small safe pass representation. Revision is a decimal string because the
+ * underlying value is PostgreSQL bigint, never a JSON number.
+ */
+export const PassSchema = Type.Object(
+  {
+    id: UuidSchema,
+    organizationId: UuidSchema,
+    studentId: UuidSchema,
+    destination: Type.Object(
+      {
+        id: UuidSchema,
+        displayName: Type.String(),
+        serviceType: Type.String(),
+      },
+      { additionalProperties: false },
+    ),
+    origin: Type.Object(
+      {
+        placementKind: Type.String(),
+        block: Type.Union([PassOriginBlockSchema, Type.Null()]),
+        section: Type.Union([PassOriginSectionSchema, Type.Null()]),
+        location: Type.Union([PassOriginLocationSchema, Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
+    requestSource: Type.String(),
+    requestedAt: InstantSchema,
+    lifecycleState: Type.String(),
+    revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+  },
+  { $id: 'Pass', additionalProperties: false },
+);
+
+export const ActiveSelfPassSchema = Type.Object(
+  { pass: Type.Union([PassSchema, Type.Null()]) },
+  { $id: 'ActiveSelfPass', additionalProperties: false },
+);
+
+export const PassResponseSchema = Type.Object(
+  { pass: PassSchema },
+  { $id: 'PassResponse', additionalProperties: false },
+);
+
+/**
+ * OpenHall Idempotency-Key contract: opaque caller-generated value, 1-255
+ * visible ASCII characters. UUIDv4/UUIDv7 recommended, not required.
+ * This documents OpenHall API behavior, not a finalized IETF RFC.
+ */
+export const IdempotencyKeyHeaderSchema = Type.String({ minLength: 1, maxLength: 255 });
+
+/** Exact OpenHall strong ETag required for If-Match on cancellation. */
+export const IfMatchHeaderSchema = Type.String({ minLength: 1 });

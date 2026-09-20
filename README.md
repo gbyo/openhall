@@ -2,9 +2,9 @@
 
 OpenHall is an open-source, self-hosted school presence and movement platform. This repository is
 currently an **early development release and is not production-ready**. School-local expected
-placement, OIDC login with opaque sessions, operator bootstrap/recovery, and relationship-aware
-authorization with user school context are implemented; pass workflows and policy execution are
-intentionally incomplete (see ADR 0014).
+placement, OIDC login with opaque sessions, operator bootstrap/recovery, relationship-aware
+authorization with user school context, and reliable pass request intake with idempotent commands
+are implemented; movement policy and execution are intentionally incomplete (see ADR 0015).
 
 First run creates the installation through an operator bootstrap ceremony: issue a bootstrap
 grant with the operator CLI, prepare the setup draft, and complete OIDC sign-in as the founding

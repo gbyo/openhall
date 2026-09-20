@@ -97,3 +97,24 @@ instant, mapped to minimized public DTOs. Object existence stays
 concealed as 404; recovery-session restrictions stay 403. Capability
 hints are never accepted back as authority, and no generic `/authorize`
 oracle exists.
+
+## Pass aggregate and idempotent commands (Phase 5)
+
+`pass` is the authoritative current aggregate; `pass_event` is immutable
+history and `outbox_event` the pending notification, committed together
+in one tenant transaction per successful command. The pure domain owns
+the lifecycle matrix and the revision invariant (creation `1n`, plus
+exactly `1n` per mutation, mirrored by `pass_event.sequence`); there is
+no event sourcing. Request intake (`POST /me/passes`,
+`POST /students/:studentId/passes`), self reads
+(`GET /me/passes/active`), and self cancellation
+(`POST /me/passes/:passId/cancel`) compose Phase 3 sessions, Phase 4
+authorization (org-level `pass.create.student` plus teacher fallback
+against the resolved current section), and one-clock-instant Expected
+Placement snapshots. `Idempotency-Key` semantics are an OpenHall API
+contract (stable command namespaces, SHA-256 semantic fingerprints,
+24-hour retention, transaction advisory locks); strong ETags
+(`"pass:<id>:<revision>"`) with `If-Match` prevent lost updates, and the
+partial unique index keeps one active pass per student. Outbox rows stay
+pending; no publisher, policy, queue, or capacity work exists yet. See
+ADR 0015. OpenHall remains not production-ready.
