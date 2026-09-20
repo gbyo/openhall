@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { Client, Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
-import { Aes256GcmSecretProtector } from '../auth/crypto.js';
+import { Aes256GcmSecretProtector, HmacCredentialDigester } from '../auth/crypto.js';
 import { TestOidcProvider } from '../auth/test-oidc-provider.js';
 
 let databaseName: string;
@@ -219,6 +219,7 @@ beforeAll(async () => {
     config,
     database: handle.database,
     logger: false,
+    rateLimitDisabled: true,
     readinessProbe: { check: () => Promise.resolve({ migration: '003_identity_secure_sessions' }) },
   });
 });
@@ -657,5 +658,200 @@ describe('HTTP hardening', () => {
     expect(response.json()).toMatchObject({ code: 'unauthenticated' });
     expect(response.body).not.toContain('revoked');
     expect(response.body).not.toContain('expired');
+  });
+});
+
+describe('OIDC edge cases', () => {
+  /** Starts a flow and returns the provider callback URL plus browser binding. */
+  async function startedFlow(): Promise<{ callback: URL; binding: string }> {
+    const start = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/oidc/greenwood/workspace/start',
+    });
+    expect(start.statusCode).toBe(302);
+    const binding = cookieValue(start.headers['set-cookie'], 'openhall_login_dev');
+    if (!binding) throw new Error('Missing binding cookie');
+    const authorize = await fetch(redirectLocation(start.headers), { redirect: 'manual' });
+    expect(authorize.status).toBe(302);
+    const callback = new URL(authorize.headers.get('location') ?? '');
+    return { callback, binding };
+  }
+
+  it('rejects callbacks with a missing state parameter', async () => {
+    const { callback, binding } = await startedFlow();
+    const code = callback.searchParams.get('code');
+    if (code === null) throw new Error('Provider callback missing code');
+    const response = await app.inject({
+      method: 'GET',
+      url: `${callback.pathname}?code=${code}`,
+      headers: { cookie: `openhall_login_dev=${binding}` },
+    });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe('/?error=auth_transaction_invalid');
+  });
+
+  it('rejects callbacks presenting the wrong browser binding', async () => {
+    const { callback, binding } = await startedFlow();
+    expect(binding.length).toBeGreaterThan(0);
+    const wrongBinding = randomUUID().replaceAll('-', '');
+    const response = await app.inject({
+      method: 'GET',
+      url: `${callback.pathname}${callback.search}`,
+      headers: { cookie: `openhall_login_dev=${wrongBinding}` },
+    });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe('/?error=auth_transaction_invalid');
+  });
+
+  it('rejects expired login transactions without revealing state', async () => {
+    const { callback, binding } = await startedFlow();
+    const state = callback.searchParams.get('state');
+    if (state === null) throw new Error('Provider callback missing state');
+    const digester = new HmacCredentialDigester(config.appSecret);
+    const stateHash = Buffer.from(digester.digest(new TextEncoder().encode(state)));
+    // CHECK (expires_at > created_at) forbids naive backdating: simulate real
+    // time passage by aging the whole row past the transaction TTL.
+    await pool.query(
+      `UPDATE oidc_login_transaction
+       SET created_at = statement_timestamp() - interval '11 minutes',
+           expires_at = statement_timestamp() - interval '1 minute'
+       WHERE state_hash = $1`,
+      [stateHash],
+    );
+    const response = await app.inject({
+      method: 'GET',
+      url: `${callback.pathname}${callback.search}`,
+      headers: { cookie: `openhall_login_dev=${binding}` },
+    });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe('/?error=auth_transaction_expired');
+  });
+
+  it('fails closed on a tampered iss parameter (request-level mix-up)', async () => {
+    const { callback, binding } = await startedFlow();
+    // An attacker rewriting iss to a rogue provider cannot divert the login:
+    // the OIDC adapter enforces the RFC 9207 iss binding against the exact
+    // provider recorded in the login transaction and refuses the exchange.
+    callback.searchParams.set('iss', 'https://evil.example');
+    const response = await app.inject({
+      method: 'GET',
+      url: `${callback.pathname}${callback.search}`,
+      headers: { cookie: `openhall_login_dev=${binding}` },
+    });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe('/?error=auth_provider_unavailable');
+    expect(String(response.headers.location)).not.toContain('evil.example');
+    expect(cookieValue(response.headers['set-cookie'], 'openhall_session_dev')).toBeUndefined();
+  });
+
+  it('maps wrong-issuer tokens to a safe failure code (token-level mix-up)', async () => {
+    provider.rig.issuerOverride = 'https://evil.example';
+    const { callback, binding } = await startedFlow();
+    const response = await app.inject({
+      method: 'GET',
+      url: `${callback.pathname}${callback.search}`,
+      headers: { cookie: `openhall_login_dev=${binding}` },
+    });
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe('/?error=auth_provider_unavailable');
+    expect(String(response.headers.location)).not.toContain('evil.example');
+  });
+
+  it('normalizes provider token errors to safe codes', async () => {
+    for (const failure of ['invalid_grant', 'access_denied']) {
+      provider.rig.tokenError = failure;
+      const { callback, binding } = await startedFlow();
+      const response = await app.inject({
+        method: 'GET',
+        url: `${callback.pathname}${callback.search}`,
+        headers: { cookie: `openhall_login_dev=${binding}` },
+      });
+      expect(response.statusCode).toBe(302);
+      expect(response.headers.location).toBe('/?error=auth_provider_unavailable');
+      expect(String(response.headers.location)).not.toContain(failure);
+    }
+  });
+
+  it('refuses providers that cannot support PKCE S256', async () => {
+    const plain = await TestOidcProvider.start({
+      clientId: 'test-client',
+      clientSecret: 'test-client-secret',
+      subject: 'subject-1',
+      email: 'ada@example.com',
+      s256Supported: false,
+    });
+    try {
+      await seedProviderRow(plain.issuer, 'plain');
+      const start = await app.inject({
+        method: 'GET',
+        url: '/api/v1/auth/oidc/greenwood/plain/start',
+      });
+      expect(start.statusCode).toBe(400);
+      expect(start.json()).toMatchObject({ code: 'provider_configuration_unsupported' });
+    } finally {
+      await plain.close();
+      await pool.query(
+        'DELETE FROM oidc_login_transaction WHERE identity_provider_id IN (SELECT id FROM identity_provider WHERE key = $1)',
+        ['plain'],
+      );
+      await pool.query("DELETE FROM identity_provider WHERE key = 'plain'");
+    }
+  });
+
+  it('does not persist provider refresh tokens', async () => {
+    await login();
+    const refreshToken = provider.lastRefreshToken;
+    expect(refreshToken.length).toBeGreaterThan(0);
+    const tables = ['auth_session', 'audit_event', 'oidc_login_transaction', 'auth_identity'];
+    for (const table of tables) {
+      const text = await pool.query(`SELECT row_to_json(t) AS row FROM ${table} t`);
+      expect(JSON.stringify(text.rows)).not.toContain(refreshToken);
+    }
+  });
+
+  it('rejects mutations without any origin even with a valid CSRF token', async () => {
+    const { sessionCookie } = await login();
+    const csrf = await csrfFor(sessionCookie);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout',
+      headers: {
+        cookie: `openhall_session_dev=${sessionCookie}`,
+        'x-csrf-token': csrf,
+      },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ code: 'invalid_request_origin' });
+  });
+
+  it('enforces CSRF on logout-all', async () => {
+    const { sessionCookie } = await login();
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout-all',
+      headers: { cookie: `openhall_session_dev=${sessionCookie}`, origin: ORIGIN },
+    });
+    expect(missing.statusCode).toBe(403);
+    expect(missing.json()).toMatchObject({ code: 'invalid_csrf_token' });
+    const wrong = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout-all',
+      headers: {
+        cookie: `openhall_session_dev=${sessionCookie}`,
+        'x-csrf-token': 'bogus',
+        origin: ORIGIN,
+      },
+    });
+    expect(wrong.statusCode).toBe(403);
+    const valid = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout-all',
+      headers: {
+        cookie: `openhall_session_dev=${sessionCookie}`,
+        'x-csrf-token': await csrfFor(sessionCookie),
+        origin: ORIGIN,
+      },
+    });
+    expect(valid.statusCode).toBe(200);
   });
 });

@@ -86,9 +86,13 @@ export function registerBootstrapRoutes(
             description: 'Installation already exists',
             content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
           },
+          429: {
+            description: 'Operator-token endpoint rate limit exceeded',
+            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+          },
         },
       },
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute', groupId: 'operator-token' } },
     },
     async (request, reply) => {
       const token = bootstrapToken(request.headers.authorization);

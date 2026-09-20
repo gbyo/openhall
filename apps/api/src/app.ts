@@ -13,7 +13,7 @@ import type { DB as Database, ReadinessProbe } from '@openhall/db';
 import type { Kysely } from 'kysely';
 import { createAuthDependencies } from './auth/dependencies.js';
 import { registerSessionContext } from './auth/session-context.js';
-import { safeRequestPath } from './http-privacy.js';
+import { carriedStatus, safeRequestPath, scrubForLog } from './http-privacy.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerBootstrapRoutes } from './routes/bootstrap.js';
 import { registerHealthRoutes } from './routes/health.js';
@@ -27,6 +27,13 @@ export interface CreateAppOptions {
   /** Test hook: captures the production logger output, config unchanged. */
   readonly loggerStream?: NodeJS.WritableStream;
   readonly webRoot?: string;
+  /**
+   * Test hook: skips registering the in-memory rate limiter so suites that
+   * legitimately exercise sensitive endpoints stay deterministic. Production
+   * always registers it; limiter behavior itself is covered by a dedicated
+   * suite with limits enabled.
+   */
+  readonly rateLimitDisabled?: boolean;
 }
 
 /**
@@ -113,7 +120,9 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   // not the security boundary; a school behind one NAT IP must still sign
   // in, so ordinary login traffic gets generous limits while operator-token
   // endpoints stay strict.
-  await typedApp.register(rateLimit, { global: false });
+  if (!options.rateLimitDisabled) {
+    await typedApp.register(rateLimit, { global: false });
+  }
 
   await typedApp.register(swagger, {
     openapi: {
@@ -144,23 +153,50 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   });
 
   // Normalize authentication errors to safe codes before logging: raw
-  // provider/OAuth payloads can carry protocol secrets.
+  // provider/OAuth payloads can carry protocol secrets. Status codes
+  // carried by the error (notably the rate limiter's 429) are preserved so
+  // abuse resistance stays distinguishable from internal failures.
   typedApp.setErrorHandler((error, request, reply) => {
     const isValidationError = typeof error === 'object' && error !== null && 'validation' in error;
-    const status = isValidationError ? 400 : 500;
+    const status = isValidationError ? 400 : carriedStatus(error);
+    const code = isValidationError
+      ? 'invalid_request'
+      : status === 429
+        ? 'rate_limited'
+        : 'internal_error';
     if (status === 500) {
-      request.log.error({ err: error, action: 'http_request_failed' }, 'Request failed');
+      // Backstop: unexpected failures are logged for diagnosis, but any
+      // protocol-secret fragments in the message or stack are redacted first.
+      const entry =
+        error instanceof Error
+          ? {
+              name: error.name,
+              message: scrubForLog(error.message),
+              stack: error.stack ? scrubForLog(error.stack) : undefined,
+            }
+          : { message: scrubForLog(String(error)) };
+      request.log.error({ err: entry, action: 'http_request_failed' }, 'Request failed');
     }
     void reply
       .status(status)
       .type('application/problem+json')
       .send({
-        type: `https://openhall.dev/problems/${isValidationError ? 'invalid_request' : 'internal_error'}`,
-        title: isValidationError ? 'Invalid request' : 'Internal server error',
+        type: `https://openhall.dev/problems/${code}`,
+        title:
+          status === 429
+            ? 'Too many requests'
+            : status === 400
+              ? 'Invalid request'
+              : 'Internal server error',
         status,
-        detail: isValidationError ? 'The request did not match the required contract.' : undefined,
+        detail:
+          status === 429
+            ? 'The request rate limit was exceeded. Retry later.'
+            : isValidationError
+              ? 'The request did not match the required contract.'
+              : undefined,
         instance: safeRequestPath(request.url),
-        code: isValidationError ? 'invalid_request' : 'internal_error',
+        code,
         requestId: request.id,
       });
   });

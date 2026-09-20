@@ -41,3 +41,18 @@ indexes were added.
 Locations are physical hierarchy nodes. Destinations are services that can accept movements.
 Sections meet in logical schedule blocks; templates give those blocks local wall-clock slots for a
 specific calendar day. No stored column claims a person's inferred current location.
+
+## Identity and secure sessions (migration 003)
+
+Migration 003 adds tenant slugs (backfilled from existing ids, unique,
+lowercase shape), identity providers (closed status/scopes/auth-method
+enums, revision-guarded), provider-linked identities keyed by
+`(issuer, subject)`, opaque sessions (token/CSRF digests, bigint revision,
+idle/absolute expiry, revocation with reason), one-time operator grants
+(digest-only, short lifetimes, atomic consumption on read), single setup
+drafts per grant, and one-time OIDC transactions (state/binding digests,
+encrypted PKCE secrets, purpose CHECKs, composite tenant/provider keys so a
+transaction cannot pair a tenant with another tenant's provider). Expiry
+columns carry `expires_at > created_at` CHECKs; session and grant digests
+carry uniqueness indexes. Temporal values cross the boundary as text with a
+UTC-pinned session for deterministic rendering.

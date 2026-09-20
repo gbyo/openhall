@@ -49,6 +49,7 @@ export class TestOidcProvider {
   /** Last issued tokens, so tests can prove they are never persisted. */
   lastAccessToken = '';
   lastIdToken = '';
+  lastRefreshToken = '';
 
   /** Mutable between logins so tests can change the asserted email. */
   email: string | undefined;
@@ -262,12 +263,15 @@ export class TestOidcProvider {
     this.rig.malformedIdToken = undefined;
     this.rig.subjectOverride = undefined;
     const accessToken = `test-access-${randomBytes(16).toString('hex')}`;
+    const refreshToken = `test-refresh-${randomBytes(16).toString('hex')}`;
     this.lastAccessToken = accessToken;
     this.lastIdToken = idToken;
+    this.lastRefreshToken = refreshToken;
     this.sendJson(response, 200, {
       access_token: accessToken,
       token_type: 'Bearer',
       expires_in: 3600,
+      refresh_token: refreshToken,
       id_token: idToken,
     });
   }

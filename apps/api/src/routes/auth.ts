@@ -48,9 +48,26 @@ const CallbackQuerySchema = Type.Object(
     state: Type.Optional(Type.String({ maxLength: 512 })),
     code: Type.Optional(Type.String({ maxLength: 4096 })),
     error: Type.Optional(Type.String({ maxLength: 200 })),
+    // Providers may append the RFC 9207 iss parameter. It is documented
+    // here but never trusted: the login transaction binds the exact
+    // provider, and the adapter enforces the iss binding on exchange.
+    iss: Type.Optional(Type.String({ maxLength: 2048 })),
   },
   { additionalProperties: true },
 );
+
+/**
+ * Redirect-only success contract. Description and headers document the 302
+ * without a body schema, so runtime response validation is unaffected while
+ * the generated OpenAPI names the status and headers deliberately.
+ */
+const RedirectFoundSchema = (description: string, setCookie: string) => ({
+  description,
+  headers: {
+    Location: { description: 'Redirect target', schema: { type: 'string' } },
+    'Set-Cookie': { description: setCookie, schema: { type: 'string' } },
+  },
+});
 
 const DiscoveryQuerySchema = Type.Object(
   {
@@ -211,6 +228,10 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
         params: StartParamsSchema,
         querystring: StartQuerySchema,
         response: {
+          302: RedirectFoundSchema(
+            'Redirect to the provider authorization URL',
+            'Fresh login-transaction binding cookie (HttpOnly, SameSite=Lax)',
+          ),
           400: {
             description: 'Login cannot start',
             content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
@@ -275,6 +296,12 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
         description:
           'OIDC callback. Always responds 302: success redirects to the safe local return path with a fresh HttpOnly session cookie; failure redirects to /?error=<code> with a safe machine-readable code. OIDC protections (state/browser binding/nonce/PKCE/replay) apply instead of the SPA CSRF header.',
         querystring: CallbackQuerySchema,
+        response: {
+          302: RedirectFoundSchema(
+            'Redirect to the return path (success) or /?error=<code> (failure)',
+            'Fresh session cookie on success (HttpOnly, SameSite=Lax)',
+          ),
+        },
       },
       config: { rateLimit: { max: 100, timeWindow: '1 minute' } },
     },
@@ -483,9 +510,13 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
             description: 'Invalid or expired recovery token',
             content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
           },
+          429: {
+            description: 'Recovery endpoint rate limit exceeded',
+            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+          },
         },
       },
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute', groupId: 'operator-token' } },
     },
     async (request, reply) => {
       const d = id();

@@ -8,6 +8,27 @@
  * globally in the Fastify composition root, not per route.
  */
 
+/**
+ * Preserves HTTP status codes carried by framework errors (notably the rate
+ * limiter's 429) instead of collapsing every failure to 500. Only
+ * well-formed 4xx/5xx codes pass through; anything else is an internal
+ * failure.
+ */
+export function carriedStatus(error: unknown): number {
+  if (typeof error === 'object' && error !== null && 'statusCode' in error) {
+    const carried = error.statusCode;
+    if (
+      typeof carried === 'number' &&
+      Number.isInteger(carried) &&
+      carried >= 400 &&
+      carried < 600
+    ) {
+      return carried;
+    }
+  }
+  return 500;
+}
+
 /** Returns only the pathname portion of an origin-form request URL. */
 export function safeRequestPath(url: string | undefined): string {
   if (url === undefined || url.length === 0) {

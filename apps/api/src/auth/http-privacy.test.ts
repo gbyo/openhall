@@ -103,4 +103,37 @@ describe('query-safe HTTP privacy', () => {
     // The request line itself must not carry the raw query string.
     expect(logs).not.toContain('code=');
   });
+
+  it('redacts protocol secrets from error logs and 500 bodies', async () => {
+    const chunks: string[] = [];
+    const stream = new Writable({
+      write(chunk, _encoding, callback) {
+        chunks.push(String(chunk));
+        callback();
+      },
+    });
+    const database = createDatabase('postgresql://unused:5432/unused');
+    const app = await createApp({
+      config,
+      database: database.database,
+      loggerStream: stream,
+      readinessProbe: {
+        check: () => Promise.resolve({ migration: '003_identity_secure_sessions' }),
+      },
+    });
+    app.get('/test-only-boom', () => {
+      throw new Error('ordinary failure with code=SUPER_SECRET_CODE');
+    });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/test-only-boom?code=SUPER_SECRET_CODE',
+    });
+    await app.close();
+    await database.destroy();
+    expect(response.statusCode).toBe(500);
+    expect(response.body).not.toContain('SUPER_SECRET_CODE');
+    const logs = chunks.join('\n');
+    expect(logs).toContain('/test-only-boom');
+    expect(logs).not.toContain('SUPER_SECRET_CODE');
+  });
 });

@@ -552,6 +552,34 @@
           }
         ],
         "responses": {
+          "302": {
+            "description": "Redirect to the provider authorization URL",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "description": "Redirect target"
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "description": "Fresh login-transaction binding cookie (HttpOnly, SameSite=Lax)"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Redirect to the provider authorization URL"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Login cannot start",
             "content": {
@@ -679,11 +707,45 @@
             "in": "query",
             "name": "error",
             "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "in": "query",
+            "name": "iss",
+            "required": false
           }
         ],
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "302": {
+            "description": "Redirect to the return path (success) or /?error=<code> (failure)",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "description": "Redirect target"
+              },
+              "Set-Cookie": {
+                "schema": {
+                  "schema": {
+                    "type": "string"
+                  }
+                },
+                "description": "Fresh session cookie on success (HttpOnly, SameSite=Lax)"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Redirect to the return path (success) or /?error=<code> (failure)"
+                }
+              }
+            }
           }
         }
       }
@@ -1029,6 +1091,51 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Recovery endpoint rate limit exceeded",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
           }
         }
       }
@@ -1319,6 +1426,51 @@
           },
           "409": {
             "description": "Installation already exists",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Operator-token endpoint rate limit exceeded",
             "content": {
               "application/problem+json": {
                 "schema": {

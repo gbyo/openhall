@@ -403,6 +403,115 @@ describe('migration 003 on PostgreSQL 18', () => {
     ).rejects.toThrow(/unique|duplicate/i);
   });
 
+  it('enforces expiry, enum, and relationship CHECKs', async () => {
+    const tenantId = await seedTenant('check-shapes');
+    const { accountId } = await seedAccount(tenantId);
+    // Grant expiry must be strictly after creation.
+    await expect(
+      pool.query(
+        "INSERT INTO local_operator_grant (purpose, token_hash, expires_at) VALUES ('bootstrap', $1, $2)",
+        [bytes(), toDatabaseInstant(NOW)],
+      ),
+    ).rejects.toThrow(/check/i);
+    // Unknown grant purposes are rejected.
+    await expect(
+      pool.query(
+        "INSERT INTO local_operator_grant (purpose, token_hash, expires_at) VALUES ('bogus', $1, $2)",
+        [bytes(), toDatabaseInstant(LATER)],
+      ),
+    ).rejects.toThrow(/check/i);
+    const sealed = secret('check-provider');
+    const sealedParts = [
+      Buffer.from(sealed.ciphertext),
+      Buffer.from(sealed.nonce),
+      Buffer.from(sealed.tag),
+    ];
+    // Provider status, scopes, and auth method are closed enums/shapes.
+    const badProviders: { key: string; authMethod: string; scopes: string; status: string }[] = [
+      {
+        key: 'check-status',
+        authMethod: 'client_secret_post',
+        scopes: '{openid,email}',
+        status: 'bogus',
+      },
+      {
+        key: 'check-scopes',
+        authMethod: 'client_secret_post',
+        scopes: '{email}',
+        status: 'active',
+      },
+      { key: 'check-method', authMethod: 'none', scopes: '{openid,email}', status: 'active' },
+    ];
+    for (const bad of badProviders) {
+      await expect(
+        pool.query(
+          `INSERT INTO identity_provider
+            (tenant_id, key, display_name, issuer, client_id,
+             client_secret_ciphertext, client_secret_nonce, client_secret_tag, client_secret_key_id,
+             token_endpoint_auth_method, scopes, status)
+           VALUES ($1, $2, 'Test Provider', 'https://provider.example.com',
+                   'client-1', $3, $4, $5, 'test-key-1', $6, $7, $8)`,
+          [tenantId, bad.key, ...sealedParts, bad.authMethod, bad.scopes, bad.status],
+        ),
+      ).rejects.toThrow(/check/i);
+    }
+    // Recovery grants must reference a real tenant: nothing forges across
+    // tenant boundaries.
+    await expect(
+      pool.query(
+        'INSERT INTO local_operator_grant (purpose, tenant_id, account_id, token_hash, expires_at) VALUES ($1, $2, $3, $4, $5)',
+        [
+          'recovery',
+          '00000000-0000-0000-0000-000000000000',
+          accountId,
+          bytes(),
+          toDatabaseInstant(LATER),
+        ],
+      ),
+    ).rejects.toThrow(/foreign key|violates/i);
+    // A login transaction cannot pair a tenant with another tenant's provider.
+    const otherTenant = await seedTenant('check-other');
+    const foreignProvider = await seedProvider(otherTenant, 'check-foreign');
+    await expect(
+      pool.query(
+        `INSERT INTO oidc_login_transaction
+          (tenant_id, identity_provider_id, purpose, state_hash, browser_binding_hash,
+           transaction_secret_ciphertext, transaction_secret_nonce, transaction_secret_tag,
+           transaction_secret_key_id, expires_at)
+         VALUES ($1, $2, 'login', $3, $4, $5, $6, $7, 'k', $8)`,
+        [
+          tenantId,
+          foreignProvider,
+          bytes(),
+          bytes(),
+          bytes(16),
+          bytes(12),
+          bytes(16),
+          toDatabaseInstant(LATER),
+        ],
+      ),
+    ).rejects.toThrow(/foreign key|violates/i);
+    // A bootstrap transaction must reference a real setup draft.
+    await expect(
+      pool.query(
+        `INSERT INTO oidc_login_transaction
+          (purpose, bootstrap_setup_id, state_hash, browser_binding_hash,
+           transaction_secret_ciphertext, transaction_secret_nonce, transaction_secret_tag,
+           transaction_secret_key_id, expires_at)
+         VALUES ('bootstrap', $1, $2, $3, $4, $5, $6, 'k', $7)`,
+        [
+          '00000000-0000-0000-0000-000000000000',
+          bytes(),
+          bytes(),
+          bytes(16),
+          bytes(12),
+          bytes(16),
+          toDatabaseInstant(LATER),
+        ],
+      ),
+    ).rejects.toThrow(/foreign key|violates/i);
+  });
+
   it('keeps digest uniqueness indexes in place', async () => {
     const indexes = await pool.query<{ indexname: string }>(
       `SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND indexname IN
