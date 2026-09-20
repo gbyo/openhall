@@ -1,3 +1,4 @@
+export * from './authentication/index.js';
 export * from './authorization/index.js';
 export * from './integrations/index.js';
 export * from './persistence.js';

@@ -43,3 +43,29 @@ PostgreSQL date/time scalars cross the database boundary as text through per-poo
 converted explicitly by `db` Temporal helpers. This prevents the Node process timezone from turning
 a school-local date into a different calendar day and keeps JavaScript `Date` out of scheduling
 domain/application code.
+
+## Identity, sessions, and operator flows (Phase 3)
+
+Login is OpenID Connect Authorization Code + PKCE (S256) through a generic
+adapter (`openid-client`) that lives in the API composition root behind the
+`OidcProtocolAdapter` port. Application services never import OIDC, HTTP,
+Fastify, Kysely, `pg`, or React code; the architecture boundary test enforces
+this. Discovery runs live on every flow with signature verification
+(`enableNonRepudiationChecks`); providers without S256 support are refused.
+
+Every login starts with a persisted one-time OIDC transaction claimed
+atomically on callback, so replays and concurrent callbacks fail closed.
+Canonical identity is `(issuer, subject)`; email is a snapshot, never a
+lookup key. Sessions are opaque server-side records (HMAC digests only,
+12-hour idle / 7-day absolute lifetimes) presented in `HttpOnly`
+`SameSite=Lax` cookies. SPA mutations require a stable per-session CSRF
+token (domain-separated HMAC of the session credential; `GET /auth/session`
+is read-only) plus an exact `Origin` (or same-origin `Referer`); OIDC
+redirects rely on transaction protections instead.
+
+The first installation is created by an operator bootstrap ceremony
+(one-time digested grant, setup draft, OIDC sign-in as founding admin with a
+tenant-scoped `system_admin` grant), and lockouts are recoverable through
+one-time recovery grants into short-lived sessions. Operator Bearer [REDACTED] travel
+in the `Authorization` header under strict per-process rate limits, which are
+abuse resistance rather than the security boundary. See ADR 0012 and ADR 0013.

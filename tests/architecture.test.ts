@@ -11,6 +11,11 @@ const boundaries: Readonly<Record<string, readonly RegExp[]>> = {
   'packages/application': [
     /@openhall\/(contracts|db|config|test-support)/,
     /from ['"](fastify|kysely|pg|react)/,
+    // Phase 3: the OIDC protocol adapter lives behind a port in the API
+    // composition root; openid-client and Node HTTP infrastructure must
+    // not cross into application services.
+    /from ['"]openid-client/,
+    /from ['"]node:http/,
   ],
   'packages/contracts': [
     /@openhall\/(domain|application|db|config|test-support)/,

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { LivenessSchema, ProblemDetailsSchema, ReadinessSchema } from '@openhall/contracts';
 import type { ReadinessProbe } from '@openhall/db';
+import { safeRequestPath } from '../http-privacy.js';
 
 export function registerHealthRoutes(app: FastifyInstance, readinessProbe: ReadinessProbe): void {
   const typedApp = app.withTypeProvider<TypeBoxTypeProvider>();
@@ -43,15 +44,18 @@ export function registerHealthRoutes(app: FastifyInstance, readinessProbe: Readi
         };
       } catch (error) {
         request.log.warn({ err: error, action: 'readiness_failed' }, 'Readiness check failed');
-        return reply.status(503).type('application/problem+json').send({
-          type: 'https://openhall.dev/problems/not_ready',
-          title: 'Service unavailable',
-          status: 503,
-          detail: 'A required dependency is unavailable or not current.',
-          instance: request.url,
-          code: 'not_ready',
-          requestId: request.id,
-        });
+        return reply
+          .status(503)
+          .type('application/problem+json')
+          .send({
+            type: 'https://openhall.dev/problems/not_ready',
+            title: 'Service unavailable',
+            status: 503,
+            detail: 'A required dependency is unavailable or not current.',
+            instance: safeRequestPath(request.url),
+            code: 'not_ready',
+            requestId: request.id,
+          });
       }
     },
   );

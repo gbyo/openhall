@@ -6,6 +6,8 @@ const validEnvironment = {
   APP_BASE_URL: 'https://openhall.example.edu',
   DATABASE_URL: 'postgresql://openhall:secret@db/openhall',
   APP_SECRET: 'a-secure-production-secret-that-is-long-enough',
+  DATA_ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+  DATA_ENCRYPTION_KEY_ID: 'prod-key-1',
   TRUST_PROXY: 'false',
   PORT: '3000',
 };
@@ -32,5 +34,60 @@ describe('loadConfig', () => {
 
   it('does not silently invent required settings', () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL is required/);
+  });
+
+  it('requires a bare-origin APP_BASE_URL for exact redirect construction', () => {
+    expect(() =>
+      loadConfig({ ...validEnvironment, APP_BASE_URL: 'https://openhall.example.edu/app' }),
+    ).toThrow(/must not include a path/);
+    expect(() =>
+      loadConfig({ ...validEnvironment, APP_BASE_URL: 'https://user@example.edu' }),
+    ).toThrow(/must not include credentials/);
+    expect(() =>
+      loadConfig({ ...validEnvironment, APP_BASE_URL: 'https://example.edu/?next=/x' }),
+    ).toThrow(/must not include a query or fragment/);
+  });
+
+  it('rejects the published development key in production but allows it elsewhere', () => {
+    const publishedHex = 'd1891fe393da7c992d51a8f99ec6ee3ea4646b3aa574d3fd1fa37be90725f01d';
+    expect(() => loadConfig({ ...validEnvironment, DATA_ENCRYPTION_KEY: publishedHex })).toThrow(
+      /fresh production key/,
+    );
+    const publishedBase64 = Buffer.from(publishedHex, 'hex').toString('base64');
+    expect(() => loadConfig({ ...validEnvironment, DATA_ENCRYPTION_KEY: publishedBase64 })).toThrow(
+      /fresh production key/,
+    );
+    const development = loadConfig({
+      ...validEnvironment,
+      NODE_ENV: 'development',
+      APP_BASE_URL: 'http://localhost:3000',
+      DATA_ENCRYPTION_KEY: publishedHex,
+      DATA_ENCRYPTION_KEY_ID: 'development-only-key-1',
+    });
+    expect(development.dataEncryptionKey.length).toBe(32);
+  });
+
+  it('requires exactly 256 bits of data-encryption key material', () => {
+    const key = loadConfig(validEnvironment).dataEncryptionKey;
+    expect(key.length).toBe(32);
+    expect(() => loadConfig({ ...validEnvironment, DATA_ENCRYPTION_KEY: 'short' })).toThrow(
+      /DATA_ENCRYPTION_KEY/,
+    );
+    expect(() =>
+      loadConfig({
+        ...validEnvironment,
+        DATA_ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdeg',
+      }),
+    ).toThrow(/DATA_ENCRYPTION_KEY/);
+    const base64 = loadConfig({
+      ...validEnvironment,
+      DATA_ENCRYPTION_KEY: Buffer.from(validEnvironment.DATA_ENCRYPTION_KEY, 'hex').toString(
+        'base64url',
+      ),
+    }).dataEncryptionKey;
+    expect(base64.length).toBe(32);
+    expect(() => loadConfig({ ...validEnvironment, DATA_ENCRYPTION_KEY_ID: '' })).toThrow(
+      /DATA_ENCRYPTION_KEY_ID is required/,
+    );
   });
 });

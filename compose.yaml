@@ -26,6 +26,8 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
       DATABASE_URL: postgresql://openhall:openhall-development-only@postgres:5432/openhall
       APP_SECRET: ${APP_SECRET:-development-only-change-this-secret-32-characters}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-d1891fe393da7c992d51a8f99ec6ee3ea4646b3aa574d3fd1fa37be90725f01d}
+      DATA_ENCRYPTION_KEY_ID: ${DATA_ENCRYPTION_KEY_ID:-development-only-key-1}
       TRUST_PROXY: ${TRUST_PROXY:-false}
       PORT: 3000
     depends_on:

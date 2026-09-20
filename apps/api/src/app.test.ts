@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AppConfig } from '@openhall/config';
+import { createDatabase } from '@openhall/db';
 import { createApp } from './app.js';
 
 const config: AppConfig = {
@@ -7,14 +8,18 @@ const config: AppConfig = {
   appBaseUrl: new URL('http://localhost:3000'),
   databaseUrl: 'postgresql://unused',
   appSecret: 'test-secret',
+  dataEncryptionKey: new Uint8Array(32).fill(7),
+  dataEncryptionKeyId: 'test-key-1',
   trustProxy: false,
   port: 3000,
 };
 
 describe('foundation HTTP API', () => {
   it('reports liveness and readiness without exposing configuration', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
     const app = await createApp({
       config,
+      database: database.database,
       logger: false,
       readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
     });
@@ -40,11 +45,14 @@ describe('foundation HTTP API', () => {
     expect(info.body).not.toContain('databaseUrl');
     expect(info.body).not.toContain('appSecret');
     await app.close();
+    await database.destroy();
   });
 
   it('returns RFC 9457-style Problem Details when the database is unavailable', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
     const app = await createApp({
       config,
+      database: database.database,
       logger: false,
       readinessProbe: { check: () => Promise.reject(new Error('connection refused')) },
     });
@@ -55,11 +63,14 @@ describe('foundation HTTP API', () => {
     expect(response.json()).toMatchObject({ status: 503, code: 'not_ready' });
     expect(response.body).not.toContain('connection refused');
     await app.close();
+    await database.destroy();
   });
 
   it('generates OpenAPI 3.1 from the registered route schemas', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
     const app = await createApp({
       config,
+      database: database.database,
       logger: false,
       readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
     });
@@ -74,5 +85,55 @@ describe('foundation HTTP API', () => {
       },
     });
     await app.close();
+    await database.destroy();
+  });
+
+  it('documents cookie AND CSRF in one requirement for protected mutations', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
+    const app = await createApp({
+      config,
+      database: database.database,
+      logger: false,
+      readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
+    });
+    await app.ready();
+    const document = app.swagger() as unknown as {
+      paths: Record<string, Record<string, { security?: Record<string, string[]>[] }>>;
+    };
+    for (const path of ['/api/v1/auth/logout', '/api/v1/auth/logout-all']) {
+      const security = document.paths[path]?.post?.security;
+      expect(security).toBeDefined();
+      // One requirement object must demand both schemes (AND). Separate
+      // objects would document OR.
+      expect(
+        security?.some((requirement) => 'cookieAuth' in requirement && 'csrfHeader' in requirement),
+      ).toBe(true);
+    }
+    await app.close();
+    await database.destroy();
+  });
+
+  it('documents /auth/session as anonymously callable while /me requires cookie auth', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
+    const app = await createApp({
+      config,
+      database: database.database,
+      logger: false,
+      readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
+    });
+    await app.ready();
+    const document = app.swagger() as unknown as {
+      paths: Record<string, Record<string, { security?: Record<string, string[]>[] }>>;
+    };
+    const sessionSecurity = document.paths['/api/v1/auth/session']?.get?.security;
+    expect(sessionSecurity).toBeDefined();
+    expect(sessionSecurity?.some((requirement) => Object.keys(requirement).length === 0)).toBe(
+      true,
+    );
+    expect(sessionSecurity?.some((requirement) => 'cookieAuth' in requirement)).toBe(true);
+    const meSecurity = document.paths['/api/v1/me']?.get?.security;
+    expect(meSecurity).toEqual([{ cookieAuth: [] }]);
+    await app.close();
+    await database.destroy();
   });
 });

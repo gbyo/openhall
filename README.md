@@ -2,8 +2,14 @@
 
 OpenHall is an open-source, self-hosted school presence and movement platform. This repository is
 currently an **early development release and is not production-ready**. School-local expected
-placement is implemented internally; authentication, HTTP exposure for student data, pass
-workflows, and policy execution are intentionally incomplete.
+placement, OIDC login with opaque sessions, and operator bootstrap/recovery are implemented;
+HTTP exposure for student data, pass workflows, and policy execution are intentionally
+incomplete.
+
+First run creates the installation through an operator bootstrap ceremony: issue a bootstrap
+grant with the operator CLI, prepare the setup draft, and complete OIDC sign-in as the founding
+administrator. See [docs/architecture.md](docs/architecture.md) and
+[docs/adr/0013-operator-bootstrap-recovery.md](docs/adr/0013-operator-bootstrap-recovery.md).
 
 The architecture distinguishes three facts that must never be conflated:
 
@@ -36,6 +42,17 @@ The production image serves the built web shell from the API origin.
 For the containerized evaluation path, run `docker compose up --build`. Compose runs migrations as
 an explicit one-shot job before it starts the application. Advanced deployments can run
 `node node_modules/@openhall/db/dist/cli.js` from the application image as a separate release step.
+
+The first run needs an operator bootstrap grant (raw token on stdout, shown once, never logged):
+
+```sh
+docker compose exec app node dist/operator-cli.js operator bootstrap issue
+docker compose exec app node dist/operator-cli.js operator recovery issue --tenant <slug> --account <uuid>
+```
+
+Open the setup page, paste the bootstrap token when asked, and complete OIDC sign-in as the
+founding administrator. Recovery grants are break-glass only: they mint a 30-minute session for
+an existing `system_admin` account.
 
 ## Verification
 

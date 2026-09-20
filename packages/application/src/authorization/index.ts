@@ -1,11 +1,7 @@
-import type { AccountId, OrganizationId, PersonId } from '@openhall/domain';
+import type { OrganizationId } from '@openhall/domain';
+import type { Principal } from '../authentication/principal.js';
 
-export interface Principal {
-  readonly tenantId: string;
-  readonly accountId: AccountId;
-  readonly personId: PersonId;
-  readonly sessionRevision: number;
-}
+export type { Principal } from '../authentication/principal.js';
 
 export type AuthorizationScope =
   | { readonly kind: 'tenant' }
