@@ -85,6 +85,15 @@ export interface NewSession {
 
 export interface SessionRepository {
   create(context: TenantTransactionContext, input: NewSession): Promise<SessionRecord>;
+  /**
+   * Rotates the session CSRF token digest. The session endpoint issues a
+   * fresh raw CSRF value on every authenticated read, so only digests rest.
+   */
+  rotateCsrfToken(
+    context: TenantTransactionContext,
+    sessionId: string,
+    csrfTokenDigest: Uint8Array,
+  ): Promise<void>;
   touchLastSeen(
     context: TenantTransactionContext,
     sessionId: string,

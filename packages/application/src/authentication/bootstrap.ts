@@ -157,7 +157,8 @@ export async function prepareBootstrap(
   input: PrepareBootstrapInput,
   dependencies: PrepareBootstrapDependencies,
 ): Promise<PreparedBootstrap> {
-  return dependencies.runner.run(async (system) => {
+  // Phase 1 (short transaction): grant + field validation, no network.
+  const prepared = await dependencies.runner.run(async () => {
     const now = dependencies.clock.now();
     const digest = dependencies.digester.digest(decodeOperatorToken(input.operatorToken));
     const grant = await dependencies.grants.findValidByTokenDigest(digest, now);
@@ -203,34 +204,40 @@ export async function prepareBootstrap(
     if (input.providerClientSecret.length === 0 || input.providerClientSecret.length > 2000) {
       throw new AuthenticationError('invalid_bootstrap_draft', 'Invalid provider client secret');
     }
-    const configuration = {
-      issuer: draft.providerIssuer,
-      clientId: draft.providerClientId,
-      clientSecret: input.providerClientSecret,
-      tokenEndpointAuthMethod: draft.providerAuthMethod,
-      scopes: [...draft.providerScopes],
-      allowInsecureHttp: dependencies.allowInsecureHttp,
-    };
-    try {
-      await dependencies.adapter.validateProviderConfiguration(configuration);
-    } catch (error) {
-      if (error instanceof AuthenticationError) {
-        throw error;
-      }
-      throw new AuthenticationError('provider_configuration_unsupported');
+    return { grantId: grant.id, draft };
+  });
+  const configuration = {
+    issuer: prepared.draft.providerIssuer,
+    clientId: prepared.draft.providerClientId,
+    clientSecret: input.providerClientSecret,
+    tokenEndpointAuthMethod: prepared.draft.providerAuthMethod,
+    scopes: [...prepared.draft.providerScopes],
+    allowInsecureHttp: dependencies.allowInsecureHttp,
+  };
+  // Phase 2 (network, no transaction): live provider validation.
+  try {
+    await dependencies.adapter.validateProviderConfiguration(configuration);
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      throw error;
     }
+    throw new AuthenticationError('provider_configuration_unsupported');
+  }
+  // Phase 3 (short transaction): draft + login transaction persistence.
+  const staged = await dependencies.runner.run(async (system) => {
+    const now = dependencies.clock.now();
     const withSecret: BootstrapDraftInput = {
-      ...draft,
+      ...prepared.draft,
       providerSecret: dependencies.protector.protect(
         input.providerClientSecret,
-        bootstrapSecretContext(grant.id),
+        bootstrapSecretContext(prepared.grantId),
       ),
     };
-    const existing = await dependencies.drafts.findByGrantId(system, grant.id);
+    const existing = await dependencies.drafts.findByGrantId(system, prepared.grantId);
     const setup =
       existing !== undefined && existing.completedAt === null
         ? await dependencies.drafts.updateDraft(system, existing.id, withSecret)
-        : await dependencies.drafts.createDraft(system, grant.id, withSecret);
+        : await dependencies.drafts.createDraft(system, prepared.grantId, withSecret);
     const state = toBase64Url(dependencies.random.randomBytes(32));
     const nonce = toBase64Url(dependencies.random.randomBytes(32));
     const verifier = toBase64Url(dependencies.random.randomBytes(32));
@@ -249,15 +256,17 @@ export async function prepareBootstrap(
       returnPath: normalizeReturnPath('/'),
       expiresAt: now.add({ seconds: BOOTSTRAP_TRANSACTION_TTL_SECONDS }),
     });
-    const authorizationUrl = await dependencies.adapter.buildAuthorizationUrl({
-      configuration,
-      redirectUri: dependencies.redirectUri,
-      state,
-      nonce,
-      codeChallenge: pkceChallenge(verifier, dependencies.hasher),
-    });
-    return { authorizationUrl, state };
+    return { state, nonce, verifier };
   });
+  // Phase 4 (network, no transaction): authorization redirect.
+  const authorizationUrl = await dependencies.adapter.buildAuthorizationUrl({
+    configuration,
+    redirectUri: dependencies.redirectUri,
+    state: staged.state,
+    nonce: staged.nonce,
+    codeChallenge: pkceChallenge(staged.verifier, dependencies.hasher),
+  });
+  return { authorizationUrl, state: staged.state };
 }
 
 function decodeOperatorToken(raw: string): Uint8Array {

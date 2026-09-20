@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AppConfig } from '@openhall/config';
+import { createDatabase } from '@openhall/db';
 import { createApp } from './app.js';
 
 const config: AppConfig = {
@@ -15,8 +16,10 @@ const config: AppConfig = {
 
 describe('foundation HTTP API', () => {
   it('reports liveness and readiness without exposing configuration', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
     const app = await createApp({
       config,
+      database: database.database,
       logger: false,
       readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
     });
@@ -42,11 +45,14 @@ describe('foundation HTTP API', () => {
     expect(info.body).not.toContain('databaseUrl');
     expect(info.body).not.toContain('appSecret');
     await app.close();
+    await database.destroy();
   });
 
   it('returns RFC 9457-style Problem Details when the database is unavailable', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
     const app = await createApp({
       config,
+      database: database.database,
       logger: false,
       readinessProbe: { check: () => Promise.reject(new Error('connection refused')) },
     });
@@ -57,11 +63,14 @@ describe('foundation HTTP API', () => {
     expect(response.json()).toMatchObject({ status: 503, code: 'not_ready' });
     expect(response.body).not.toContain('connection refused');
     await app.close();
+    await database.destroy();
   });
 
   it('generates OpenAPI 3.1 from the registered route schemas', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
     const app = await createApp({
       config,
+      database: database.database,
       logger: false,
       readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
     });
@@ -76,5 +85,6 @@ describe('foundation HTTP API', () => {
       },
     });
     await app.close();
+    await database.destroy();
   });
 });

@@ -75,7 +75,9 @@ function providerSecretContext(tenantId: string, providerId: string): string {
 /**
  * Starts a normal OIDC login: validates tenant/provider, persists a durable
  * login transaction holding only digests plus an encrypted PKCE
- * verifier/nonce bundle, and returns the provider authorization URL.
+ * verifier/nonce bundle, and returns the provider authorization URL. The
+ * database transaction is never held open across provider network calls:
+ * persistence completes first, then discovery/URL building runs outside it.
  */
 export async function beginOidcLogin(
   input: BeginLoginInput,
@@ -85,7 +87,7 @@ export async function beginOidcLogin(
   if (tenant === undefined || tenant.status !== 'active') {
     throw new AuthenticationError('auth_provider_unavailable');
   }
-  return dependencies.runner.run(tenant.id, async (context) => {
+  const prepared = await dependencies.runner.run(tenant.id, async (context) => {
     const provider = await dependencies.directory.findProviderByKey(
       context,
       input.providerKey.trim().toLowerCase(),
@@ -118,26 +120,37 @@ export async function beginOidcLogin(
       returnPath: normalizeReturnPath(input.returnPath),
       expiresAt: now.add({ seconds: OIDC_TRANSACTION_TTL_SECONDS }),
     });
-    const clientSecret = dependencies.protector.reveal(
-      provider.clientSecret,
-      providerSecretContext(tenant.id, provider.id),
-    );
-    const authorizationUrl = await dependencies.adapter.buildAuthorizationUrl({
-      configuration: {
-        issuer: issuer.issuer,
-        clientId: provider.clientId,
-        clientSecret,
-        tokenEndpointAuthMethod: provider.tokenEndpointAuthMethod,
-        scopes: [...scopes],
-        allowInsecureHttp: issuer.insecureHttp,
-      },
-      redirectUri: dependencies.redirectUri,
+    return {
+      issuer,
+      providerId: provider.id,
+      clientId: provider.clientId,
+      clientSecret: provider.clientSecret,
+      tokenEndpointAuthMethod: provider.tokenEndpointAuthMethod,
+      scopes: [...scopes],
       state,
       nonce,
-      codeChallenge: pkceChallenge(verifier, dependencies.hasher),
-    });
-    return { authorizationUrl, state };
+      verifier,
+    };
   });
+  const clientSecret = dependencies.protector.reveal(
+    prepared.clientSecret,
+    providerSecretContext(tenant.id, prepared.providerId),
+  );
+  const authorizationUrl = await dependencies.adapter.buildAuthorizationUrl({
+    configuration: {
+      issuer: prepared.issuer.issuer,
+      clientId: prepared.clientId,
+      clientSecret,
+      tokenEndpointAuthMethod: prepared.tokenEndpointAuthMethod,
+      scopes: prepared.scopes,
+      allowInsecureHttp: prepared.issuer.insecureHttp,
+    },
+    redirectUri: dependencies.redirectUri,
+    state: prepared.state,
+    nonce: prepared.nonce,
+    codeChallenge: pkceChallenge(prepared.verifier, dependencies.hasher),
+  });
+  return { authorizationUrl, state: prepared.state };
 }
 
 function decodeBinding(raw: string): Uint8Array {
@@ -156,7 +169,7 @@ export interface CompleteLoginInput {
   readonly callbackUrl: string;
   readonly requestId: string;
   /** Previously valid session presenting this browser, if any. */
-  readonly supersededSession?: SessionRecord;
+  readonly supersededSession: SessionRecord | undefined;
 }
 
 export interface CompletedLogin {

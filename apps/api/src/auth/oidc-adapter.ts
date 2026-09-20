@@ -153,7 +153,9 @@ export class OpenIdClientAdapter implements OidcProtocolAdapter {
     if (claims === undefined || typeof claims.sub !== 'string' || claims.sub.length === 0) {
       throw new AuthenticationError('auth_provider_unavailable');
     }
-    const email = typeof claims.email === 'string' ? claims.email : undefined;
-    return { issuer: claims.iss, subject: claims.sub, email };
+    if (typeof claims.email === 'string') {
+      return { issuer: claims.iss, subject: claims.sub, email: claims.email };
+    }
+    return { issuer: claims.iss, subject: claims.sub };
   }
 }

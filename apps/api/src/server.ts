@@ -7,6 +7,7 @@ const config = loadConfig();
 const databaseHandle = createDatabase(config.databaseUrl);
 const app = await createApp({
   config,
+  database: databaseHandle.database,
   readinessProbe: new PostgresReadinessProbe(databaseHandle.database),
   webRoot: path.resolve(process.cwd(), 'apps/web/dist'),
 });

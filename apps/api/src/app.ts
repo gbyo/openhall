@@ -1,24 +1,44 @@
 import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
+import cookie from '@fastify/cookie';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import fastifyStatic from '@fastify/static';
 import { TypeBoxValidatorCompiler } from '@fastify/type-provider-typebox';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import type { AppConfig } from '@openhall/config';
-import type { ReadinessProbe } from '@openhall/db';
+import type { DB as Database, ReadinessProbe } from '@openhall/db';
+import type { Kysely } from 'kysely';
+import { createAuthDependencies } from './auth/dependencies.js';
+import { registerSessionContext } from './auth/session-context.js';
 import { safeRequestPath } from './http-privacy.js';
+import { registerAuthRoutes } from './routes/auth.js';
+import { registerBootstrapRoutes } from './routes/bootstrap.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerSystemRoutes } from './routes/system.js';
 
 export interface CreateAppOptions {
   readonly config: AppConfig;
+  readonly database: Kysely<Database>;
   readonly readinessProbe: ReadinessProbe;
   readonly logger?: boolean;
   readonly webRoot?: string;
 }
 
+/**
+ * Sensitive paths always carry Cache-Control: no-store: auth session
+ * payloads, identity, bootstrap/recovery exchanges, and OIDC callbacks.
+ */
+const NO_STORE_PREFIXES = [
+  '/api/v1/auth/',
+  '/api/v1/me',
+  '/api/v1/bootstrap/',
+] as const;
+
 export async function createApp(options: CreateAppOptions): Promise<FastifyInstance> {
+  const isProduction = options.config.nodeEnv === 'production';
   const app = Fastify({
     trustProxy: options.config.trustProxy,
     genReqId: () => randomUUID(),
@@ -65,6 +85,37 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
 
   const typedApp = app.withTypeProvider<TypeBoxTypeProvider>();
 
+  // Security headers first. Production enables HSTS; plain-HTTP localhost
+  // development never forces it. OIDC is top-level navigation, so IdPs stay
+  // out of connect-src.
+  await typedApp.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'none'"],
+        formAction: ["'self'"],
+      },
+    },
+    referrerPolicy: { policy: 'no-referrer' },
+    ...(isProduction ? {} : { hsts: false }),
+  });
+
+  // Cookie parsing before any hook that reads cookies. Cookies are opaque
+  // random bearers and are never signed: modified values simply miss lookup.
+  await typedApp.register(cookie);
+
+  // Abuse resistance for sensitive endpoints only. Limits are per process,
+  // not the security boundary; a school behind one NAT IP must still sign
+  // in, so ordinary login traffic gets generous limits while operator-token
+  // endpoints stay strict.
+  await typedApp.register(rateLimit, { global: false });
+
   await typedApp.register(swagger, {
     openapi: {
       openapi: '3.1.0',
@@ -74,9 +125,27 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
         version: '0.1.0',
       },
       servers: [{ url: options.config.appBaseUrl.origin }],
+      components: {
+        securitySchemes: {
+          cookieAuth: {
+            type: 'apiKey',
+            in: 'cookie',
+            name: '__Host-openhall_session',
+            description: 'Opaque server-side session bearer (development: openhall_session_dev).',
+          },
+          csrfHeader: {
+            type: 'apiKey',
+            in: 'header',
+            name: 'X-CSRF-Token',
+            description: 'Per-session CSRF token from GET /api/v1/auth/session.',
+          },
+        },
+      },
     },
   });
 
+  // Normalize authentication errors to safe codes before logging: raw
+  // provider/OAuth payloads can carry protocol secrets.
   typedApp.setErrorHandler((error, request, reply) => {
     const isValidationError = typeof error === 'object' && error !== null && 'validation' in error;
     const status = isValidationError ? 400 : 500;
@@ -108,8 +177,19 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     });
   });
 
+  typedApp.addHook('onSend', async (request, reply) => {
+    const pathname = safeRequestPath(request.url);
+    if (NO_STORE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix))) {
+      void reply.header('Cache-Control', 'no-store');
+    }
+  });
+
+  const dependencies = createAuthDependencies(options.config, options.database);
+  await registerSessionContext(typedApp, { dependencies });
   registerHealthRoutes(typedApp, options.readinessProbe);
   registerSystemRoutes(typedApp);
+  registerAuthRoutes(typedApp, dependencies);
+  registerBootstrapRoutes(typedApp, dependencies);
 
   typedApp.get(
     '/api/openapi.json',

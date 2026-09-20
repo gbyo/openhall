@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AppConfig } from '@openhall/config';
+import { createDatabase } from '@openhall/db';
 import { createApp } from '../src/app.js';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -16,14 +17,17 @@ const config: AppConfig = {
   trustProxy: false,
   port: 3000,
 };
+const database = createDatabase('postgresql://unused:5432/unused');
 const app = await createApp({
   config,
+  database: database.database,
   logger: false,
   readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
 });
 await app.ready();
 const rendered = `${JSON.stringify(app.swagger(), null, 2)}\n`;
 await app.close();
+await database.destroy();
 
 if (process.argv.includes('--check')) {
   const committed = await readFile(outputPath, 'utf8');
