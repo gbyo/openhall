@@ -633,6 +633,20 @@ describe('POST /api/v1/students/:studentId/passes', () => {
     expect(response.statusCode).toBe(201);
   });
 
+  it('denies unauthorized staff without revealing student existence', async () => {
+    // Authorization precedes the student lookup, so a caller without
+    // authority learns nothing from missing versus active student IDs.
+    if (teacher === null) throw new Error('teacher fixture missing');
+    const missing = await app.inject({
+      method: 'POST',
+      url: `/api/v1/students/${randomUUID()}/passes`,
+      headers: authHeaders({ cookie: teacher.cookie, csrf: teacher.csrf }, randomUUID()),
+      payload: { destinationId: destinationA },
+    });
+    expect(missing.statusCode).toBe(403);
+    expect(missing.json<{ code: string }>().code).toBe('forbidden');
+  });
+
   it('denies staff authority from another school', async () => {
     const student = await makeStudent(tenantA, schoolA, 'WrongSchool');
     if (schoolBCounselor === null) throw new Error('school B counselor missing');
@@ -856,6 +870,8 @@ describe('pass command durability', () => {
   });
 
   it('conceals cross-tenant students from staff requests', async () => {
+    // Authorization precedes the lookup, so staff cannot probe whether an
+    // unknown ID belongs to a student elsewhere: 403 either way.
     const outsiderId = await insertReturningId(
       `INSERT INTO person (tenant_id, given_name, family_name, display_name) VALUES ((SELECT tenant_id FROM organization WHERE id = $1), 'X', 'Y', 'X Y') RETURNING id`,
       [tenantBSchool],
@@ -867,7 +883,8 @@ describe('pass command durability', () => {
       headers: authHeaders({ cookie: counselor.cookie, csrf: counselor.csrf }, randomUUID()),
       payload: { destinationId: destinationA },
     });
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(403);
+    expect(response.json<{ code: string }>().code).toBe('forbidden');
   });
 
   it('snapshots block-only placement without fabricating section or room', async () => {
@@ -905,6 +922,14 @@ describe('pass command durability', () => {
     expect(metadata.origin.kind).toBe('block_only');
     expect(metadata.origin.blockId).toBe(row?.origin_schedule_block_id);
     expect(metadata.origin.sectionId).toBeUndefined();
+    const active = await app.inject({
+      method: 'GET',
+      url: '/api/v1/me/passes/active',
+      headers: { cookie: `openhall_session_dev=${student.cookie}` },
+    });
+    expect(active.json<{ pass: PassBody }>().pass.origin.placementKind).toBe(
+      body.pass.origin.placementKind,
+    );
   });
 
   it('records ambiguous placement without candidate IDs', async () => {
@@ -920,7 +945,9 @@ describe('pass command durability', () => {
     );
     expect(created.statusCode).toBe(201);
     const body = created.json<{ pass: PassBody }>();
-    expect(body.pass.origin.placementKind).toBe('ambiguous');
+    // The create response matches later reads, which derive the kind from
+    // stored row fields; the detailed snapshot stays in pass.requested.
+    expect(body.pass.origin.placementKind).toBe('unresolved');
     expect(body.pass.origin.section).toBeNull();
     const metadata = (
       await pool.query<{ metadata: unknown }>(
@@ -948,7 +975,7 @@ describe('pass command durability', () => {
     });
     expect(response.statusCode).toBe(201);
     const body = response.json<{ pass: PassBody }>();
-    expect(body.pass.origin.placementKind).toBe('calendar_not_configured');
+    expect(body.pass.origin.placementKind).toBe('unresolved');
     expect(body.pass.origin.block).toBeNull();
     expect(body.pass.origin.section).toBeNull();
     expect(body.pass.origin.location).toBeNull();

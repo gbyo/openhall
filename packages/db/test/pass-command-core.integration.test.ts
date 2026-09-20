@@ -78,6 +78,7 @@ interface SchoolFixture {
   studentA: string;
   locationA: string;
   locationB: string;
+  destinationA: string;
   destinationB: string;
 }
 
@@ -128,7 +129,22 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
       [tenantId, schoolB, locationB],
     ),
   );
-  return { tenantId, schoolA, schoolB, studentA, locationA, locationB, destinationB };
+  const destinationA = idOf(
+    await target.query<{ id: string }>(
+      `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'restroom', 'Restroom A') RETURNING id`,
+      [tenantId, schoolA, locationA],
+    ),
+  );
+  return {
+    tenantId,
+    schoolA,
+    schoolB,
+    studentA,
+    locationA,
+    locationB,
+    destinationA,
+    destinationB,
+  };
 }
 
 describe('migration 005 pass command core', () => {
@@ -280,9 +296,9 @@ describe('migration 005 pass command core', () => {
       await expect(
         scratch.query(
           `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, origin_schedule_block_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, $5, 'student_web', 'requested')`,
-          [fixture.tenantId, fixture.schoolA, fixture.studentA, fixture.destinationB, blockB],
+          [fixture.tenantId, fixture.schoolA, fixture.studentA, fixture.destinationA, blockB],
         ),
-      ).rejects.toThrow(/pass_phase5/);
+      ).rejects.toThrow(/pass_phase5_origin_block_same_school/);
     } finally {
       await scratch.end();
     }

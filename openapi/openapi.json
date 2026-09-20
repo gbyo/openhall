@@ -2865,9 +2865,7 @@
         ],
         "security": [
           {
-            "cookieAuth": []
-          },
-          {
+            "cookieAuth": [],
             "csrfHeader": []
           }
         ],
@@ -3333,9 +3331,7 @@
         ],
         "security": [
           {
-            "cookieAuth": []
-          },
-          {
+            "cookieAuth": [],
             "csrfHeader": []
           }
         ],
@@ -4084,9 +4080,7 @@
         ],
         "security": [
           {
-            "cookieAuth": []
-          },
-          {
+            "cookieAuth": [],
             "csrfHeader": []
           }
         ],

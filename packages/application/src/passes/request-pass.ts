@@ -24,7 +24,7 @@ import {
   requireIdempotencyKey,
 } from './idempotency.js';
 import type { PassRepository, PassRow } from './ports.js';
-import { etagForPass, type PassRepresentation } from './representations.js';
+import { etagForPass, placementKindFromRow, type PassRepresentation } from './representations.js';
 
 export interface RequestPassDependencies {
   readonly clock: Clock;
@@ -221,6 +221,39 @@ async function executeRequest(
       } catch {
         throw new PassApplicationError('destination_not_found', 'Destination not found.');
       }
+      // Staff callers authorize before the student lookup so unauthorized
+      // callers cannot distinguish missing students from active ones.
+      const authorizeStaff = async (): Promise<void> => {
+        const orgDecision = await authorization.decideWithContext(context, {
+          principal,
+          capability: 'pass.create.student',
+          resource: { kind: 'student', organizationId: schoolId, studentId: targetStudentId },
+          at: now,
+        });
+        if (!orgDecision.allowed) {
+          if (orgDecision.reason === 'recovery_session_restricted') {
+            throw denyToPassError(orgDecision.reason);
+          }
+          if (placement.kind === 'resolved') {
+            const sectionDecision = await authorization.decideWithContext(context, {
+              principal,
+              capability: 'pass.create.student',
+              resource: {
+                kind: 'student_in_section',
+                sectionId: placement.section.id,
+                studentId: targetStudentId,
+              },
+              at: now,
+            });
+            if (!sectionDecision.allowed) throw denyToPassError(sectionDecision.reason);
+          } else {
+            throw denyToPassError(orgDecision.reason);
+          }
+        }
+      };
+      if (!authorizeSelf) {
+        await authorizeStaff();
+      }
       const active = await passes.loadActiveStudent(context, schoolId, targetStudentId, schoolDate);
       if (active === null) {
         if (authorizeSelf) {
@@ -254,33 +287,6 @@ async function executeRequest(
           at: now,
         });
         if (!decision.allowed) throw denyToPassError(decision.reason);
-      } else {
-        const orgDecision = await authorization.decideWithContext(context, {
-          principal,
-          capability: 'pass.create.student',
-          resource: { kind: 'student', organizationId: schoolId, studentId: targetStudentId },
-          at: now,
-        });
-        if (!orgDecision.allowed) {
-          if (orgDecision.reason === 'recovery_session_restricted') {
-            throw denyToPassError(orgDecision.reason);
-          }
-          if (placement.kind === 'resolved') {
-            const sectionDecision = await authorization.decideWithContext(context, {
-              principal,
-              capability: 'pass.create.student',
-              resource: {
-                kind: 'student_in_section',
-                sectionId: placement.section.id,
-                studentId: targetStudentId,
-              },
-              at: now,
-            });
-            if (!sectionDecision.allowed) throw denyToPassError(sectionDecision.reason);
-          } else {
-            throw denyToPassError(orgDecision.reason);
-          }
-        }
       }
       const snapshot = snapshotPlacement(placement);
       const aggregate = createRequestedPass({
@@ -364,7 +370,10 @@ async function executeRequest(
           destinationId,
         },
       });
-      const representation = toRepresentation(row, snapshot.kind);
+      // Derive the placement kind from the stored row, exactly as later
+      // reads do, so the create response matches subsequent GETs. The
+      // detailed snapshot stays in the pass.requested event metadata.
+      const representation = toRepresentation(row, placementKindFromRow(row));
       return {
         representation,
         etag: etagForPass(row.id, row.revision),

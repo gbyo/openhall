@@ -23,7 +23,7 @@ import type { PassDependencies } from '../passes/dependencies.js';
 import { safeRequestPath } from '../http-privacy.js';
 
 const COOKIE_SECURITY = [{ cookieAuth: [] as string[] }];
-const COOKIE_CSRF_SECURITY = [{ cookieAuth: [] as string[] }, { csrfHeader: [] as string[] }];
+const COOKIE_CSRF_SECURITY = [{ cookieAuth: [] as string[], csrfHeader: [] as string[] }];
 
 const StudentIdParamsSchema = Type.Object(
   { studentId: UuidSchema },
