@@ -724,7 +724,24 @@ export class RelationshipAuthorizationService {
     const date = schoolDateFor(at, organization.timeZone);
     if (date === null) return deny('invalid_school_time_zone');
 
-    // Target must hold an active student section membership here.
+    // Target must first hold an active student school membership in the
+    // section's canonical school: a section relationship never resurrects
+    // authority over someone no longer an active student there. Membership
+    // dates stay inclusive on the school-local date; grant instants are a
+    // separate half-open concept evaluated elsewhere.
+    const targetSchoolMemberships = await this.repository.listPersonMemberships(
+      context,
+      resource.studentId,
+    );
+    const targetActiveStudent = targetSchoolMemberships.some(
+      (targetMembership) =>
+        targetMembership.organizationId === organization.id &&
+        targetMembership.affiliation === 'student' &&
+        membershipActiveOn(targetMembership, date),
+    );
+    if (!targetActiveStudent) return deny('target_not_active_student');
+
+    // Then the target must hold an active student section membership here.
     const targetSection = await this.repository.checkSectionMembership(
       context,
       section.id,

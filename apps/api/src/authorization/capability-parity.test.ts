@@ -25,18 +25,52 @@ describe('capability vocabulary parity', () => {
     expect(contractLiterals()).not.toContain('teacher');
   });
 
-  it('invalid capability/resource combinations fail compilation', () => {
+  it('capability/resource compatibility holds at compile time', () => {
     function accepts<C extends Capability>(
       capability: C,
       resource: ResourceByCapability[C],
     ): [C, ResourceByCapability[C]] {
       return [capability, resource];
     }
-    accepts('self.read', { kind: 'self' });
-    accepts('pass.approve.section', { kind: 'student_in_section', sectionId: 's', studentId: 'p' });
+    // Valid mappings compile without casts.
+    accepts('schedule.manage', { kind: 'organization', organizationId: 'org-1' });
+    accepts('pass.request.self', {
+      kind: 'student',
+      organizationId: 'org-1',
+      studentId: 'person-1',
+    });
+    accepts('pass.create.student', {
+      kind: 'student',
+      organizationId: 'org-1',
+      studentId: 'person-1',
+    });
+    accepts('pass.create.student', {
+      kind: 'student_in_section',
+      sectionId: 'sec-1',
+      studentId: 'person-1',
+    });
+    accepts('pass.approve.section', {
+      kind: 'student_in_section',
+      sectionId: 'sec-1',
+      studentId: 'person-1',
+    });
+    accepts('destination.station.manage', { kind: 'destination', destinationId: 'dest-1' });
+    accepts('identity.manage', { kind: 'tenant' });
+    // Invalid mappings fail for the capability/resource mismatch, using
+    // well-formed resources of the wrong kind.
     // @ts-expect-error schedule.manage is not applicable to self resources.
     accepts('schedule.manage', { kind: 'self' });
-    // @ts-expect-error pass.approve.section requires a student_in_section resource.
-    accepts('pass.approve.section', { kind: 'tenant' });
+    // @ts-expect-error pass.request.self requires a student resource.
+    accepts('pass.request.self', { kind: 'organization', organizationId: 'org-1' });
+    accepts('pass.approve.section', {
+      // @ts-expect-error pass.approve.section requires a student_in_section resource.
+      kind: 'student',
+      organizationId: 'org-1',
+      studentId: 'person-1',
+    });
+    // @ts-expect-error destination.station.manage requires a destination resource.
+    accepts('destination.station.manage', { kind: 'organization', organizationId: 'org-1' });
+    // @ts-expect-error identity.manage requires a tenant resource.
+    accepts('identity.manage', { kind: 'organization', organizationId: 'org-1' });
   });
 });

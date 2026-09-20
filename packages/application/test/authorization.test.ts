@@ -302,6 +302,40 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
   facts.sectionMemberships.set('sec-a2|s3|student', sectionMembership('sec-a2', 's3', 'student'));
   facts.sectionMemberships.set('sec-b1|s4|student', sectionMembership('sec-b1', 's4', 'student'));
 
+  // Stale-target fixtures: active section membership paired with a
+  // non-current school membership.
+  facts.memberships.set('s6', []);
+  facts.sectionMemberships.set('sec-a1|s6|student', sectionMembership('sec-a1', 's6', 'student'));
+  facts.memberships.set('s7', [membership('school-a', 'student', { status: 'inactive' })]);
+  facts.sectionMemberships.set('sec-a1|s7|student', sectionMembership('sec-a1', 's7', 'student'));
+  facts.memberships.set('s8', [
+    membership('school-a', 'student', { validFrom: D('2026-01-01'), validUntil: D('2026-09-20') }),
+  ]);
+  facts.sectionMemberships.set('sec-a1|s8|student', sectionMembership('sec-a1', 's8', 'student'));
+  facts.memberships.set('s9', [membership('school-a', 'student', { validFrom: D('2026-09-22') })]);
+  facts.sectionMemberships.set('sec-a1|s9|student', sectionMembership('sec-a1', 's9', 'student'));
+  facts.memberships.set('s10', [membership('school-a', 'student')]);
+  facts.sectionMemberships.set(
+    'sec-a1|s10|student',
+    sectionMembership('sec-a1', 's10', 'student', { status: 'inactive' }),
+  );
+  facts.memberships.set('s11', [membership('school-a', 'student')]);
+  facts.sectionMemberships.set(
+    'sec-a1|s11|student',
+    sectionMembership('sec-a1', 's11', 'student', {
+      startsOn: D('2026-01-01'),
+      endsOn: D('2026-06-01'),
+    }),
+  );
+  // Active membership in another school must not count for school-a.
+  facts.memberships.set('s12', [membership('school-b', 'student')]);
+  facts.sectionMemberships.set('sec-a1|s12|student', sectionMembership('sec-a1', 's12', 'student'));
+  // Boundary fixture: school membership ends exactly on the school-local date.
+  facts.memberships.set('s13', [
+    membership('school-a', 'student', { validFrom: D('2026-09-01'), validUntil: D('2026-09-21') }),
+  ]);
+  facts.sectionMemberships.set('sec-a1|s13|student', sectionMembership('sec-a1', 's13', 'student'));
+
   // Teacher t1 teaches sec-a1.
   facts.memberships.set('t1', [membership('school-a', 'staff')]);
   facts.sectionMemberships.set('sec-a1|t1|teacher', sectionMembership('sec-a1', 't1', 'teacher'));
@@ -373,9 +407,9 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
   return { facts, service };
 }
 
-async function decide(
+async function decide<C extends Capability>(
   service: RelationshipAuthorizationService,
-  request: AuthorizationRequest,
+  request: AuthorizationRequest<C>,
 ): Promise<{ allowed: boolean; basis?: unknown; reason?: unknown }> {
   const decision = await service.decide(request);
   return decision.allowed
@@ -620,6 +654,9 @@ describe('phase 4 authorization matrix', () => {
           capability === 'pass.create.student'
             ? { kind: 'student', organizationId: 'school-a', studentId: 's2' }
             : { kind: 'organization', organizationId: 'school-a' };
+        // Isolated test-only cast: the loop pairs each capability with its
+        // matching resource, but TypeScript cannot correlate the two unions
+        // across iterations. Each individual pair is a valid mapping.
         expect(
           await decide(service, {
             principal: principal(account, person),
@@ -812,14 +849,20 @@ describe('phase 4 authorization matrix', () => {
   it('rejects invalid capability/resource shapes and unknown resources', async () => {
     const { service } = seeded();
     const me = principal('acct-s1', 's1');
-    expect(
-      await decide(service, {
-        principal: me,
-        capability: 'schedule.manage',
-        resource: { kind: 'self' },
-        at: AT,
-      }),
-    ).toMatchObject({ allowed: false, reason: 'capability_not_applicable' });
+    // Isolated test-only cast: this pair cannot be constructed through the
+    // typed API. The cast simulates a value crossing an untyped boundary
+    // (decoded input) to verify the runtime stays fail-closed with
+    // capability_not_applicable.
+    const mismatched = {
+      principal: me,
+      capability: 'schedule.manage',
+      resource: { kind: 'self' },
+      at: AT,
+    } as unknown as AuthorizationRequest<'schedule.manage'>;
+    expect(await decide(service, mismatched)).toMatchObject({
+      allowed: false,
+      reason: 'capability_not_applicable',
+    });
 
     expect(
       await decide(service, {
@@ -869,6 +912,88 @@ describe('phase 4 authorization matrix', () => {
         at: AT,
       }),
     ).toMatchObject({ allowed: false, reason: 'resource_inactive' });
+  });
+
+  it('section targets require active school student membership first', async () => {
+    const { service } = seeded();
+    const teacher = principal('acct-t1', 't1');
+    const approve = (
+      studentId: string,
+      at: Temporal.Instant = AT,
+    ): Promise<{ allowed: boolean; reason?: unknown }> =>
+      decide(service, {
+        principal: teacher,
+        capability: 'pass.approve.section',
+        resource: { kind: 'student_in_section', sectionId: 'sec-a1', studentId },
+        at,
+      });
+
+    // Active school student + active section membership: actor rules apply.
+    expect(await approve('s2')).toMatchObject({
+      allowed: true,
+      basis: { kind: 'teacher_section_relationship' },
+    });
+
+    // Missing, inactive, expired, future, or other-school memberships deny
+    // with target_not_active_student even though section rows are active.
+    for (const studentId of ['s6', 's7', 's8', 's9', 's12']) {
+      expect(await approve(studentId)).toMatchObject({
+        allowed: false,
+        reason: 'target_not_active_student',
+      });
+    }
+
+    // Active school membership with inactive or expired section membership
+    // denies with target_not_in_section instead.
+    for (const studentId of ['s10', 's11']) {
+      expect(await approve(studentId)).toMatchObject({
+        allowed: false,
+        reason: 'target_not_in_section',
+      });
+    }
+  });
+
+  it('no actor bypasses the section target school-membership invariant', async () => {
+    const { service } = seeded();
+    const target = { kind: 'student_in_section', sectionId: 'sec-a1', studentId: 's6' } as const;
+    const actors: [string, string, Capability][] = [
+      ['acct-sys', 'sys', 'pass.approve.section'],
+      ['acct-a1', 'a1', 'pass.approve.section'],
+      ['acct-t1', 't1', 'pass.approve.section'],
+      ['acct-c1', 'c1', 'pass.create.student'],
+      ['acct-o1', 'o1', 'pass.create.student'],
+    ];
+    for (const [account, person, capability] of actors) {
+      expect(
+        await decide(service, {
+          principal: principal(account, person),
+          capability,
+          resource: target,
+          at: AT,
+        }),
+      ).toMatchObject({ allowed: false, reason: 'target_not_active_student' });
+    }
+  });
+
+  it('section target school membership uses the school-local date', async () => {
+    const { service } = seeded();
+    const teacher = principal('acct-t1', 't1');
+    const approve = (at: Temporal.Instant) =>
+      decide(service, {
+        principal: teacher,
+        capability: 'pass.approve.section',
+        resource: { kind: 'student_in_section', sectionId: 'sec-a1', studentId: 's13' },
+        at,
+      });
+    // 2026-09-22T03:00Z is still Sept 21 in New York, the membership's
+    // inclusive last day: actor rules apply. The UTC date (Sept 22) alone
+    // would wrongly deny.
+    expect(await approve(I('2026-09-22T03:00:00Z'))).toMatchObject({ allowed: true });
+    // 2026-09-22T04:30Z is Sept 22 locally: membership expired.
+    expect(await approve(I('2026-09-22T04:30:00Z'))).toMatchObject({
+      allowed: false,
+      reason: 'target_not_active_student',
+    });
   });
 
   it('canonical ownership wins over client-supplied organization', async () => {
