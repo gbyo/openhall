@@ -23,28 +23,26 @@ export type JsonPrimitive = boolean | number | string | null;
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
-export type Timestamp = ColumnType<Date, Date | string, Date | string>;
-
 export interface AcademicSession {
-  ends_on: Timestamp;
+  ends_on: string;
   id: Generated<string>;
   kind: string;
   name: string;
   organization_id: string;
   parent_id: string | null;
-  starts_on: Timestamp;
+  starts_on: string;
   status: Generated<string>;
   tenant_id: string;
 }
 
 export interface Account {
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   id: Generated<string>;
   person_id: string;
   session_revision: Generated<Int8>;
   status: Generated<string>;
   tenant_id: string;
-  updated_at: Generated<Timestamp>;
+  updated_at: Generated<string>;
 }
 
 export interface AuditEvent {
@@ -53,7 +51,7 @@ export interface AuditEvent {
   actor_kind: string;
   id: Generated<string>;
   metadata: Generated<Json>;
-  occurred_at: Generated<Timestamp>;
+  occurred_at: Generated<string>;
   organization_id: string | null;
   outcome: string;
   request_id: string;
@@ -64,18 +62,18 @@ export interface AuditEvent {
 
 export interface AuthIdentity {
   account_id: string;
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   email_snapshot: string | null;
   id: Generated<string>;
   issuer: string;
   provider_subject: string;
   tenant_id: string;
-  updated_at: Generated<Timestamp>;
+  updated_at: Generated<string>;
 }
 
 export interface AuthorizationGrant {
   account_id: string;
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   destination_id: string | null;
   id: Generated<string>;
   organization_id: string | null;
@@ -84,13 +82,13 @@ export interface AuthorizationGrant {
   section_id: string | null;
   status: Generated<string>;
   tenant_id: string;
-  valid_from: Timestamp | null;
-  valid_until: Timestamp | null;
+  valid_from: string | null;
+  valid_until: string | null;
 }
 
 export interface CalendarDay {
   cycle_code: string | null;
-  date: Timestamp;
+  date: string;
   day_kind: string;
   id: Generated<string>;
   operational_note: string | null;
@@ -125,11 +123,11 @@ export interface Destination {
 
 export interface DestinationReservation {
   destination_id: string;
-  expires_at: Timestamp | null;
+  expires_at: string | null;
   id: Generated<string>;
   pass_id: string;
-  released_at: Timestamp | null;
-  reserved_at: Generated<Timestamp>;
+  released_at: string | null;
+  reserved_at: Generated<string>;
   tenant_id: string;
 }
 
@@ -140,7 +138,7 @@ export interface ExternalReference {
   external_object_type: string;
   id: Generated<string>;
   integration_id: string;
-  last_seen_at: Timestamp | null;
+  last_seen_at: string | null;
   source_fingerprint: string | null;
   tenant_id: string;
 }
@@ -148,8 +146,8 @@ export interface ExternalReference {
 export interface IdempotencyRecord {
   actor_account_id: string;
   command: string;
-  created_at: Generated<Timestamp>;
-  expires_at: Timestamp;
+  created_at: Generated<string>;
+  expires_at: string;
   id: Generated<string>;
   idempotency_key: string;
   request_fingerprint: string;
@@ -171,14 +169,14 @@ export interface IncidentPresenceReport {
   location_id: string;
   person_id: string;
   presence_state: string;
-  reported_at: Generated<Timestamp>;
+  reported_at: Generated<string>;
   reported_by_person_id: string;
   tenant_id: string;
 }
 
 export interface Integration {
   configuration: Generated<Json>;
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   id: Generated<string>;
   integration_type: string;
   name: string;
@@ -187,12 +185,12 @@ export interface Integration {
   secret_key_id: string | null;
   status: Generated<string>;
   tenant_id: string;
-  updated_at: Generated<Timestamp>;
+  updated_at: Generated<string>;
 }
 
 export interface Location {
   code: string | null;
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   floor_label: string | null;
   id: Generated<string>;
   kind: string;
@@ -201,13 +199,13 @@ export interface Location {
   parent_location_id: string | null;
   status: Generated<string>;
   tenant_id: string;
-  updated_at: Generated<Timestamp>;
+  updated_at: Generated<string>;
 }
 
 export interface OperationalIncident {
-  activated_at: Generated<Timestamp>;
+  activated_at: Generated<string>;
   activated_by_person_id: string;
-  ended_at: Timestamp | null;
+  ended_at: string | null;
   ended_by_person_id: string | null;
   id: Generated<string>;
   mode: string;
@@ -217,7 +215,7 @@ export interface OperationalIncident {
 }
 
 export interface Organization {
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   id: Generated<string>;
   kind: string;
   name: string;
@@ -226,53 +224,54 @@ export interface Organization {
   status: Generated<string>;
   tenant_id: string;
   time_zone: string | null;
-  updated_at: Generated<Timestamp>;
+  updated_at: Generated<string>;
 }
 
 export interface OrganizationMembership {
   affiliation: string;
   grade_level: string | null;
+  id: Generated<string>;
   organization_id: string;
   person_id: string;
   status: Generated<string>;
   tenant_id: string;
-  valid_from: Timestamp | null;
-  valid_until: Timestamp | null;
+  valid_from: string | null;
+  valid_until: string | null;
 }
 
 export interface OutboxEvent {
   aggregate_id: string;
   aggregate_kind: string;
   attempt_count: Generated<number>;
-  available_at: Generated<Timestamp>;
+  available_at: Generated<string>;
   event_type: string;
   id: Generated<string>;
   last_error: string | null;
-  occurred_at: Timestamp;
+  occurred_at: string;
   organization_id: string | null;
   payload: Json;
-  published_at: Timestamp | null;
+  published_at: string | null;
   tenant_id: string;
 }
 
 export interface Pass {
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   destination_id: string;
-  expected_return_at: Timestamp | null;
+  expected_return_at: string | null;
   id: Generated<string>;
   lifecycle_state: string;
   organization_id: string;
   origin_location_id: string | null;
   origin_section_id: string | null;
   request_source: string;
-  requested_at: Generated<Timestamp>;
+  requested_at: Generated<string>;
   requested_by_person_id: string | null;
   return_location_id: string | null;
   revision: Generated<Int8>;
   scheduled_authorization_id: string | null;
   student_id: string;
   tenant_id: string;
-  updated_at: Generated<Timestamp>;
+  updated_at: Generated<string>;
 }
 
 export interface PassEvent {
@@ -282,7 +281,7 @@ export interface PassEvent {
   event_type: string;
   id: Generated<string>;
   metadata: Generated<Json>;
-  occurred_at: Timestamp;
+  occurred_at: string;
   pass_id: string;
   sequence: Int8;
   tenant_id: string;
@@ -290,31 +289,31 @@ export interface PassEvent {
 
 export interface PassOverride {
   category: string | null;
-  decided_at: Timestamp | null;
+  decided_at: string | null;
   decided_by_person_id: string | null;
   decision: Generated<string>;
   evaluation_result_id: string;
   id: Generated<string>;
   pass_id: string;
-  requested_at: Generated<Timestamp>;
+  requested_at: Generated<string>;
   requested_by_person_id: string;
   tenant_id: string;
 }
 
 export interface Person {
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   display_name: string;
   family_name: string;
   given_name: string;
   id: Generated<string>;
   status: Generated<string>;
   tenant_id: string;
-  updated_at: Generated<Timestamp>;
+  updated_at: Generated<string>;
 }
 
 export interface PolicyEvaluation {
   decision: string;
-  evaluated_at: Generated<Timestamp>;
+  evaluated_at: Generated<string>;
   id: Generated<string>;
   pass_id: string;
   stage: string;
@@ -334,7 +333,7 @@ export interface PolicyEvaluationResult {
 
 export interface PolicyRule {
   configuration: Json;
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   enabled: Generated<boolean>;
   id: Generated<string>;
   name: string;
@@ -348,18 +347,18 @@ export interface PolicyRule {
   scope_organization_id: string | null;
   scope_section_id: string | null;
   tenant_id: string;
-  updated_at: Generated<Timestamp>;
-  valid_from: Timestamp | null;
-  valid_until: Timestamp | null;
+  updated_at: Generated<string>;
+  valid_from: string | null;
+  valid_until: string | null;
 }
 
 export interface QueueEntry {
   destination_id: string;
-  entered_at: Generated<Timestamp>;
+  entered_at: Generated<string>;
   id: Generated<string>;
   pass_id: string;
   priority: Generated<number>;
-  released_at: Timestamp | null;
+  released_at: string | null;
   tenant_id: string;
 }
 
@@ -375,7 +374,7 @@ export interface ScheduleBlock {
 
 export interface ScheduledAuthorization {
   approval_mode: string;
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   created_by_person_id: string;
   destination_id: string;
   display_category: string | null;
@@ -386,15 +385,16 @@ export interface ScheduledAuthorization {
   status: Generated<string>;
   student_id: string;
   tenant_id: string;
-  updated_at: Generated<Timestamp>;
-  valid_from: Timestamp;
-  valid_until: Timestamp;
+  updated_at: Generated<string>;
+  valid_from: string;
+  valid_until: string;
 }
 
 export interface ScheduleSlot {
   ends_at: string;
   id: Generated<string>;
   ordinal: number;
+  organization_id: string;
   schedule_block_id: string;
   schedule_template_id: string;
   starts_at: string;
@@ -422,21 +422,23 @@ export interface Section {
 
 export interface SectionMeeting {
   cycle_code: string | null;
-  effective_from: Timestamp | null;
-  effective_until: Timestamp | null;
+  effective_from: string | null;
+  effective_until: string | null;
   id: Generated<string>;
   location_id: string | null;
+  organization_id: string;
   schedule_block_id: string;
   section_id: string;
   tenant_id: string;
 }
 
 export interface SectionMembership {
-  ends_on: Timestamp | null;
+  ends_on: string | null;
+  id: Generated<string>;
   person_id: string;
   role: string;
   section_id: string;
-  starts_on: Timestamp | null;
+  starts_on: string | null;
   status: Generated<string>;
   tenant_id: string;
 }
@@ -444,23 +446,23 @@ export interface SectionMembership {
 export interface SyncRun {
   created_count: Generated<number>;
   error_summary: string | null;
-  finished_at: Timestamp | null;
+  finished_at: string | null;
   id: Generated<string>;
   integration_id: string;
   outcome: Generated<string>;
   processed_count: Generated<number>;
   skipped_count: Generated<number>;
-  started_at: Generated<Timestamp>;
+  started_at: Generated<string>;
   tenant_id: string;
   updated_count: Generated<number>;
 }
 
 export interface Tenant {
-  created_at: Generated<Timestamp>;
+  created_at: Generated<string>;
   id: Generated<string>;
   name: string;
   status: Generated<string>;
-  updated_at: Generated<Timestamp>;
+  updated_at: Generated<string>;
 }
 
 export interface DB {

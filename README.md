@@ -1,14 +1,17 @@
 # OpenHall
 
 OpenHall is an open-source, self-hosted school presence and movement platform. This repository is
-currently a **foundation release and is not production-ready**. Authentication, the pass workflow,
-policy execution, and the Phase 1 security milestones are intentionally incomplete.
+currently an **early development release and is not production-ready**. School-local expected
+placement is implemented internally; authentication, HTTP exposure for student data, pass
+workflows, and policy execution are intentionally incomplete.
 
 The architecture distinguishes three facts that must never be conflated:
 
 - expected placement, derived from academics and the school-local schedule;
-- actual movement, represented by explicit passes and staff presence observations; and
-- policy decisions, which allow, deny, queue, or require approval/override.
+- actual movement, represented by explicit pass events; and
+- observed presence, represented by explicit human observations.
+
+Policy decisions will later consume those facts but must not conflate them.
 
 ## Requirements
 
