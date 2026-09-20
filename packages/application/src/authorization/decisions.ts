@@ -1,13 +1,17 @@
 import type { Capability } from './capabilities.js';
-import type { AuthorizationResource } from './resources.js';
+import type { ResourceByCapability } from './resources.js';
 import type { Principal } from '../authentication/principal.js';
 import type { Temporal } from '@js-temporal/polyfill';
 
-/** Typed authorization request. The calling use case provides one instant. */
+/**
+ * Typed authorization request. The capability statically determines the
+ * permitted resource type, so mismatched pairs fail compilation at the
+ * normal call site. The calling use case provides one instant.
+ */
 export interface AuthorizationRequest<C extends Capability = Capability> {
   readonly principal: Principal;
   readonly capability: C;
-  readonly resource: AuthorizationResource & Record<string, unknown>;
+  readonly resource: ResourceByCapability[C];
   readonly at: Temporal.Instant;
 }
 

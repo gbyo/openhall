@@ -7,6 +7,7 @@ import type {
   AuthorizationBasis,
   AuthorizationDecision,
   AuthorizationDenialReason,
+  AuthorizationRequest,
   ExplicitRole,
 } from './decisions.js';
 import { isExplicitRole } from './roles.js';
@@ -17,20 +18,12 @@ import type {
   OrganizationMembershipFact,
 } from './ports.js';
 import type {
-  AuthorizationResource,
   DestinationResource,
   OrganizationResource,
   SectionResource,
   StudentInSectionResource,
   StudentResource,
 } from './resources.js';
-
-export interface TypedAuthorizationRequest {
-  readonly principal: Principal;
-  readonly capability: Capability;
-  readonly resource: AuthorizationResource;
-  readonly at: Temporal.Instant;
-}
 
 export interface OrganizationAuthorizationSnapshot {
   readonly affiliations: readonly ('student' | 'staff' | 'other')[];
@@ -220,19 +213,21 @@ export class RelationshipAuthorizationService {
     private readonly runner: TenantTransactionRunner,
   ) {}
 
-  async decide(request: TypedAuthorizationRequest): Promise<AuthorizationDecision> {
+  async decide<C extends Capability>(
+    request: AuthorizationRequest<C>,
+  ): Promise<AuthorizationDecision> {
     return this.runner.run(request.principal.tenantId, (context) =>
       this.decideWithContext(context, request),
     );
   }
 
-  async isAllowed(request: TypedAuthorizationRequest): Promise<boolean> {
+  async isAllowed<C extends Capability>(request: AuthorizationRequest<C>): Promise<boolean> {
     return (await this.decide(request)).allowed;
   }
 
   async decideWithContext(
     context: TenantTransactionContext,
-    request: TypedAuthorizationRequest,
+    request: AuthorizationRequest,
   ): Promise<AuthorizationDecision> {
     const { principal, capability, resource, at } = request;
 

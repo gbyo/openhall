@@ -13,10 +13,11 @@ import type {
   StaffedDestinationFact,
   TeachingSectionFact,
 } from '../src/authorization/ports.js';
-import {
-  RelationshipAuthorizationService,
-  type TypedAuthorizationRequest,
-} from '../src/authorization/service.js';
+import { RelationshipAuthorizationService } from '../src/authorization/service.js';
+import type {
+  AuthorizationDecision,
+  AuthorizationRequest,
+} from '../src/authorization/decisions.js';
 import type { DestinationId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
 import type { TenantTransactionContext, TenantTransactionRunner } from '../src/persistence.js';
 
@@ -374,7 +375,7 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
 
 async function decide(
   service: RelationshipAuthorizationService,
-  request: TypedAuthorizationRequest,
+  request: AuthorizationRequest,
 ): Promise<{ allowed: boolean; basis?: unknown; reason?: unknown }> {
   const decision = await service.decide(request);
   return decision.allowed
@@ -583,7 +584,7 @@ describe('phase 4 authorization matrix', () => {
       }),
     ]);
     const actor = principal('acct-db1', 'db1');
-    const request = (at: Temporal.Instant): TypedAuthorizationRequest => ({
+    const request = (at: Temporal.Instant): AuthorizationRequest<'destination.station.manage'> => ({
       principal: actor,
       capability: 'destination.station.manage',
       resource: { kind: 'destination', destinationId: 'dest-a1' },
@@ -625,7 +626,7 @@ describe('phase 4 authorization matrix', () => {
             capability,
             resource,
             at: AT,
-          } as TypedAuthorizationRequest),
+          } as AuthorizationRequest),
         ).toMatchObject({ allowed: true });
       }
       // No historical browsing or admin powers by default.
@@ -793,7 +794,7 @@ describe('phase 4 authorization matrix', () => {
       membership('school-a', 'student', { validFrom: D('2026-09-21'), validUntil: null }),
     ]);
     const actor = principal('acct-s5', 's5');
-    const context: Omit<TypedAuthorizationRequest, 'at'> = {
+    const context: Omit<AuthorizationRequest<'organization.context.read'>, 'at'> = {
       principal: actor,
       capability: 'organization.context.read',
       resource: { kind: 'organization', organizationId: 'school-a' },
@@ -980,6 +981,31 @@ describe('phase 4 authorization matrix', () => {
         AT,
       ),
     ).toBeNull();
+  });
+
+  it('the enforcement entry point statically pairs capability and resource', async () => {
+    const { service } = seeded();
+    const me = principal('acct-t1', 't1');
+    const pending: Promise<AuthorizationDecision>[] = [];
+    pending.push(
+      service.decide({
+        principal: me,
+        capability: 'pass.approve.section',
+        resource: { kind: 'student_in_section', sectionId: 'sec-a1', studentId: 's2' },
+        at: AT,
+      }),
+    );
+    pending.push(
+      service.decide({
+        principal: me,
+        capability: 'pass.approve.section',
+        // @ts-expect-error tenant is not a valid resource for pass.approve.section.
+        resource: { kind: 'tenant' },
+        at: AT,
+      }),
+    );
+    const [decision] = await Promise.all(pending);
+    expect(decision?.allowed).toBe(true);
   });
 
   it('accessible organizations list current schools once', async () => {
