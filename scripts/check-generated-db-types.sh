@@ -8,5 +8,6 @@ fi
 
 temporary_file="$(mktemp)"
 trap 'rm -f "$temporary_file"' EXIT
-pnpm --filter @openhall/db exec kysely-codegen --dialect postgres --url "$DATABASE_URL" --out-file "$temporary_file"
+pnpm --filter @openhall/db exec kysely-codegen --dialect postgres --url "$DATABASE_URL" --out-file "$temporary_file" \
+  --type-mapping='{"date":"string","time":"string","timestamp":"string","timestamptz":"string"}'
 diff -u packages/db/src/database.generated.ts "$temporary_file"

@@ -11,9 +11,10 @@
   },
   "scripts": {
     "migrate": "tsx src/cli.ts",
-    "generate": "kysely-codegen --dialect postgres --url \"$DATABASE_URL\" --out-file src/database.generated.ts"
+    "generate": "kysely-codegen --dialect postgres --url \"$DATABASE_URL\" --out-file src/database.generated.ts --type-mapping='{\"date\":\"string\",\"time\":\"string\",\"timestamp\":\"string\",\"timestamptz\":\"string\"}'"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "@openhall/application": "workspace:*",
     "@openhall/domain": "workspace:*",
     "kysely": "0.29.6",

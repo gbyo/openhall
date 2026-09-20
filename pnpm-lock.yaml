@@ -90,6 +90,9 @@ importers:
 
   packages/application:
     dependencies:
+      '@js-temporal/polyfill':
+        specifier: 0.5.1
+        version: 0.5.1
       '@openhall/domain':
         specifier: workspace:*
         version: link:../domain
@@ -104,6 +107,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@js-temporal/polyfill':
+        specifier: 0.5.1
+        version: 0.5.1
       '@openhall/application':
         specifier: workspace:*
         version: link:../application

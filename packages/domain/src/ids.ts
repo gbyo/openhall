@@ -1,0 +1,12 @@
+export type TenantId = string;
+export type OrganizationId = string;
+export type PersonId = string;
+export type AccountId = string;
+export type PassId = string;
+export type SectionId = string;
+export type LocationId = string;
+export type ScheduleBlockId = string;
+export type ScheduleTemplateId = string;
+export type ScheduleSlotId = string;
+export type SectionMeetingId = string;
+export type CalendarDayId = string;

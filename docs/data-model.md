@@ -1,7 +1,7 @@
 # Data model
 
-The foundation migration creates 36 domain tables plus Kysely's migration metadata. UUID primary
-keys use PostgreSQL 18 `uuidv7()` defaults.
+The foundation plus scheduling migration creates 36 domain tables plus Kysely's migration
+metadata. UUID primary keys use PostgreSQL 18 `uuidv7()` defaults.
 
 | Area                      | Tables                                                                                                                                                   |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -18,6 +18,25 @@ Important invariants are database-enforced: tenant-consistent composite referenc
 one active pass per student, one active reservation and queue entry per pass, one active incident
 per school, immutable event sequence uniqueness, and conflict-free external mappings. Foreign keys
 preserve history by default; there are no cascading deletes or generic soft-delete columns.
+
+`organization_membership` and `section_membership` have UUIDv7 primary identities. Their semantic
+keys remain unique (`tenant + organization + person + affiliation` and
+`tenant + section + person + role` respectively). Stable membership identities allow a future
+external enrollment record to reference a canonical membership without treating its mutable
+relationship fields as identity.
+
+The following schedule-facing entities are school-local: sections, locations, schedule blocks,
+schedule templates, section meetings, schedule slots, calendar days, and destinations. Composite
+uniqueness and foreign keys enforce the same tenant and organization for location parentage,
+section/meeting/block/location relationships, template/slot/block relationships, calendar-day
+templates, and destination locations. `section_meeting` and `schedule_slot` store their authoritative
+`organization_id` explicitly. Migration 002 backfills it from section and template respectively and
+fails rather than normalizing contradictory preexisting cross-school data.
+
+Resolver access is supported by an index on `section_membership (tenant_id, person_id)` and an
+index on `section_meeting (tenant_id, organization_id, section_id)`. Existing unique indexes already
+cover calendar-day lookup by tenant/school/date and slot lookup by tenant/template, so no redundant
+indexes were added.
 
 Locations are physical hierarchy nodes. Destinations are services that can accept movements.
 Sections meet in logical schedule blocks; templates give those blocks local wall-clock slots for a

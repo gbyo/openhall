@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Client, Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase } from '../src/database.js';
-import { migrateToLatest } from '../src/migrator.js';
+import { createMigrator, migrateToLatest } from '../src/migrator.js';
 import { PostgresReadinessProbe } from '../src/readiness.js';
 
 let databaseName: string;
@@ -172,10 +172,211 @@ describe('foundation migration on PostgreSQL 18', () => {
     ).rows[0]?.id;
     await expect(
       pool.query(
-        "INSERT INTO schedule_slot (tenant_id, schedule_template_id, schedule_block_id, starts_at, ends_at, ordinal) VALUES ($1, $2, $3, TIME '10:00', TIME '09:00', 1)",
-        [fixture.tenantA, template, block],
+        "INSERT INTO schedule_slot (tenant_id, organization_id, schedule_template_id, schedule_block_id, starts_at, ends_at, ordinal) VALUES ($1, $2, $3, $4, TIME '10:00', TIME '09:00', 1)",
+        [fixture.tenantA, fixture.organizationA, template, block],
       ),
     ).rejects.toMatchObject({ code: '23514' });
+  });
+
+  it('gives memberships UUIDv7 identities while preserving semantic uniqueness', async () => {
+    const fixture = await seed();
+    const organizationMembership = await pool.query<{ id: string; version: number }>(
+      `INSERT INTO organization_membership
+         (tenant_id, organization_id, person_id, affiliation)
+       VALUES ($1, $2, $3, 'student')
+       RETURNING id, uuid_extract_version(id) AS version`,
+      [fixture.tenantA, fixture.organizationA, fixture.student],
+    );
+    expect(organizationMembership.rows[0]?.version).toBe(7);
+    await expect(
+      pool.query(
+        `INSERT INTO organization_membership
+           (tenant_id, organization_id, person_id, affiliation)
+         VALUES ($1, $2, $3, 'student')`,
+        [fixture.tenantA, fixture.organizationA, fixture.student],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+
+    const session = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO academic_session
+           (tenant_id, organization_id, kind, name, starts_on, ends_on)
+         VALUES ($1, $2, 'term', 'Identity term', '2026-09-01', '2027-06-01') RETURNING id`,
+        [fixture.tenantA, fixture.organizationA],
+      )
+    ).rows[0]?.id;
+    const section = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO section (tenant_id, organization_id, academic_session_id, title)
+         VALUES ($1, $2, $3, 'Identity section') RETURNING id`,
+        [fixture.tenantA, fixture.organizationA, session],
+      )
+    ).rows[0]?.id;
+    const sectionMembership = await pool.query<{ id: string; version: number }>(
+      `INSERT INTO section_membership (tenant_id, section_id, person_id, role)
+       VALUES ($1, $2, $3, 'student')
+       RETURNING id, uuid_extract_version(id) AS version`,
+      [fixture.tenantA, section, fixture.student],
+    );
+    expect(sectionMembership.rows[0]?.version).toBe(7);
+    await expect(
+      pool.query(
+        `INSERT INTO section_membership (tenant_id, section_id, person_id, role)
+         VALUES ($1, $2, $3, 'student')`,
+        [fixture.tenantA, section, fixture.student],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+
+  it('enforces exact-school schedule and location references', async () => {
+    const fixture = await seed();
+    const schoolB = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO organization (tenant_id, kind, name, slug, time_zone)
+         VALUES ($1, 'school', 'Same Tenant School B', $2, 'America/New_York') RETURNING id`,
+        [fixture.tenantA, `same-b-${randomUUID()}`],
+      )
+    ).rows[0]?.id;
+    const locationB = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO location (tenant_id, organization_id, kind, name)
+         VALUES ($1, $2, 'classroom', 'B 101') RETURNING id`,
+        [fixture.tenantA, schoolB],
+      )
+    ).rows[0]?.id;
+    const blockA = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO schedule_block (tenant_id, organization_id, code, display_name, kind)
+         VALUES ($1, $2, $3, 'A Block', 'instructional') RETURNING id`,
+        [fixture.tenantA, fixture.organizationA, `a-${randomUUID()}`],
+      )
+    ).rows[0]?.id;
+    const blockB = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO schedule_block (tenant_id, organization_id, code, display_name, kind)
+         VALUES ($1, $2, $3, 'B Block', 'instructional') RETURNING id`,
+        [fixture.tenantA, schoolB, `b-${randomUUID()}`],
+      )
+    ).rows[0]?.id;
+    const templateA = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO schedule_template (tenant_id, organization_id, name)
+         VALUES ($1, $2, 'A Regular') RETURNING id`,
+        [fixture.tenantA, fixture.organizationA],
+      )
+    ).rows[0]?.id;
+    const templateB = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO schedule_template (tenant_id, organization_id, name)
+         VALUES ($1, $2, 'B Regular') RETURNING id`,
+        [fixture.tenantA, schoolB],
+      )
+    ).rows[0]?.id;
+    const sessionA = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO academic_session
+           (tenant_id, organization_id, kind, name, starts_on, ends_on)
+         VALUES ($1, $2, 'term', 'Term', '2026-09-01', '2027-06-01') RETURNING id`,
+        [fixture.tenantA, fixture.organizationA],
+      )
+    ).rows[0]?.id;
+    const sectionA = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO section
+           (tenant_id, organization_id, academic_session_id, title)
+         VALUES ($1, $2, $3, 'Math') RETURNING id`,
+        [fixture.tenantA, fixture.organizationA, sessionA],
+      )
+    ).rows[0]?.id;
+
+    await expect(
+      pool.query(
+        `INSERT INTO location
+           (tenant_id, organization_id, parent_location_id, kind, name)
+         VALUES ($1, $2, $3, 'room', 'Cross-school child')`,
+        [fixture.tenantA, fixture.organizationA, locationB],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+    await expect(
+      pool.query(
+        `INSERT INTO section_meeting
+           (tenant_id, organization_id, section_id, schedule_block_id)
+         VALUES ($1, $2, $3, $4)`,
+        [fixture.tenantA, fixture.organizationA, sectionA, blockB],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+    await expect(
+      pool.query(
+        `INSERT INTO schedule_slot
+           (tenant_id, organization_id, schedule_template_id, schedule_block_id, starts_at, ends_at, ordinal)
+         VALUES ($1, $2, $3, $4, '09:00', '10:00', 1)`,
+        [fixture.tenantA, fixture.organizationA, templateA, blockB],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+    await expect(
+      pool.query(
+        `INSERT INTO calendar_day
+           (tenant_id, organization_id, date, day_kind, schedule_template_id)
+         VALUES ($1, $2, '2026-09-21', 'instructional', $3)`,
+        [fixture.tenantA, fixture.organizationA, templateB],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+    await expect(
+      pool.query(
+        `INSERT INTO destination (tenant_id, organization_id, location_id, service_type)
+         VALUES ($1, $2, $3, 'cross-school')`,
+        [fixture.tenantA, fixture.organizationA, locationB],
+      ),
+    ).rejects.toMatchObject({ code: '23503' });
+    expect(blockA).toBeDefined();
+  });
+
+  it('upgrades an existing 001 database without rewriting membership identity semantics', async () => {
+    const upgradeName = `openhall_upgrade_${randomUUID().replaceAll('-', '')}`;
+    const administration = new Client({ connectionString: administrationUrl });
+    await administration.connect();
+    await administration.query(`CREATE DATABASE ${quotedIdentifier(upgradeName)}`);
+    await administration.end();
+    const upgradeUrl = new URL(databaseUrl);
+    upgradeUrl.pathname = `/${upgradeName}`;
+    const handle = createDatabase(upgradeUrl.toString(), { max: 1 });
+    try {
+      const first = await createMigrator(handle.database).migrateTo('001_foundation');
+      expect(first.error).toBeUndefined();
+      const tenant = await handle.pool.query<{ id: string }>(
+        "INSERT INTO tenant (name) VALUES ('Upgrade') RETURNING id",
+      );
+      const tenantId = tenant.rows[0]?.id;
+      const school = await handle.pool.query<{ id: string }>(
+        `INSERT INTO organization (tenant_id, kind, name, slug, time_zone)
+         VALUES ($1, 'school', 'Upgrade School', 'upgrade-school', 'America/New_York') RETURNING id`,
+        [tenantId],
+      );
+      const person = await handle.pool.query<{ id: string }>(
+        `INSERT INTO person (tenant_id, given_name, family_name, display_name)
+         VALUES ($1, 'Upgrade', 'Student', 'Upgrade Student') RETURNING id`,
+        [tenantId],
+      );
+      await handle.pool.query(
+        `INSERT INTO organization_membership
+           (tenant_id, organization_id, person_id, affiliation)
+         VALUES ($1, $2, $3, 'student')`,
+        [tenantId, school.rows[0]?.id, person.rows[0]?.id],
+      );
+      await migrateToLatest(handle.database);
+      const upgraded = await handle.pool.query<{ id: string; version: number }>(
+        `SELECT id, uuid_extract_version(id) AS version FROM organization_membership
+         WHERE tenant_id = $1`,
+        [tenantId],
+      );
+      expect(upgraded.rows[0]?.version).toBe(7);
+    } finally {
+      await handle.destroy();
+      const cleanup = new Client({ connectionString: administrationUrl });
+      await cleanup.connect();
+      await cleanup.query(`DROP DATABASE IF EXISTS ${quotedIdentifier(upgradeName)} WITH (FORCE)`);
+      await cleanup.end();
+    }
   });
 
   it('allows only one active pass per student', async () => {
@@ -257,7 +458,9 @@ describe('foundation migration on PostgreSQL 18', () => {
   it('reports readiness only while the migrated database is reachable', async () => {
     const handle = createDatabase(databaseUrl, { max: 1 });
     const probe = new PostgresReadinessProbe(handle.database);
-    await expect(probe.check()).resolves.toEqual({ migration: '001_foundation' });
+    await expect(probe.check()).resolves.toEqual({
+      migration: '002_scheduling_expected_placement',
+    });
     await handle.destroy();
     await expect(probe.check()).rejects.toBeDefined();
   });
