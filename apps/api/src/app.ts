@@ -24,6 +24,8 @@ export interface CreateAppOptions {
   readonly database: Kysely<Database>;
   readonly readinessProbe: ReadinessProbe;
   readonly logger?: boolean;
+  /** Test hook: captures the production logger output, config unchanged. */
+  readonly loggerStream?: NodeJS.WritableStream;
   readonly webRoot?: string;
 }
 
@@ -31,11 +33,7 @@ export interface CreateAppOptions {
  * Sensitive paths always carry Cache-Control: no-store: auth session
  * payloads, identity, bootstrap/recovery exchanges, and OIDC callbacks.
  */
-const NO_STORE_PREFIXES = [
-  '/api/v1/auth/',
-  '/api/v1/me',
-  '/api/v1/bootstrap/',
-] as const;
+const NO_STORE_PREFIXES = ['/api/v1/auth/', '/api/v1/me', '/api/v1/bootstrap/'] as const;
 
 export async function createApp(options: CreateAppOptions): Promise<FastifyInstance> {
   const isProduction = options.config.nodeEnv === 'production';
@@ -80,6 +78,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
               ],
               censor: '[REDACTED]',
             },
+            ...(options.loggerStream !== undefined ? { stream: options.loggerStream } : {}),
           },
   }).setValidatorCompiler(TypeBoxValidatorCompiler);
 
@@ -167,14 +166,17 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   });
 
   typedApp.setNotFoundHandler((request, reply) => {
-    void reply.status(404).type('application/problem+json').send({
-      type: 'https://openhall.dev/problems/not_found',
-      title: 'Not found',
-      status: 404,
-      instance: safeRequestPath(request.url),
-      code: 'not_found',
-      requestId: request.id,
-    });
+    void reply
+      .status(404)
+      .type('application/problem+json')
+      .send({
+        type: 'https://openhall.dev/problems/not_found',
+        title: 'Not found',
+        status: 404,
+        instance: safeRequestPath(request.url),
+        code: 'not_found',
+        requestId: request.id,
+      });
   });
 
   typedApp.addHook('onSend', async (request, reply) => {
@@ -185,7 +187,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   });
 
   const dependencies = createAuthDependencies(options.config, options.database);
-  await registerSessionContext(typedApp, { dependencies });
+  registerSessionContext(typedApp, { dependencies });
   registerHealthRoutes(typedApp, options.readinessProbe);
   registerSystemRoutes(typedApp);
   registerAuthRoutes(typedApp, dependencies);

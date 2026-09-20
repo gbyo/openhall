@@ -114,7 +114,11 @@ export class Aes256GcmSecretProtector implements SecretProtector {
       const decipher = createDecipheriv(
         'aes-256-gcm',
         this.key,
-        Buffer.from(secret.nonce.buffer as ArrayBuffer, secret.nonce.byteOffset, secret.nonce.byteLength),
+        Buffer.from(
+          secret.nonce.buffer as ArrayBuffer,
+          secret.nonce.byteOffset,
+          secret.nonce.byteLength,
+        ),
       );
       decipher.setAAD(Buffer.from(context, 'utf8'));
       decipher.setAuthTag(

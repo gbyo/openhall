@@ -13,11 +13,7 @@ import {
 } from '@openhall/contracts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-import {
-  bindingTokenFrom,
-  decodeCookieToken,
-  setLoginBindingCookie,
-} from '../auth/cookies.js';
+import { bindingTokenFrom, decodeCookieToken, setLoginBindingCookie } from '../auth/cookies.js';
 import type { AuthDependencies } from '../auth/dependencies.js';
 import { problemFor, statusFor } from '../auth/problems.js';
 
@@ -63,7 +59,7 @@ export function registerBootstrapRoutes(
     },
     async (_request, reply) => {
       const count = await dependencies.tenants.countCanonical();
-      return reply.header('Cache-Control', 'no-store').send({ initialized: count > 0 });
+      return await reply.header('Cache-Control', 'no-store').send({ initialized: count > 0 });
     },
   );
 
@@ -106,11 +102,17 @@ export function registerBootstrapRoutes(
         setLoginBindingCookie(reply, dependencies.isProduction, binding);
       }
       const body = request.body;
-      if (body.providerPreset === 'google' && body.providerIssuer !== GOOGLE_WORKSPACE_PRESET.issuer) {
+      if (
+        body.providerPreset === 'google' &&
+        body.providerIssuer !== GOOGLE_WORKSPACE_PRESET.issuer
+      ) {
         await sendAuthProblem(
           reply,
           request,
-          new AuthenticationError('invalid_bootstrap_draft', 'Google preset requires the Google issuer'),
+          new AuthenticationError(
+            'invalid_bootstrap_draft',
+            'Google preset requires the Google issuer',
+          ),
         );
         return;
       }
@@ -151,7 +153,7 @@ export function registerBootstrapRoutes(
             allowInsecureHttp: dependencies.allowInsecureHttp,
           },
         );
-        return reply
+        return await reply
           .header('Cache-Control', 'no-store')
           .send({ authorizationUrl: prepared.authorizationUrl });
       } catch (error) {

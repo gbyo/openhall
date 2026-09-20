@@ -1,14 +1,6 @@
 import type { Temporal } from '@js-temporal/polyfill';
-import type {
-  AccountId,
-  OrganizationId,
-  PersonId,
-  TenantId,
-} from '@openhall/domain';
-import type {
-  SystemTransactionContext,
-  TenantTransactionContext,
-} from '../persistence.js';
+import type { AccountId, OrganizationId, PersonId, TenantId } from '@openhall/domain';
+import type { SystemTransactionContext, TenantTransactionContext } from '../persistence.js';
 
 /** At least 256 bits of cryptographically secure randomness per credential. */
 export interface SecureRandomSource {
@@ -19,7 +11,10 @@ export interface SecureRandomSource {
  * One-way digests for high-entropy ephemeral Bearer [REDACTED] (session
  * tokens, CSRF comparison material, OIDC state lookups, browser bindings,
  * operator/recovery tokens): HMAC-SHA-256(APP_SECRET, credential).
- * Rotating APP_SECRET intentionally invalidates outstanding credentials.
+ * Canonical input is always the raw credential bytes: base64url transport
+ * encodings are decoded back to raw bytes before digesting, on both the
+ * creation and verification sides. Rotating APP_SECRET intentionally
+ * invalidates outstanding credentials.
  */
 export interface CredentialDigester {
   digest(credential: Uint8Array): Uint8Array;
@@ -201,7 +196,9 @@ export interface IdentityDirectory {
     context: TenantTransactionContext,
     providerKey: string,
   ): Promise<IdentityProviderRecord | undefined>;
-  listActiveProviders(context: TenantTransactionContext): Promise<readonly IdentityProviderRecord[]>;
+  listActiveProviders(
+    context: TenantTransactionContext,
+  ): Promise<readonly IdentityProviderRecord[]>;
   createIdentity(
     context: TenantTransactionContext,
     input: {
@@ -279,6 +276,13 @@ export interface OidcTransactionStore {
     stateDigest: Uint8Array,
     now: Temporal.Instant,
   ): Promise<OidcTransactionRecord | undefined>;
+  /**
+   * Non-consuming lookup by state digest so the shared OIDC callback can
+   * dispatch login vs bootstrap completions. Returns the latest matching
+   * transaction regardless of status; the completing use case still
+   * enforces the atomic pending → processing claim, so replays fail.
+   */
+  peekByStateDigest(stateDigest: Uint8Array): Promise<OidcTransactionRecord | undefined>;
   markFailed(transactionId: string, now: Temporal.Instant): Promise<void>;
   consume(transactionId: string, now: Temporal.Instant): Promise<void>;
 }
@@ -356,10 +360,7 @@ export interface AuditEventInput {
 }
 
 export interface AuditWriter {
-  append(
-    context: TenantTransactionContext,
-    event: AuditEventInput,
-  ): Promise<void>;
+  append(context: TenantTransactionContext, event: AuditEventInput): Promise<void>;
 }
 
 export type OperatorGrantPurpose = 'bootstrap' | 'recovery';

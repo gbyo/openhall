@@ -8,11 +8,7 @@ import {
   type SessionRecord,
 } from '@openhall/application';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import {
-  clearSessionCookie,
-  decodeCookieToken,
-  sessionTokenFrom,
-} from './cookies.js';
+import { clearSessionCookie, decodeCookieToken, sessionTokenFrom } from './cookies.js';
 import type { AuthDependencies } from './dependencies.js';
 import { problemFor, statusFor } from './problems.js';
 
@@ -34,10 +30,7 @@ export interface SessionContextOptions {
  * opportunistically and the request continues anonymously; protected
  * routes turn that into 401 via requirePrincipal.
  */
-export async function registerSessionContext(
-  app: FastifyInstance,
-  options: SessionContextOptions,
-): Promise<void> {
+export function registerSessionContext(app: FastifyInstance, options: SessionContextOptions): void {
   const { dependencies } = options;
   app.addHook('onRequest', async (request, reply) => {
     const raw = sessionTokenFrom(request, dependencies.isProduction);

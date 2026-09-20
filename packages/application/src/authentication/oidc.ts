@@ -1,8 +1,5 @@
 import type { Clock } from '@openhall/domain';
-import type {
-  TenantTransactionContext,
-  TenantTransactionRunner,
-} from '../persistence.js';
+import type { TenantTransactionContext, TenantTransactionRunner } from '../persistence.js';
 import { AuthenticationError } from './errors.js';
 import type {
   AuditWriter,
@@ -84,7 +81,7 @@ export async function beginOidcLogin(
   dependencies: OidcUseCaseDependencies,
 ): Promise<BegunLogin> {
   const tenant = await dependencies.tenants.findBySlug(input.tenantSlug.trim().toLowerCase());
-  if (tenant === undefined || tenant.status !== 'active') {
+  if (tenant?.status !== 'active') {
     throw new AuthenticationError('auth_provider_unavailable');
   }
   const prepared = await dependencies.runner.run(tenant.id, async (context) => {
@@ -92,7 +89,7 @@ export async function beginOidcLogin(
       context,
       input.providerKey.trim().toLowerCase(),
     );
-    if (provider === undefined || provider.status !== 'active') {
+    if (provider?.status !== 'active') {
       throw new AuthenticationError('auth_provider_unavailable');
     }
     const issuer = assertIssuerShape(provider.issuer, {
@@ -192,7 +189,7 @@ export async function completeOidcLogin(
   const now = dependencies.clock.now();
   const stateDigest = dependencies.digester.digest(new TextEncoder().encode(input.state));
   const transaction = await dependencies.transactions.claimByStateDigest(stateDigest, now);
-  if (transaction === undefined || transaction.purpose !== 'login' || transaction.tenantId === null) {
+  if (transaction?.purpose !== 'login' || transaction.tenantId === null) {
     throw new AuthenticationError('auth_transaction_invalid');
   }
   const tenantId = transaction.tenantId;
@@ -205,7 +202,7 @@ export async function completeOidcLogin(
       await markFailed();
       throw new AuthenticationError('auth_transaction_expired');
     }
-    let bindingValid = false;
+    let bindingValid: boolean;
     try {
       bindingValid = dependencies.digester.matches(
         decodeBinding(input.browserBinding),
@@ -219,11 +216,7 @@ export async function completeOidcLogin(
       throw new AuthenticationError('auth_transaction_invalid');
     }
     const provider = await dependencies.directory.findProvider(context, providerId);
-    if (
-      provider === undefined ||
-      provider.status !== 'active' ||
-      provider.revision !== transaction.providerRevision
-    ) {
+    if (provider?.status !== 'active' || provider.revision !== transaction.providerRevision) {
       await markFailed();
       throw new AuthenticationError('auth_provider_unavailable');
     }
@@ -350,13 +343,10 @@ async function finalizeLogin(
   const person =
     account === undefined ? undefined : await directory.findPerson(context, account.personId);
   if (
-    tenant === undefined ||
-    tenant.status !== 'active' ||
+    tenant?.status !== 'active' ||
     identity === undefined ||
-    account === undefined ||
-    account.status !== 'active' ||
-    person === undefined ||
-    person.status !== 'active'
+    account?.status !== 'active' ||
+    person?.status !== 'active'
   ) {
     await dependencies.transactions.consume(input.transactionId, dependencies.clock.now());
     const now = dependencies.clock.now();
@@ -376,14 +366,19 @@ async function finalizeLogin(
     await directory.updateIdentityEmailSnapshot(context, identity.id, input.email);
   }
   const now = dependencies.clock.now();
-  const sessionToken = toBase64Url(dependencies.random.randomBytes(32));
-  const csrfToken = toBase64Url(dependencies.random.randomBytes(32));
+  // Digests cover the raw credential bytes. Verification decodes the
+  // base64url cookie/header back to these same bytes before digesting, so
+  // both sides must use the raw form, never the encoded string.
+  const sessionTokenBytes = dependencies.random.randomBytes(32);
+  const csrfTokenBytes = dependencies.random.randomBytes(32);
+  const sessionToken = toBase64Url(sessionTokenBytes);
+  const csrfToken = toBase64Url(csrfTokenBytes);
   const session = await dependencies.sessions.create(context, {
     tenantId: input.tenantId,
     accountId: account.id,
     identityProviderId: input.providerId,
-    tokenDigest: dependencies.digester.digest(new TextEncoder().encode(sessionToken)),
-    csrfTokenDigest: dependencies.digester.digest(new TextEncoder().encode(csrfToken)),
+    tokenDigest: dependencies.digester.digest(sessionTokenBytes),
+    csrfTokenDigest: dependencies.digester.digest(csrfTokenBytes),
     accountSessionRevision: account.sessionRevision,
     authenticationMethod: 'oidc',
     authenticatedAt: now,

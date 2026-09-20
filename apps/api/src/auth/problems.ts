@@ -36,7 +36,10 @@ export function statusFor(code: AuthErrorCode): number {
   return STATUS_BY_CODE[code];
 }
 
-export function problemFor(error: AuthenticationError, request: FastifyRequest): {
+export function problemFor(
+  error: AuthenticationError,
+  request: FastifyRequest,
+): {
   readonly type: string;
   readonly title: string;
   readonly status: number;

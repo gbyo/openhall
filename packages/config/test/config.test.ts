@@ -6,9 +6,8 @@ const validEnvironment = {
   APP_BASE_URL: 'https://openhall.example.edu',
   DATABASE_URL: 'postgresql://openhall:secret@db/openhall',
   APP_SECRET: 'a-secure-production-secret-that-is-long-enough',
-  DATA_ENCRYPTION_KEY:
-    '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-  DATA_ENCRYPTION_KEY_ID: 'test-key-1',
+  DATA_ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+  DATA_ENCRYPTION_KEY_ID: 'prod-key-1',
   TRUST_PROXY: 'false',
   PORT: '3000',
 };

@@ -48,11 +48,20 @@ afterAll(async () => {
 });
 
 async function seed() {
+  // Every test seeds the shared database, so tenant slugs must be unique
+  // per call since migration 003 enforces UNIQUE(tenant.slug).
+  const nonce = randomUUID();
   const tenantA = (
-    await pool.query<{ id: string }>("INSERT INTO tenant (name) VALUES ('A') RETURNING id")
+    await pool.query<{ id: string }>(
+      'INSERT INTO tenant (name, slug) VALUES ($1, $2) RETURNING id',
+      ['A', `tenant-a-${nonce}`],
+    )
   ).rows[0]?.id;
   const tenantB = (
-    await pool.query<{ id: string }>("INSERT INTO tenant (name) VALUES ('B') RETURNING id")
+    await pool.query<{ id: string }>(
+      'INSERT INTO tenant (name, slug) VALUES ($1, $2) RETURNING id',
+      ['B', `tenant-b-${nonce}`],
+    )
   ).rows[0]?.id;
   if (!tenantA || !tenantB) throw new Error('Fixture tenant insert failed');
   const organizationA = (
@@ -122,7 +131,7 @@ describe('foundation migration on PostgreSQL 18', () => {
     );
     expect(Number.parseInt(version.rows[0]?.version ?? '0', 10)).toBe(18);
     const row = await pool.query<{ id: string; version: number }>(
-      "INSERT INTO tenant (name) VALUES ('UUID Test') RETURNING id, uuid_extract_version(id) AS version",
+      "INSERT INTO tenant (name, slug) VALUES ('UUID Test', 'uuid-test') RETURNING id, uuid_extract_version(id) AS version",
     );
     expect(row.rows[0]?.version).toBe(7);
     const tables = await pool.query<{ count: string }>(
@@ -459,7 +468,7 @@ describe('foundation migration on PostgreSQL 18', () => {
     const handle = createDatabase(databaseUrl, { max: 1 });
     const probe = new PostgresReadinessProbe(handle.database);
     await expect(probe.check()).resolves.toEqual({
-      migration: '002_scheduling_expected_placement',
+      migration: '003_identity_secure_sessions',
     });
     await handle.destroy();
     await expect(probe.check()).rejects.toBeDefined();

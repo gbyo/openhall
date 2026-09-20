@@ -44,19 +44,13 @@ export const SlugSchema = Type.String({ pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', m
 
 export const AuthSessionSchema = Type.Union(
   [
-    Type.Object(
-      { authenticated: Type.Literal(false) },
-      { additionalProperties: false },
-    ),
+    Type.Object({ authenticated: Type.Literal(false) }, { additionalProperties: false }),
     Type.Object(
       {
         authenticated: Type.Literal(true),
         csrfToken: Type.String({ minLength: 1 }),
         absoluteExpiresAt: InstantSchema,
-        authenticationMethod: Type.Union([
-          Type.Literal('oidc'),
-          Type.Literal('recovery'),
-        ]),
+        authenticationMethod: Type.Union([Type.Literal('oidc'), Type.Literal('recovery')]),
       },
       { additionalProperties: false },
     ),
@@ -97,10 +91,7 @@ export const ProviderSummarySchema = Type.Object(
 
 export const AuthDiscoverySchema = Type.Union(
   [
-    Type.Object(
-      { tenantSelectionRequired: Type.Literal(true) },
-      { additionalProperties: false },
-    ),
+    Type.Object({ tenantSelectionRequired: Type.Literal(true) }, { additionalProperties: false }),
     Type.Object(
       {
         tenantSelectionRequired: Type.Literal(false),

@@ -32,6 +32,9 @@ export function createDatabase(
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
+    // Temporal values travel as text; pinning the session zone keeps their
+    // rendering deterministic no matter how the server was initialized.
+    options: '-c TimeZone=UTC',
     ...remainingOverrides,
     types: databaseTypeOverrides(types),
   });

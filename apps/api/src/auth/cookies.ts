@@ -64,10 +64,16 @@ export function decodeCookieToken(value: string | undefined): Uint8Array | undef
   }
 }
 
-export function sessionTokenFrom(request: FastifyRequest, isProduction: boolean): string | undefined {
-  return request.cookies?.[sessionCookieName(isProduction)];
+export function sessionTokenFrom(
+  request: FastifyRequest,
+  isProduction: boolean,
+): string | undefined {
+  return request.cookies[sessionCookieName(isProduction)];
 }
 
-export function bindingTokenFrom(request: FastifyRequest, isProduction: boolean): string | undefined {
-  return request.cookies?.[loginBindingCookieName(isProduction)];
+export function bindingTokenFrom(
+  request: FastifyRequest,
+  isProduction: boolean,
+): string | undefined {
+  return request.cookies[loginBindingCookieName(isProduction)];
 }

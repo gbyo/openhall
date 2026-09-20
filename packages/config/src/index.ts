@@ -31,10 +31,7 @@ export class ConfigError extends Error {
  * Parses DATA_ENCRYPTION_KEY as exactly 256 random bits in a documented
  * encoding: 64 hexadecimal characters, or base64/base64url encoding 32 bytes.
  */
-function parseDataEncryptionKey(
-  environment: NodeJS.ProcessEnv,
-  issues: string[],
-): Uint8Array {
+function parseDataEncryptionKey(environment: NodeJS.ProcessEnv, issues: string[]): Uint8Array {
   const raw = environment.DATA_ENCRYPTION_KEY?.trim() ?? '';
   if (raw.length === 0) {
     issues.push('DATA_ENCRYPTION_KEY is required');
@@ -126,6 +123,12 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
   }
 
   const dataEncryptionKeyId = required(environment, 'DATA_ENCRYPTION_KEY_ID', issues);
+  if (
+    nodeEnv === 'production' &&
+    /development|example|change-this|test/i.test(dataEncryptionKeyId)
+  ) {
+    issues.push('DATA_ENCRYPTION_KEY_ID must be a production key id in production');
+  }
   const dataEncryptionKey = parseDataEncryptionKey(environment, issues);
 
   const trustProxyValue = environment.TRUST_PROXY?.trim() ?? 'false';

@@ -162,7 +162,7 @@ export async function prepareBootstrap(
     const now = dependencies.clock.now();
     const digest = dependencies.digester.digest(decodeOperatorToken(input.operatorToken));
     const grant = await dependencies.grants.findValidByTokenDigest(digest, now);
-    if (grant === undefined || grant.purpose !== 'bootstrap') {
+    if (grant?.purpose !== 'bootstrap') {
       throw new AuthenticationError('bootstrap_token_invalid');
     }
     if ((await dependencies.tenants.countCanonical()) > 0) {
@@ -235,7 +235,7 @@ export async function prepareBootstrap(
     };
     const existing = await dependencies.drafts.findByGrantId(system, prepared.grantId);
     const setup =
-      existing !== undefined && existing.completedAt === null
+      existing?.completedAt === null
         ? await dependencies.drafts.updateDraft(system, existing.id, withSecret)
         : await dependencies.drafts.createDraft(system, prepared.grantId, withSecret);
     const state = toBase64Url(dependencies.random.randomBytes(32));
@@ -322,11 +322,7 @@ export async function completeBootstrap(
     dependencies.digester.digest(new TextEncoder().encode(input.state)),
     now,
   );
-  if (
-    transaction === undefined ||
-    transaction.purpose !== 'bootstrap' ||
-    transaction.bootstrapSetupId === null
-  ) {
+  if (transaction?.purpose !== 'bootstrap' || transaction.bootstrapSetupId === null) {
     throw new AuthenticationError('auth_transaction_invalid');
   }
   const setupId = transaction.bootstrapSetupId;
@@ -338,7 +334,7 @@ export async function completeBootstrap(
       await dependencies.transactions.markFailed(transaction.id, now);
       throw new AuthenticationError('auth_transaction_expired');
     }
-    let bindingValid = false;
+    let bindingValid: boolean;
     try {
       bindingValid = dependencies.digester.matches(
         decodeBinding(input.browserBinding),
@@ -347,12 +343,12 @@ export async function completeBootstrap(
     } catch {
       bindingValid = false;
     }
-    if (!bindingValid || setupId === null) {
+    if (!bindingValid) {
       await markFailed();
       throw new AuthenticationError('auth_transaction_invalid');
     }
     const setup = await dependencies.drafts.findBySetupId(system, setupId);
-    if (setup === undefined || setup.completedAt !== null) {
+    if (setup?.completedAt !== null) {
       await markFailed();
       throw new AuthenticationError('auth_transaction_invalid');
     }
@@ -406,15 +402,17 @@ export async function completeBootstrap(
     }
     // Never email-match: the presenter of this transaction is explicitly
     // becoming the initial administrator.
-    const sessionToken = toBase64Url(dependencies.random.randomBytes(32));
-    const csrfToken = toBase64Url(dependencies.random.randomBytes(32));
+    const sessionTokenBytes = dependencies.random.randomBytes(32);
+    const csrfTokenBytes = dependencies.random.randomBytes(32);
+    const sessionToken = toBase64Url(sessionTokenBytes);
+    const csrfToken = toBase64Url(csrfTokenBytes);
     const installation = await dependencies.finalizer.finalize(system, {
       setupId: setup.id,
       transactionId: transaction.id,
       identity,
       providerClientSecret: clientSecret,
-      sessionTokenDigest: dependencies.digester.digest(new TextEncoder().encode(sessionToken)),
-      csrfTokenDigest: dependencies.digester.digest(new TextEncoder().encode(csrfToken)),
+      sessionTokenDigest: dependencies.digester.digest(sessionTokenBytes),
+      csrfTokenDigest: dependencies.digester.digest(csrfTokenBytes),
       now: dependencies.clock.now(),
       requestId: input.requestId,
     });
@@ -460,7 +458,7 @@ export async function consumeRecoveryGrant(
     throw new AuthenticationError('recovery_token_invalid');
   }
   const grant = await dependencies.grants.consumeByTokenDigest(digest, now);
-  if (grant === undefined || grant.purpose !== 'recovery' || grant.tenantId === null) {
+  if (grant?.purpose !== 'recovery' || grant.tenantId === null) {
     throw new AuthenticationError('recovery_token_invalid');
   }
   const tenantId = grant.tenantId;
@@ -479,25 +477,24 @@ export async function consumeRecoveryGrant(
         ? false
         : await dependencies.directory.hasActiveSystemAdminGrant(context, account.id, now);
     if (
-      tenant === undefined ||
-      tenant.status !== 'active' ||
-      account === undefined ||
-      account.status !== 'active' ||
-      person === undefined ||
-      person.status !== 'active' ||
+      tenant?.status !== 'active' ||
+      account?.status !== 'active' ||
+      person?.status !== 'active' ||
       !hasAdminGrant
     ) {
       throw new AuthenticationError('recovery_token_invalid');
     }
     const authenticatedAt = dependencies.clock.now();
-    const sessionToken = toBase64Url(dependencies.random.randomBytes(32));
-    const csrfToken = toBase64Url(dependencies.random.randomBytes(32));
+    const sessionTokenBytes = dependencies.random.randomBytes(32);
+    const csrfTokenBytes = dependencies.random.randomBytes(32);
+    const sessionToken = toBase64Url(sessionTokenBytes);
+    const csrfToken = toBase64Url(csrfTokenBytes);
     const session = await dependencies.sessions.create(context, {
       tenantId,
       accountId: account.id,
       identityProviderId: null,
-      tokenDigest: dependencies.digester.digest(new TextEncoder().encode(sessionToken)),
-      csrfTokenDigest: dependencies.digester.digest(new TextEncoder().encode(csrfToken)),
+      tokenDigest: dependencies.digester.digest(sessionTokenBytes),
+      csrfTokenDigest: dependencies.digester.digest(csrfTokenBytes),
       accountSessionRevision: account.sessionRevision,
       authenticationMethod: 'recovery',
       authenticatedAt,
@@ -536,7 +533,7 @@ export async function issueRecoveryGrant(
   dependencies: IssueRecoveryDependencies,
 ): Promise<IssuedOperatorGrant> {
   const tenant = await tenants.findById(input.tenantId);
-  if (tenant === undefined || tenant.status !== 'active') {
+  if (tenant?.status !== 'active') {
     throw new AuthenticationError('recovery_token_invalid');
   }
   const eligible = await checker.checkRecoveryEligible(context, input.tenantId, input.accountId);

@@ -48,7 +48,8 @@ afterAll(async () => {
 async function seedSchedule() {
   const tenant = (
     await handle.pool.query<{ id: string }>(
-      "INSERT INTO tenant (name) VALUES ('Resolver') RETURNING id",
+      "INSERT INTO tenant (name, slug) VALUES ('Resolver', $1) RETURNING id",
+      [`resolver-${randomUUID()}`],
     )
   ).rows[0]?.id;
   if (!tenant) throw new Error('Tenant fixture failed');
@@ -188,7 +189,8 @@ describe('PostgreSQL expected-placement repository', () => {
     const fixture = await seedSchedule();
     const otherTenant = (
       await handle.pool.query<{ id: string }>(
-        "INSERT INTO tenant (name) VALUES ('Other') RETURNING id",
+        "INSERT INTO tenant (name, slug) VALUES ('Other', $1) RETURNING id",
+        [`other-${randomUUID()}`],
       )
     ).rows[0]?.id;
     const resolver = new ExpectedPlacementResolver(

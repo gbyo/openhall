@@ -2,6 +2,7 @@ import type {} from '@fastify/cookie';
 import {
   AuthenticationError,
   beginOidcLogin,
+  completeBootstrap,
   completeOidcLogin,
   consumeRecoveryGrant,
   logoutAllSessions,
@@ -58,11 +59,6 @@ const DiscoveryQuerySchema = Type.Object(
   { additionalProperties: true },
 );
 
-const CsrfHeaderSchema = Type.Object(
-  { 'x-csrf-token': Type.String({ minLength: 1 }) },
-  { additionalProperties: true },
-);
-
 const COOKIE_SECURITY = [{ cookieAuth: [] as string[] }];
 const CSRF_SECURITY = [{ cookieAuth: [] as string[] }, { csrfHeader: [] as string[] }];
 
@@ -89,10 +85,7 @@ async function sendAuthProblem(
     .send(problemFor(error, request));
 }
 
-export function registerAuthRoutes(
-  app: FastifyInstance,
-  dependencies: AuthDependencies,
-): void {
+export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDependencies): void {
   const typedApp = app.withTypeProvider<TypeBoxTypeProvider>();
   const id = () => dependencies;
 
@@ -112,21 +105,21 @@ export function registerAuthRoutes(
     async (request, reply) => {
       const resolved = request.resolvedSession;
       if (resolved === undefined) {
-        return reply
-          .header('Cache-Control', 'no-store')
-          .send({ authenticated: false as const });
+        return reply.header('Cache-Control', 'no-store').send({ authenticated: false as const });
       }
       // A refresh obtains a new CSRF value: rotate the digest and return the
       // fresh raw token for SPA runtime memory. Never stored raw server-side.
-      const csrfToken = toBase64Url(dependencies.random.randomBytes(32));
+      // The digest covers the raw bytes, matching CSRF verification.
+      const csrfTokenBytes = dependencies.random.randomBytes(32);
+      const csrfToken = toBase64Url(csrfTokenBytes);
       await dependencies.tenantRunner.run(resolved.session.tenantId, async (context) => {
         await dependencies.sessions.rotateCsrfToken(
           context,
           resolved.session.id,
-          dependencies.digester.digest(new TextEncoder().encode(csrfToken)),
+          dependencies.digester.digest(csrfTokenBytes),
         );
       });
-      return reply.header('Cache-Control', 'no-store').send({
+      return await reply.header('Cache-Control', 'no-store').send({
         authenticated: true as const,
         csrfToken,
         absoluteExpiresAt: resolved.session.absoluteExpiresAt.toString(),
@@ -159,7 +152,7 @@ export function registerAuthRoutes(
         await sendAuthProblem(reply, request, new AuthenticationError('unauthenticated'));
         return;
       }
-      return reply.header('Cache-Control', 'no-store').send({
+      return await reply.header('Cache-Control', 'no-store').send({
         person: {
           id: resolved.person.id,
           givenName: resolved.person.givenName,
@@ -192,7 +185,7 @@ export function registerAuthRoutes(
       const slug = request.query.tenant?.trim().toLowerCase();
       if (slug !== undefined && slug.length > 0) {
         const tenant = await d.tenants.findBySlug(slug);
-        if (tenant !== undefined && tenant.status === 'active') {
+        if (tenant?.status === 'active') {
           return discoveryFor(d, tenant.id);
         }
       }
@@ -262,7 +255,7 @@ export function registerAuthRoutes(
             allowInsecureHttp: d.allowInsecureHttp,
           },
         );
-        return reply.header('Cache-Control', 'no-store').redirect(begun.authorizationUrl);
+        return await reply.header('Cache-Control', 'no-store').redirect(begun.authorizationUrl);
       } catch (error) {
         if (error instanceof AuthenticationError) {
           await sendAuthProblem(reply, request, error);
@@ -294,9 +287,53 @@ export function registerAuthRoutes(
       const state = request.query.state;
       const binding = bindingTokenFrom(request, d.isProduction);
       if (typeof state !== 'string' || state.length === 0 || binding === undefined) {
-        return reply.header('Cache-Control', 'no-store').redirect('/?error=auth_transaction_invalid');
+        return await reply
+          .header('Cache-Control', 'no-store')
+          .redirect('/?error=auth_transaction_invalid');
       }
       try {
+        // The OIDC redirect URI is shared: peek at the transaction purpose
+        // (non-consuming) and dispatch to the bootstrap or login completion.
+        // The completing use case still enforces the atomic claim, so a
+        // raced or replayed callback fails closed either way.
+        const pending = await d.transactions.peekByStateDigest(
+          d.digester.digest(new TextEncoder().encode(state)),
+        );
+        if (pending?.purpose === 'bootstrap') {
+          const installed = await completeBootstrap(
+            {
+              state,
+              browserBinding: binding,
+              callbackUrl,
+              requestId: request.id,
+            },
+            {
+              grants: d.grants,
+              drafts: d.drafts,
+              tenants: d.tenants,
+              transactions: d.transactions,
+              adapter: d.adapter,
+              protector: d.protector,
+              random: d.random,
+              digester: d.digester,
+              clock: d.clock,
+              finalizer: d.finalizer,
+              sessionRunner: d.systemRunner,
+              redirectUri: d.redirectUri,
+              allowInsecureHttp: d.allowInsecureHttp,
+            },
+          );
+          const bootstrapMaxAge = Math.max(
+            60,
+            Math.floor(
+              (installed.installation.session.absoluteExpiresAt.epochMilliseconds -
+                d.clock.now().epochMilliseconds) /
+                1000,
+            ),
+          );
+          setSessionCookie(reply, d.isProduction, installed.sessionToken, bootstrapMaxAge);
+          return await reply.header('Cache-Control', 'no-store').redirect('/');
+        }
         const completed = await completeOidcLogin(
           {
             state,
@@ -325,17 +362,16 @@ export function registerAuthRoutes(
         const maxAge = Math.max(
           60,
           Math.floor(
-            (completed.session.absoluteExpiresAt.epochMilliseconds - d.clock.now().epochMilliseconds) /
+            (completed.session.absoluteExpiresAt.epochMilliseconds -
+              d.clock.now().epochMilliseconds) /
               1000,
           ),
         );
         setSessionCookie(reply, d.isProduction, completed.sessionToken, maxAge);
-        return reply.header('Cache-Control', 'no-store').redirect(completed.returnPath);
+        return await reply.header('Cache-Control', 'no-store').redirect(completed.returnPath);
       } catch (error) {
         if (error instanceof AuthenticationError) {
-          return reply
-            .header('Cache-Control', 'no-store')
-            .redirect(`/?error=${error.code}`);
+          return reply.header('Cache-Control', 'no-store').redirect(`/?error=${error.code}`);
         }
         throw error;
       }
@@ -348,9 +384,9 @@ export function registerAuthRoutes(
       schema: {
         operationId: 'logout',
         tags: ['auth'],
-        description: 'Revokes the current session. Requires session, CSRF token, and same origin.',
+        description:
+          'Revokes the current session. Requires the session cookie, the X-CSRF-Token header, and a same-origin request.',
         security: CSRF_SECURITY,
-        headers: CsrfHeaderSchema,
         response: {
           200: OkSchema,
           401: {
@@ -383,7 +419,7 @@ export function registerAuthRoutes(
         });
       });
       clearSessionCookie(reply, d.isProduction);
-      return reply.header('Cache-Control', 'no-store').send({ ok: true as const });
+      return await reply.header('Cache-Control', 'no-store').send({ ok: true as const });
     },
   );
 
@@ -394,9 +430,8 @@ export function registerAuthRoutes(
         operationId: 'logoutAll',
         tags: ['auth'],
         description:
-          'Revokes every session for the account by bumping session_revision. Requires session, CSRF token, and same origin.',
+          'Revokes every session for the account by bumping session_revision. Requires the session cookie, the X-CSRF-Token header, and a same-origin request.',
         security: CSRF_SECURITY,
-        headers: CsrfHeaderSchema,
         response: {
           200: OkSchema,
           401: {
@@ -430,7 +465,7 @@ export function registerAuthRoutes(
         });
       });
       clearSessionCookie(reply, d.isProduction);
-      return reply.header('Cache-Control', 'no-store').send({ ok: true as const });
+      return await reply.header('Cache-Control', 'no-store').send({ ok: true as const });
     },
   );
 
@@ -475,7 +510,7 @@ export function registerAuthRoutes(
           },
         );
         setSessionCookie(reply, d.isProduction, consumed.sessionToken, 30 * 60);
-        return reply.header('Cache-Control', 'no-store').send({
+        return await reply.header('Cache-Control', 'no-store').send({
           authenticated: true as const,
           authenticationMethod: 'recovery' as const,
         });
@@ -502,7 +537,7 @@ async function discoveryFor(
     }
 > {
   const tenant = await dependencies.tenants.findById(tenantId);
-  if (tenant === undefined || tenant.status !== 'active') {
+  if (tenant?.status !== 'active') {
     return { tenantSelectionRequired: true as const };
   }
   const providers = await dependencies.tenantRunner.run(tenantId, async (context) =>

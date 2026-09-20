@@ -17,7 +17,12 @@ import {
 import type { AppConfig } from '@openhall/config';
 import type { Kysely } from 'kysely';
 import type { DB as Database } from '@openhall/db';
-import { Aes256GcmSecretProtector, HmacCredentialDigester, NodeSecureRandom, NodeSha256Hasher } from './crypto.js';
+import {
+  Aes256GcmSecretProtector,
+  HmacCredentialDigester,
+  NodeSecureRandom,
+  NodeSha256Hasher,
+} from './crypto.js';
 import { OpenIdClientAdapter } from './oidc-adapter.js';
 
 /** Exact OIDC callback path derived from APP_BASE_URL, never from headers. */

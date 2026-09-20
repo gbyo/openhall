@@ -106,8 +106,8 @@ const TOKEN_AUTH_METHODS = ['client_secret_post', 'client_secret_basic'] as cons
 export type TokenEndpointAuthMethod = (typeof TOKEN_AUTH_METHODS)[number];
 
 export function assertTokenAuthMethod(value: string): TokenEndpointAuthMethod {
-  if (value === 'client_secret_post' || value === 'client_secret_basic') {
-    return value;
+  if ((TOKEN_AUTH_METHODS as readonly string[]).includes(value)) {
+    return value as TokenEndpointAuthMethod;
   }
   throw new AuthenticationError(
     'provider_configuration_unsupported',
@@ -155,13 +155,13 @@ export function toBase64Url(bytes: Uint8Array): string {
     const second = index + 1 < bytes.length ? (bytes[index + 1] ?? 0) : 0;
     const third = index + 2 < bytes.length ? (bytes[index + 2] ?? 0) : 0;
     const group = (first << 16) | (second << 8) | third;
-    output += BASE64URL_ALPHABET[(group >> 18) & 63];
-    output += BASE64URL_ALPHABET[(group >> 12) & 63];
+    output += BASE64URL_ALPHABET.charAt((group >> 18) & 63);
+    output += BASE64URL_ALPHABET.charAt((group >> 12) & 63);
     if (index + 1 < bytes.length) {
-      output += BASE64URL_ALPHABET[(group >> 6) & 63];
+      output += BASE64URL_ALPHABET.charAt((group >> 6) & 63);
     }
     if (index + 2 < bytes.length) {
-      output += BASE64URL_ALPHABET[group & 63];
+      output += BASE64URL_ALPHABET.charAt(group & 63);
     }
   }
   return output;

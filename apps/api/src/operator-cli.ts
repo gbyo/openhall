@@ -80,7 +80,7 @@ async function main(): Promise<number> {
       }
       const tenant =
         (await tenants.findBySlug(tenantRef.toLowerCase())) ?? (await tenants.findById(tenantRef));
-      if (tenant === null || tenant === undefined) {
+      if (tenant === undefined) {
         process.stderr.write('No matching active tenant for recovery grant.\n');
         return 1;
       }

@@ -18,16 +18,14 @@ function clientAuth(configuration: OidcProviderConfiguration): client.ClientAuth
   return client.ClientSecretPost(configuration.clientSecret);
 }
 
-async function discover(
-  configuration: OidcProviderConfiguration,
-): Promise<client.Configuration> {
+async function discover(configuration: OidcProviderConfiguration): Promise<client.Configuration> {
   let issuer: URL;
   try {
     issuer = new URL(configuration.issuer);
   } catch {
     throw new AuthenticationError('provider_configuration_unsupported');
   }
-  if (issuer.protocol === 'http:' && configuration.allowInsecureHttp !== true) {
+  if (issuer.protocol === 'http:' && !configuration.allowInsecureHttp) {
     throw new AuthenticationError('provider_configuration_unsupported');
   }
   try {
@@ -36,11 +34,24 @@ async function discover(
       configuration.clientId,
       configuration.clientSecret,
       clientAuth(configuration),
-      { timeout: PROVIDER_TIMEOUT_SECONDS },
+      {
+        timeout: PROVIDER_TIMEOUT_SECONDS,
+        execute: [
+          // The plain code flow receives the ID Token over server
+          // -authenticated TLS, but OpenHall additionally requires JWS
+          // signature verification (unknown keys and tampered tokens must
+          // fail) rather than relying on TLS alone.
+          client.enableNonRepudiationChecks,
+          // HTTP issuers are only ever attempted for explicitly local
+          // development/test providers (checked above); without this, the
+          // library rightfully refuses insecure discovery. The library marks
+          // this helper deprecated only for visibility and still documents
+          // it as the sanctioned path for non-TLS development environments.
+          // eslint-disable-next-line @typescript-eslint/no-deprecated
+          ...(issuer.protocol === 'http:' ? [client.allowInsecureRequests] : []),
+        ],
+      },
     );
-    if (issuer.protocol === 'http:') {
-      client.allowInsecureRequests(discovered);
-    }
     return discovered;
   } catch (error) {
     if (error instanceof AuthenticationError) {
@@ -84,14 +95,13 @@ function enforceBaseline(
 /**
  * Generic OIDC adapter built on openid-client. No OAuth cryptography is
  * implemented here: discovery, authorization URL creation, code exchange,
- * PKCE, nonce, issuer, and ID Token validation all run through the library.
- * Each call performs its own short-lived discovery so metadata is never
- * stale; nothing provider-specific (Google, Microsoft, ...) lives here.
+ * PKCE, nonce, issuer, and ID Token validation (claims plus JWS signature
+ * via non-repudiation checks) all run through the library. Each call
+ * performs its own short-lived discovery so metadata is never stale;
+ * nothing provider-specific (Google, Microsoft, ...) lives here.
  */
 export class OpenIdClientAdapter implements OidcProtocolAdapter {
-  async validateProviderConfiguration(
-    configuration: OidcProviderConfiguration,
-  ): Promise<void> {
+  async validateProviderConfiguration(configuration: OidcProviderConfiguration): Promise<void> {
     const discovered = await discover(configuration);
     enforceBaseline(discovered.serverMetadata(), configuration);
   }

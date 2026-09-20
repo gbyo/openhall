@@ -53,8 +53,6 @@ function secretFrom(
   return { ciphertext: bytes(ciphertext), nonce: bytes(nonce), tag: bytes(tag), keyId };
 }
 
-
-
 function mapSession(row: {
   id: string;
   tenant_id: string;
@@ -347,7 +345,7 @@ export class PostgresSessionRepository implements SessionRepository {
       .where('account_id', '=', accountId)
       .where('revoked_at', 'is', null)
       .executeTakeFirst();
-    return Number(result.numUpdatedRows ?? 0);
+    return Number(result.numUpdatedRows);
   }
 }
 
@@ -577,16 +575,10 @@ export class PostgresIdentityDirectory implements IdentityDirectory {
       .where('scope_kind', '=', 'tenant')
       .where('status', '=', 'active')
       .where((builder) =>
-        builder.or([
-          builder('valid_from', 'is', null),
-          builder('valid_from', '<=', instant),
-        ]),
+        builder.or([builder('valid_from', 'is', null), builder('valid_from', '<=', instant)]),
       )
       .where((builder) =>
-        builder.or([
-          builder('valid_until', 'is', null),
-          builder('valid_until', '>', instant),
-        ]),
+        builder.or([builder('valid_until', 'is', null), builder('valid_until', '>', instant)]),
       )
       .executeTakeFirst();
     return row !== undefined;
@@ -676,6 +668,9 @@ export class PostgresOidcTransactionStore implements OidcTransactionStore {
 
   async claimByStateDigest(
     stateDigest: Uint8Array,
+    // Reserved for OidcTransactionStore conformance: expiry is enforced by
+    // the completing use case so expired transactions stay distinguishable.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _now: Temporal.Instant,
   ): Promise<OidcTransactionRecord | undefined> {
     const result = await sql`
@@ -697,6 +692,17 @@ export class PostgresOidcTransactionStore implements OidcTransactionStore {
     return row === undefined ? undefined : mapTransaction(row);
   }
 
+  async peekByStateDigest(stateDigest: Uint8Array): Promise<OidcTransactionRecord | undefined> {
+    const row = await this.database
+      .selectFrom('oidc_login_transaction')
+      .selectAll()
+      .where('state_hash', '=', toDatabaseBytes(stateDigest))
+      .orderBy('created_at', 'desc')
+      .executeTakeFirst();
+    return row === undefined ? undefined : mapTransaction(row);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async markFailed(transactionId: string, _now: Temporal.Instant): Promise<void> {
     await this.database
       .updateTable('oidc_login_transaction')
@@ -960,7 +966,7 @@ export class PostgresRecoveryEligibilityChecker implements RecoveryEligibilityCh
       .select(['id', 'status'])
       .where('id', '=', tenantId)
       .executeTakeFirst();
-    if (tenant === undefined || tenant.status !== 'active') {
+    if (tenant?.status !== 'active') {
       return false;
     }
     const account = await connection
@@ -969,7 +975,7 @@ export class PostgresRecoveryEligibilityChecker implements RecoveryEligibilityCh
       .where('tenant_id', '=', tenantId)
       .where('id', '=', accountId)
       .executeTakeFirst();
-    if (account === undefined || account.status !== 'active') {
+    if (account?.status !== 'active') {
       return false;
     }
     const person = await connection
@@ -978,7 +984,7 @@ export class PostgresRecoveryEligibilityChecker implements RecoveryEligibilityCh
       .where('tenant_id', '=', tenantId)
       .where('id', '=', account.person_id)
       .executeTakeFirst();
-    if (person === undefined || person.status !== 'active') {
+    if (person?.status !== 'active') {
       return false;
     }
     const grant = await connection
@@ -990,16 +996,10 @@ export class PostgresRecoveryEligibilityChecker implements RecoveryEligibilityCh
       .where('scope_kind', '=', 'tenant')
       .where('status', '=', 'active')
       .where((builder) =>
-        builder.or([
-          builder('valid_from', 'is', null),
-          builder('valid_from', '<=', instant),
-        ]),
+        builder.or([builder('valid_from', 'is', null), builder('valid_from', '<=', instant)]),
       )
       .where((builder) =>
-        builder.or([
-          builder('valid_until', 'is', null),
-          builder('valid_until', '>', instant),
-        ]),
+        builder.or([builder('valid_until', 'is', null), builder('valid_until', '>', instant)]),
       )
       .executeTakeFirst();
     return grant !== undefined;
@@ -1014,7 +1014,11 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
     input: {
       readonly setupId: string;
       readonly transactionId: string;
-      readonly identity: { readonly issuer: string; readonly subject: string; readonly email?: string };
+      readonly identity: {
+        readonly issuer: string;
+        readonly subject: string;
+        readonly email?: string;
+      };
       readonly providerClientSecret: string;
       readonly sessionTokenDigest: Uint8Array;
       readonly csrfTokenDigest: Uint8Array;
@@ -1041,8 +1045,7 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
         .where('id', '=', input.setupId)
         .executeTakeFirst();
       if (
-        setup === undefined ||
-        setup.completed_at !== null ||
+        setup?.completed_at !== null ||
         fromDatabaseInstant(setup.expires_at).epochMilliseconds <= input.now.epochMilliseconds
       ) {
         throw new AuthenticationError('auth_transaction_invalid');
@@ -1065,8 +1068,7 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
         .where('id', '=', input.transactionId)
         .executeTakeFirst();
       if (
-        transaction === undefined ||
-        transaction.status !== 'processing' ||
+        transaction?.status !== 'processing' ||
         transaction.purpose !== 'bootstrap' ||
         transaction.bootstrap_setup_id !== input.setupId
       ) {
@@ -1168,12 +1170,8 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
           email_snapshot: input.identity.email ?? null,
         })
         .execute();
-      const idleExpires = toDatabaseInstant(
-        input.now.add({ seconds: 12 * 60 * 60 }),
-      );
-      const absoluteExpires = toDatabaseInstant(
-        input.now.add({ seconds: 7 * 24 * 60 * 60 }),
-      );
+      const idleExpires = toDatabaseInstant(input.now.add({ seconds: 12 * 60 * 60 }));
+      const absoluteExpires = toDatabaseInstant(input.now.add({ seconds: 7 * 24 * 60 * 60 }));
       const session = await connection
         .insertInto('auth_session')
         .values({
@@ -1243,7 +1241,7 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
         throw error;
       }
       if (typeof error === 'object' && error !== null && 'code' in error) {
-        const code = (error as { code: unknown }).code;
+        const code = error.code;
         if (code === '23505') {
           throw new AuthenticationError(
             'invalid_bootstrap_draft',

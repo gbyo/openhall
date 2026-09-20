@@ -25,5 +25,9 @@
     "kysely": "0.29.6",
     "openid-client": "6.8.8",
     "typebox": "1.3.34"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1",
+    "pg": "8.23.0"
   }
 }

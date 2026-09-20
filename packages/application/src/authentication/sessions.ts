@@ -80,7 +80,7 @@ export async function resolveSession(
 ): Promise<ResolvedSession> {
   const digest = dependencies.digester.digest(rawToken);
   const session = await dependencies.lookup.findByTokenDigest(digest);
-  if (session === undefined || session.revokedAt !== null) {
+  if (session?.revokedAt !== null) {
     throw new AuthenticationError('unauthenticated');
   }
   return dependencies.runTenantTransaction(session.tenantId, async (context) => {
@@ -177,4 +177,3 @@ export async function logoutAllSessions(
     requestId,
   });
 }
-
