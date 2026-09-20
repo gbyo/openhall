@@ -86,6 +86,51 @@ export interface AuthorizationGrant {
   valid_until: string | null;
 }
 
+export interface AuthSession {
+  absolute_expires_at: string;
+  account_id: string;
+  account_session_revision: Int8;
+  authenticated_at: Generated<string>;
+  authentication_method: string;
+  client_kind: Generated<string>;
+  created_at: Generated<string>;
+  csrf_token_hash: Buffer;
+  id: Generated<string>;
+  identity_provider_id: string | null;
+  idle_expires_at: string;
+  last_seen_at: Generated<string>;
+  revocation_reason: string | null;
+  revoked_at: string | null;
+  tenant_id: string;
+  token_hash: Buffer;
+}
+
+export interface BootstrapSetup {
+  admin_display_name: string;
+  admin_family_name: string;
+  admin_given_name: string;
+  completed_at: string | null;
+  created_at: Generated<string>;
+  expires_at: string;
+  id: Generated<string>;
+  operator_grant_id: string;
+  provider_auth_method: string;
+  provider_client_id: string;
+  provider_display_name: string;
+  provider_issuer: string;
+  provider_key: string;
+  provider_scopes: string[];
+  provider_secret_ciphertext: Buffer;
+  provider_secret_key_id: string;
+  provider_secret_nonce: Buffer;
+  provider_secret_tag: Buffer;
+  school_name: string;
+  school_slug: string;
+  school_time_zone: string;
+  tenant_name: string;
+  tenant_slug: string;
+}
+
 export interface CalendarDay {
   cycle_code: string | null;
   date: string;
@@ -156,6 +201,25 @@ export interface IdempotencyRecord {
   tenant_id: string;
 }
 
+export interface IdentityProvider {
+  client_id: string;
+  client_secret_ciphertext: Buffer;
+  client_secret_key_id: string;
+  client_secret_nonce: Buffer;
+  client_secret_tag: Buffer;
+  created_at: Generated<string>;
+  display_name: string;
+  id: Generated<string>;
+  issuer: string;
+  key: string;
+  revision: Generated<number>;
+  scopes: string[];
+  status: Generated<string>;
+  tenant_id: string;
+  token_endpoint_auth_method: string;
+  updated_at: Generated<string>;
+}
+
 export interface IncidentAffectedPass {
   incident_id: string;
   pass_id: string;
@@ -188,6 +252,18 @@ export interface Integration {
   updated_at: Generated<string>;
 }
 
+export interface LocalOperatorGrant {
+  account_id: string | null;
+  consumed_at: string | null;
+  created_at: Generated<string>;
+  expires_at: string;
+  id: Generated<string>;
+  purpose: string;
+  revoked_at: string | null;
+  tenant_id: string | null;
+  token_hash: Buffer;
+}
+
 export interface Location {
   code: string | null;
   created_at: Generated<string>;
@@ -200,6 +276,27 @@ export interface Location {
   status: Generated<string>;
   tenant_id: string;
   updated_at: Generated<string>;
+}
+
+export interface OidcLoginTransaction {
+  bootstrap_setup_id: string | null;
+  browser_binding_hash: Buffer;
+  consumed_at: string | null;
+  created_at: Generated<string>;
+  expires_at: string;
+  id: Generated<string>;
+  identity_provider_id: string | null;
+  processing_started_at: string | null;
+  provider_revision: number | null;
+  purpose: string;
+  return_path: Generated<string>;
+  state_hash: Buffer;
+  status: Generated<string>;
+  tenant_id: string | null;
+  transaction_secret_ciphertext: Buffer;
+  transaction_secret_key_id: string;
+  transaction_secret_nonce: Buffer;
+  transaction_secret_tag: Buffer;
 }
 
 export interface OperationalIncident {
@@ -461,6 +558,7 @@ export interface Tenant {
   created_at: Generated<string>;
   id: Generated<string>;
   name: string;
+  slug: string;
   status: Generated<string>;
   updated_at: Generated<string>;
 }
@@ -470,17 +568,22 @@ export interface DB {
   account: Account;
   audit_event: AuditEvent;
   auth_identity: AuthIdentity;
+  auth_session: AuthSession;
   authorization_grant: AuthorizationGrant;
+  bootstrap_setup: BootstrapSetup;
   calendar_day: CalendarDay;
   course: Course;
   destination: Destination;
   destination_reservation: DestinationReservation;
   external_reference: ExternalReference;
   idempotency_record: IdempotencyRecord;
+  identity_provider: IdentityProvider;
   incident_affected_pass: IncidentAffectedPass;
   incident_presence_report: IncidentPresenceReport;
   integration: Integration;
+  local_operator_grant: LocalOperatorGrant;
   location: Location;
+  oidc_login_transaction: OidcLoginTransaction;
   operational_incident: OperationalIncident;
   organization: Organization;
   organization_membership: OrganizationMembership;

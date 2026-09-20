@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { LivenessSchema, ProblemDetailsSchema, ReadinessSchema } from '@openhall/contracts';
 import type { ReadinessProbe } from '@openhall/db';
+import { safeRequestPath } from '../http-privacy.js';
 
 export function registerHealthRoutes(app: FastifyInstance, readinessProbe: ReadinessProbe): void {
   const typedApp = app.withTypeProvider<TypeBoxTypeProvider>();
@@ -48,7 +49,7 @@ export function registerHealthRoutes(app: FastifyInstance, readinessProbe: Readi
           title: 'Service unavailable',
           status: 503,
           detail: 'A required dependency is unavailable or not current.',
-          instance: request.url,
+          instance: safeRequestPath(request.url),
           code: 'not_ready',
           requestId: request.id,
         });

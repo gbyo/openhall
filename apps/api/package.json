@@ -10,12 +10,16 @@
     "openapi:check": "tsx scripts/generate-openapi.ts --check"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/helmet": "13.1.1",
+    "@fastify/rate-limit": "11.2.0",
     "@fastify/static": "10.1.4",
     "@fastify/swagger": "9.8.1",
     "@fastify/type-provider-typebox": "6.1.0",
     "@openhall/config": "workspace:*",
     "@openhall/contracts": "workspace:*",
     "@openhall/db": "workspace:*",
-    "fastify": "5.12.5"
+    "fastify": "5.12.5",
+    "openid-client": "6.8.8"
   }
 }

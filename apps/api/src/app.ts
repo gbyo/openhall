@@ -7,6 +7,7 @@ import { TypeBoxValidatorCompiler } from '@fastify/type-provider-typebox';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import type { AppConfig } from '@openhall/config';
 import type { ReadinessProbe } from '@openhall/db';
+import { safeRequestPath } from './http-privacy.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerSystemRoutes } from './routes/system.js';
 
@@ -26,15 +27,36 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
         ? false
         : {
             level: options.config.nodeEnv === 'development' ? 'debug' : 'info',
+            // Request logs carry method, sanitized pathname, request ID, and
+            // safe remote metadata only. Query strings are never logged, and
+            // headers (Cookie, Authorization, X-CSRF-Token, ...) are never
+            // logged, so OIDC codes/state, session material, and operator
+            // credentials cannot enter logs through raw URLs or headers.
+            serializers: {
+              req(request) {
+                return {
+                  id: request.id,
+                  method: request.method,
+                  url: safeRequestPath(request.url),
+                  hostname: request.hostname,
+                  remoteAddress: request.ip,
+                };
+              },
+            },
             redact: {
               paths: [
                 'req.headers.authorization',
                 'req.headers.cookie',
+                'req.headers.x-csrf-token',
                 'res.headers.set-cookie',
                 '*.password',
                 '*.token',
                 '*.client_secret',
+                '*.clientSecret',
                 '*.integration_secret',
+                '*.code',
+                '*.state',
+                '*.nonce',
               ],
               censor: '[REDACTED]',
             },
@@ -69,7 +91,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
         title: isValidationError ? 'Invalid request' : 'Internal server error',
         status,
         detail: isValidationError ? 'The request did not match the required contract.' : undefined,
-        instance: request.url,
+        instance: safeRequestPath(request.url),
         code: isValidationError ? 'invalid_request' : 'internal_error',
         requestId: request.id,
       });
@@ -80,7 +102,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
       type: 'https://openhall.dev/problems/not_found',
       title: 'Not found',
       status: 404,
-      instance: request.url,
+      instance: safeRequestPath(request.url),
       code: 'not_found',
       requestId: request.id,
     });

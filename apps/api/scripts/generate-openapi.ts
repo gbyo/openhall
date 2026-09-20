@@ -11,6 +11,8 @@ const config: AppConfig = {
   appBaseUrl: new URL('http://localhost:3000'),
   databaseUrl: 'postgresql://unused',
   appSecret: 'unused-in-openapi-generation',
+  dataEncryptionKey: new Uint8Array(32).fill(7),
+  dataEncryptionKeyId: 'test-key-1',
   trustProxy: false,
   port: 3000,
 };
