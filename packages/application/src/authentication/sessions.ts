@@ -78,7 +78,7 @@ export async function resolveSession(
   rawToken: Uint8Array,
   dependencies: SessionResolutionDependencies,
 ): Promise<ResolvedSession> {
-  const digest = dependencies.digester.digest(rawToken);
+  const digest = dependencies.digester.digestSessionToken(rawToken);
   const session = await dependencies.lookup.findByTokenDigest(digest);
   if (session?.revokedAt !== null) {
     throw new AuthenticationError('unauthenticated');

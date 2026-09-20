@@ -8,9 +8,12 @@ export interface SecureRandomSource {
 }
 
 /**
- * One-way digests for high-entropy ephemeral Bearer [REDACTED] (session
- * tokens, CSRF comparison material, OIDC state lookups, browser bindings,
- * operator/recovery tokens): HMAC-SHA-256(APP_SECRET, credential).
+ * One-way digests for high-entropy ephemeral Bearer [REDACTED] (OIDC state
+ * lookups, browser bindings, operator/recovery tokens, and the stored digest
+ * of a derived CSRF token): HMAC-SHA-256(APP_SECRET, credential). Session
+ * lookup digests and derived CSRF tokens use explicit domain separation (see
+ * below) so the two values are cryptographically distinct even though both
+ * derive from the same opaque session credential.
  * Canonical input is always the raw credential bytes: base64url transport
  * encodings are decoded back to raw bytes before digesting, on both the
  * creation and verification sides. Rotating APP_SECRET intentionally
@@ -19,6 +22,21 @@ export interface SecureRandomSource {
 export interface CredentialDigester {
   digest(credential: Uint8Array): Uint8Array;
   matches(credential: Uint8Array, expectedDigest: Uint8Array): boolean;
+  /**
+   * Session lookup digest: HMAC(APP_SECRET, "session-digest:v1" || 0x00 ||
+   * raw session credential). Stored as auth_session.token_hash and used for
+   * cookie lookup. Never exposed to the client.
+   */
+  digestSessionToken(credential: Uint8Array): Uint8Array;
+  /**
+   * Stable per-session CSRF token material: HMAC(APP_SECRET,
+   * "csrf-token:v1" || 0x00 || raw session credential). The base64url
+   * encoding of this value is the X-CSRF-Token header value; it is stable
+   * for the lifetime of the auth_session, so concurrent reads and multiple
+   * tabs never invalidate one another. Only its generic digest
+   * (digest(derived)) rests server-side as auth_session.csrf_token_hash.
+   */
+  deriveCsrfToken(credential: Uint8Array): Uint8Array;
 }
 
 /** Plain SHA-256 for PKCE S256 challenges (not a credential digest). */
@@ -80,15 +98,6 @@ export interface NewSession {
 
 export interface SessionRepository {
   create(context: TenantTransactionContext, input: NewSession): Promise<SessionRecord>;
-  /**
-   * Rotates the session CSRF token digest. The session endpoint issues a
-   * fresh raw CSRF value on every authenticated read, so only digests rest.
-   */
-  rotateCsrfToken(
-    context: TenantTransactionContext,
-    sessionId: string,
-    csrfTokenDigest: Uint8Array,
-  ): Promise<void>;
   touchLastSeen(
     context: TenantTransactionContext,
     sessionId: string,

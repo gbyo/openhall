@@ -87,4 +87,53 @@ describe('foundation HTTP API', () => {
     await app.close();
     await database.destroy();
   });
+
+  it('documents cookie AND CSRF in one requirement for protected mutations', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
+    const app = await createApp({
+      config,
+      database: database.database,
+      logger: false,
+      readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
+    });
+    await app.ready();
+    const document = app.swagger() as unknown as {
+      paths: Record<string, Record<string, { security?: Record<string, string[]>[] }>>;
+    };
+    for (const path of ['/api/v1/auth/logout', '/api/v1/auth/logout-all']) {
+      const security = document.paths[path]?.post?.security;
+      expect(security).toBeDefined();
+      // One requirement object must demand both schemes (AND). Separate
+      // objects would document OR.
+      expect(
+        security?.some((requirement) => 'cookieAuth' in requirement && 'csrfHeader' in requirement),
+      ).toBe(true);
+    }
+    await app.close();
+    await database.destroy();
+  });
+
+  it('documents /auth/session as anonymously callable while /me requires cookie auth', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
+    const app = await createApp({
+      config,
+      database: database.database,
+      logger: false,
+      readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
+    });
+    await app.ready();
+    const document = app.swagger() as unknown as {
+      paths: Record<string, Record<string, { security?: Record<string, string[]>[] }>>;
+    };
+    const sessionSecurity = document.paths['/api/v1/auth/session']?.get?.security;
+    expect(sessionSecurity).toBeDefined();
+    expect(sessionSecurity?.some((requirement) => Object.keys(requirement).length === 0)).toBe(
+      true,
+    );
+    expect(sessionSecurity?.some((requirement) => 'cookieAuth' in requirement)).toBe(true);
+    const meSecurity = document.paths['/api/v1/me']?.get?.security;
+    expect(meSecurity).toEqual([{ cookieAuth: [] }]);
+    await app.close();
+    await database.destroy();
+  });
 });

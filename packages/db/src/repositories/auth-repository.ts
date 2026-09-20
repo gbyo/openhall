@@ -286,21 +286,6 @@ export class PostgresSessionRepository implements SessionRepository {
     return mapSession(row);
   }
 
-  async rotateCsrfToken(
-    context: TenantTransactionContext,
-    sessionId: string,
-    csrfTokenDigest: Uint8Array,
-  ): Promise<void> {
-    const connection = connectionFor(context);
-    await connection
-      .updateTable('auth_session')
-      .set({ csrf_token_hash: toDatabaseBytes(csrfTokenDigest) })
-      .where('id', '=', sessionId)
-      .where('tenant_id', '=', context.tenantId)
-      .where('revoked_at', 'is', null)
-      .execute();
-  }
-
   async touchLastSeen(
     context: TenantTransactionContext,
     sessionId: string,

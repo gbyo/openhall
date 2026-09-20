@@ -26,8 +26,10 @@ export class NodeSecureRandom implements SecureRandomSource {
 
 /**
  * One-way digests for high-entropy ephemeral Bearer [REDACTED]:
- * HMAC-SHA-256(APP_SECRET, credential). Password-hashing algorithms are
- * deliberately not used: these are 256-bit random tokens, not human
+ * HMAC-SHA-256(APP_SECRET, credential) for generic tokens, plus
+ * domain-separated HMACs for session lookup digests ("session-digest:v1")
+ * and derived CSRF tokens ("csrf-token:v1"). Password-hashing algorithms
+ * are deliberately not used: these are 256-bit random tokens, not human
  * passwords. Rotating APP_SECRET invalidates outstanding credentials.
  */
 export class HmacCredentialDigester implements CredentialDigester {
@@ -39,6 +41,24 @@ export class HmacCredentialDigester implements CredentialDigester {
 
   digest(credential: Uint8Array): Uint8Array {
     return new Uint8Array(createHmac('sha256', this.appSecret).update(credential).digest());
+  }
+
+  digestSessionToken(credential: Uint8Array): Uint8Array {
+    return this.domainHmac('session-digest:v1', credential);
+  }
+
+  deriveCsrfToken(credential: Uint8Array): Uint8Array {
+    return this.domainHmac('csrf-token:v1', credential);
+  }
+
+  private domainHmac(domain: string, credential: Uint8Array): Uint8Array {
+    const hmac = createHmac('sha256', this.appSecret);
+    hmac.update(domain, 'utf8');
+    hmac.update(Buffer.from([0]));
+    hmac.update(
+      Buffer.from(credential.buffer as ArrayBuffer, credential.byteOffset, credential.byteLength),
+    );
+    return new Uint8Array(hmac.digest());
   }
 
   matches(credential: Uint8Array, expectedDigest: Uint8Array): boolean {

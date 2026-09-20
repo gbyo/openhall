@@ -81,10 +81,12 @@ export async function requirePrincipal(
 }
 
 /**
- * Stateful synchronizer-token CSRF plus same-origin enforcement for unsafe
+ * Stable synchronizer-token CSRF plus same-origin enforcement for unsafe
  * cookie-authenticated requests. An authenticated mutation requires a valid
- * session, the session's CSRF token, and a provable same-origin request.
- * Returns the reply to halt the request when validation fails.
+ * session, the session's stable derived CSRF token (domain "csrf-token:v1",
+ * digest-stored as csrf_token_hash, never rotated on read), and a provable
+ * same-origin request. Returns the reply to halt the request when validation
+ * fails.
  */
 export async function requireCsrf(
   request: FastifyRequest,

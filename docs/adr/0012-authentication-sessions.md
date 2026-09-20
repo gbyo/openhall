@@ -47,10 +47,16 @@ while logout-all bumps the revision and revokes all account sessions.
 `last_seen_at` is rewritten only after a five-minute touch window, never on
 every request. Idle lifetime is 12 hours, absolute lifetime 7 days.
 
-SPA mutations require a per-session CSRF token (rotated on every session
-read, digest-stored) plus an exact-match `Origin` or a same-origin `Referer`
-fallback; missing origin fails closed in every environment. OIDC redirects
-are exempt from the SPA header and rely on transaction protections instead.
+SPA mutations require a stable per-session CSRF token plus an exact-match
+`Origin` or a same-origin `Referer` fallback; missing origin fails closed in
+every environment. The CSRF token is derived deterministically from the raw
+opaque session credential via domain-separated HMAC (`csrf-token:v1`), while
+the session lookup digest uses `session-digest:v1`, so the two values are
+cryptographically distinct. `GET /api/v1/auth/session` is read-only and never
+rotates authentication state, so concurrent reads and multiple tabs always
+observe the same token. Only the generic digest of the derived token rests
+server-side (`csrf_token_hash`). OIDC redirects are exempt from the SPA
+header and rely on transaction protections instead.
 The login binding cookie is `HttpOnly` `SameSite=Lax` and never `Secure`-
 gated in a way that would break local development; production cookie flags
 are asserted by tests.

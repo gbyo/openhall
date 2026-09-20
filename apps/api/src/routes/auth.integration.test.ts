@@ -5,6 +5,7 @@ import { createDatabase } from '@openhall/db';
 import type { FastifyInstance } from 'fastify';
 import { Client, Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { fromBase64Url } from '@openhall/application';
 import { createApp } from '../app.js';
 import { Aes256GcmSecretProtector, HmacCredentialDigester } from '../auth/crypto.js';
 import { TestOidcProvider } from '../auth/test-oidc-provider.js';
@@ -468,11 +469,137 @@ describe('OIDC login flow', () => {
 });
 
 describe('sessions, CSRF, and logout', () => {
-  it('rotates the CSRF token on every session read', async () => {
+  it('returns a stable CSRF token on repeated reads without mutating csrf_token_hash', async () => {
     const { sessionCookie } = await login();
+    const digester = new HmacCredentialDigester(config.appSecret);
+    const before = (
+      await pool.query<{ csrf_token_hash: Buffer }>(
+        'SELECT csrf_token_hash FROM auth_session WHERE token_hash = $1',
+        [Buffer.from(digester.digestSessionToken(fromBase64Url(sessionCookie)))],
+      )
+    ).rows[0]?.csrf_token_hash;
+    if (!before) throw new Error('Session row missing');
     const first = await csrfFor(sessionCookie);
     const second = await csrfFor(sessionCookie);
-    expect(first).not.toBe(second);
+    expect(first).toBe(second);
+    const after = (
+      await pool.query<{ csrf_token_hash: Buffer }>(
+        'SELECT csrf_token_hash FROM auth_session WHERE token_hash = $1',
+        [Buffer.from(digester.digestSessionToken(fromBase64Url(sessionCookie)))],
+      )
+    ).rows[0]?.csrf_token_hash;
+    if (!after) throw new Error('Session row missing after reads');
+    expect(after.equals(before)).toBe(true);
+  });
+
+  it('keeps both tabs valid on the same session', async () => {
+    const { sessionCookie } = await login();
+    // Two tabs read concurrently: both must see the same stable token.
+    const [tabOne, tabTwo] = await Promise.all([csrfFor(sessionCookie), csrfFor(sessionCookie)]);
+    expect(tabOne).toBe(tabTwo);
+    // The first tab's token must still authorize a mutation after the
+    // second tab read (no invalidation across tabs).
+    const firstTabLogout = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout',
+      headers: {
+        cookie: `openhall_session_dev=${sessionCookie}`,
+        'x-csrf-token': tabOne,
+        origin: ORIGIN,
+      },
+    });
+    expect(firstTabLogout.statusCode).toBe(200);
+  });
+
+  it('issues different CSRF tokens per session, distinct from the session digest', async () => {
+    const first = await login();
+    const second = await login();
+    const csrfOne = await csrfFor(first.sessionCookie);
+    const csrfTwo = await csrfFor(second.sessionCookie);
+    expect(csrfOne).not.toBe(csrfTwo);
+    const digester = new HmacCredentialDigester(config.appSecret);
+    const sessionDigest = digester.digestSessionToken(fromBase64Url(first.sessionCookie));
+    const csrfRaw = fromBase64Url(csrfOne);
+    // CSRF token must never equal the stored session lookup digest, and the
+    // stored digests must match the domain-separated derivation.
+    expect(Buffer.from(csrfRaw).equals(Buffer.from(sessionDigest))).toBe(false);
+    const row = (
+      await pool.query<{ token_hash: Buffer; csrf_token_hash: Buffer }>(
+        'SELECT token_hash, csrf_token_hash FROM auth_session WHERE token_hash = $1',
+        [Buffer.from(sessionDigest)],
+      )
+    ).rows[0];
+    if (!row) throw new Error('Session row missing');
+    expect(row.token_hash.equals(Buffer.from(sessionDigest))).toBe(true);
+    expect(row.csrf_token_hash.equals(Buffer.from(digester.digest(csrfRaw)))).toBe(true);
+    expect(row.csrf_token_hash.equals(row.token_hash)).toBe(false);
+  });
+
+  it('rejects the derived CSRF token after logout revocation', async () => {
+    const { sessionCookie } = await login();
+    const csrf = await csrfFor(sessionCookie);
+    const logout = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout',
+      headers: {
+        cookie: `openhall_session_dev=${sessionCookie}`,
+        'x-csrf-token': csrf,
+        origin: ORIGIN,
+      },
+    });
+    expect(logout.statusCode).toBe(200);
+    // The same derived token plus the revoked cookie must no longer
+    // authorize anything: protected mutations fail closed as unauthenticated.
+    const retry = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout-all',
+      headers: {
+        cookie: `openhall_session_dev=${sessionCookie}`,
+        'x-csrf-token': csrf,
+        origin: ORIGIN,
+      },
+    });
+    expect(retry.statusCode).toBe(401);
+    const me = await app.inject({
+      method: 'GET',
+      url: '/api/v1/me',
+      headers: { cookie: `openhall_session_dev=${sessionCookie}` },
+    });
+    expect(me.statusCode).toBe(401);
+  });
+
+  it('rejects derived CSRF tokens after logout-all revision invalidation', async () => {
+    const first = await login();
+    const second = await login();
+    const csrfFirst = await csrfFor(first.sessionCookie);
+    const csrfSecond = await csrfFor(second.sessionCookie);
+    const logoutAll = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout-all',
+      headers: {
+        cookie: `openhall_session_dev=${first.sessionCookie}`,
+        'x-csrf-token': csrfFirst,
+        origin: ORIGIN,
+      },
+    });
+    expect(logoutAll.statusCode).toBe(200);
+    // Both sessions share the account revision bump: neither derived token
+    // authorizes anything afterwards.
+    for (const [cookie, csrf] of [
+      [first.sessionCookie, csrfFirst],
+      [second.sessionCookie, csrfSecond],
+    ] as const) {
+      const retry = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/logout',
+        headers: {
+          cookie: `openhall_session_dev=${cookie}`,
+          'x-csrf-token': csrf,
+          origin: ORIGIN,
+        },
+      });
+      expect(retry.statusCode).toBe(401);
+    }
   });
 
   it('enforces CSRF, origin, and cross-session binding on logout', async () => {

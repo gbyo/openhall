@@ -200,8 +200,9 @@
         "tags": [
           "auth"
         ],
-        "description": "Returns the current session. Anonymous callers receive authenticated:false.",
+        "description": "Returns the current session. Anonymous callers receive authenticated:false. Authenticated callers receive a stable per-session CSRF token derived from the session credential; reading never mutates authentication state.",
         "security": [
+          {},
           {
             "cookieAuth": []
           }
@@ -759,9 +760,7 @@
         "description": "Revokes the current session. Requires the session cookie, the X-CSRF-Token header, and a same-origin request.",
         "security": [
           {
-            "cookieAuth": []
-          },
-          {
+            "cookieAuth": [],
             "csrfHeader": []
           }
         ],
@@ -889,9 +888,7 @@
         "description": "Revokes every session for the account by bumping session_revision. Requires the session cookie, the X-CSRF-Token header, and a same-origin request.",
         "security": [
           {
-            "cookieAuth": []
-          },
-          {
+            "cookieAuth": [],
             "csrfHeader": []
           }
         ],

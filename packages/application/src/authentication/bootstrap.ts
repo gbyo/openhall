@@ -401,9 +401,10 @@ export async function completeBootstrap(
       throw new AuthenticationError('auth_transaction_invalid');
     }
     // Never email-match: the presenter of this transaction is explicitly
-    // becoming the initial administrator.
+    // becoming the initial administrator. CSRF is derived deterministically
+    // from the session credential (see oidc finalizeLogin).
     const sessionTokenBytes = dependencies.random.randomBytes(32);
-    const csrfTokenBytes = dependencies.random.randomBytes(32);
+    const csrfTokenBytes = dependencies.digester.deriveCsrfToken(sessionTokenBytes);
     const sessionToken = toBase64Url(sessionTokenBytes);
     const csrfToken = toBase64Url(csrfTokenBytes);
     const installation = await dependencies.finalizer.finalize(system, {
@@ -411,7 +412,7 @@ export async function completeBootstrap(
       transactionId: transaction.id,
       identity,
       providerClientSecret: clientSecret,
-      sessionTokenDigest: dependencies.digester.digest(sessionTokenBytes),
+      sessionTokenDigest: dependencies.digester.digestSessionToken(sessionTokenBytes),
       csrfTokenDigest: dependencies.digester.digest(csrfTokenBytes),
       now: dependencies.clock.now(),
       requestId: input.requestId,
@@ -486,14 +487,14 @@ export async function consumeRecoveryGrant(
     }
     const authenticatedAt = dependencies.clock.now();
     const sessionTokenBytes = dependencies.random.randomBytes(32);
-    const csrfTokenBytes = dependencies.random.randomBytes(32);
+    const csrfTokenBytes = dependencies.digester.deriveCsrfToken(sessionTokenBytes);
     const sessionToken = toBase64Url(sessionTokenBytes);
     const csrfToken = toBase64Url(csrfTokenBytes);
     const session = await dependencies.sessions.create(context, {
       tenantId,
       accountId: account.id,
       identityProviderId: null,
-      tokenDigest: dependencies.digester.digest(sessionTokenBytes),
+      tokenDigest: dependencies.digester.digestSessionToken(sessionTokenBytes),
       csrfTokenDigest: dependencies.digester.digest(csrfTokenBytes),
       accountSessionRevision: account.sessionRevision,
       authenticationMethod: 'recovery',

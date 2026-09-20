@@ -480,7 +480,7 @@ describe('recovery', () => {
     // Recovery sessions are short-lived: 15-minute idle and 30-minute
     // absolute lifetimes from authentication.
     const digester = new HmacCredentialDigester(config.appSecret);
-    const sessionHash = Buffer.from(digester.digest(fromBase64Url(sessionCookie)));
+    const sessionHash = Buffer.from(digester.digestSessionToken(fromBase64Url(sessionCookie)));
     const lifetimes = (
       await pool.query<{
         authenticated_at: string;

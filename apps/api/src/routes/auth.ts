@@ -24,6 +24,7 @@ import {
   bindingTokenFrom,
   clearSessionCookie,
   decodeCookieToken,
+  sessionTokenFrom,
   setLoginBindingCookie,
   setSessionCookie,
 } from '../auth/cookies.js';
@@ -77,7 +78,12 @@ const DiscoveryQuerySchema = Type.Object(
 );
 
 const COOKIE_SECURITY = [{ cookieAuth: [] as string[] }];
-const CSRF_SECURITY = [{ cookieAuth: [] as string[] }, { csrfHeader: [] as string[] }];
+// OpenAPI AND semantics: one Security Requirement Object requiring both the
+// session cookie AND the CSRF header. Separate objects would mean OR.
+const CSRF_SECURITY = [{ cookieAuth: [] as string[], csrfHeader: [] as string[] }];
+// GET /auth/session is anonymously callable: anonymous callers receive
+// {authenticated:false}. The empty requirement documents that alternative.
+const OPTIONAL_SESSION_SECURITY = [{}, { cookieAuth: [] as string[] }];
 
 function bearerToken(header: string | undefined, scheme: string): string | undefined {
   if (typeof header !== 'string') {
@@ -112,8 +118,9 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
       schema: {
         operationId: 'getAuthSession',
         tags: ['auth'],
-        description: 'Returns the current session. Anonymous callers receive authenticated:false.',
-        security: COOKIE_SECURITY,
+        description:
+          'Returns the current session. Anonymous callers receive authenticated:false. Authenticated callers receive a stable per-session CSRF token derived from the session credential; reading never mutates authentication state.',
+        security: OPTIONAL_SESSION_SECURITY,
         response: {
           200: AuthSessionSchema,
         },
@@ -124,18 +131,16 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
       if (resolved === undefined) {
         return reply.header('Cache-Control', 'no-store').send({ authenticated: false as const });
       }
-      // A refresh obtains a new CSRF value: rotate the digest and return the
-      // fresh raw token for SPA runtime memory. Never stored raw server-side.
-      // The digest covers the raw bytes, matching CSRF verification.
-      const csrfTokenBytes = dependencies.random.randomBytes(32);
-      const csrfToken = toBase64Url(csrfTokenBytes);
-      await dependencies.tenantRunner.run(resolved.session.tenantId, async (context) => {
-        await dependencies.sessions.rotateCsrfToken(
-          context,
-          resolved.session.id,
-          dependencies.digester.digest(csrfTokenBytes),
-        );
-      });
+      // Read-only: derive the stable per-session CSRF token from the raw
+      // opaque session credential (domain "csrf-token:v1"). Same session
+      // always yields the same token, so concurrent reads and multiple tabs
+      // never invalidate one another. No digest is rotated here.
+      const rawCookie = sessionTokenFrom(request, dependencies.isProduction);
+      const rawBytes = decodeCookieToken(rawCookie);
+      if (rawBytes === undefined) {
+        return reply.header('Cache-Control', 'no-store').send({ authenticated: false as const });
+      }
+      const csrfToken = toBase64Url(dependencies.digester.deriveCsrfToken(rawBytes));
       return await reply.header('Cache-Control', 'no-store').send({
         authenticated: true as const,
         csrfToken,

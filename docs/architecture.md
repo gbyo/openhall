@@ -58,9 +58,10 @@ atomically on callback, so replays and concurrent callbacks fail closed.
 Canonical identity is `(issuer, subject)`; email is a snapshot, never a
 lookup key. Sessions are opaque server-side records (HMAC digests only,
 12-hour idle / 7-day absolute lifetimes) presented in `HttpOnly`
-`SameSite=Lax` cookies. SPA mutations require a rotating per-session CSRF
-token plus an exact `Origin` (or same-origin `Referer`); OIDC redirects rely
-on transaction protections instead.
+`SameSite=Lax` cookies. SPA mutations require a stable per-session CSRF
+token (domain-separated HMAC of the session credential; `GET /auth/session`
+is read-only) plus an exact `Origin` (or same-origin `Referer`); OIDC
+redirects rely on transaction protections instead.
 
 The first installation is created by an operator bootstrap ceremony
 (one-time digested grant, setup draft, OIDC sign-in as founding admin with a

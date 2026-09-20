@@ -77,6 +77,38 @@ describe('HmacCredentialDigester', () => {
     const other = new NodeSecureRandom().randomBytes(32);
     expect(digester.matches(other, digest)).toBe(false);
   });
+
+  it('derives a stable per-session CSRF token distinct from the session digest', () => {
+    const digester = new HmacCredentialDigester('app-secret-for-tests-only');
+    const credential = new NodeSecureRandom().randomBytes(32);
+    const other = new NodeSecureRandom().randomBytes(32);
+    // Same session always produces the same CSRF token and session digest.
+    expect(Buffer.from(digester.deriveCsrfToken(credential))).toEqual(
+      Buffer.from(digester.deriveCsrfToken(credential)),
+    );
+    expect(Buffer.from(digester.digestSessionToken(credential))).toEqual(
+      Buffer.from(digester.digestSessionToken(credential)),
+    );
+    // Different sessions produce different CSRF tokens.
+    expect(Buffer.from(digester.deriveCsrfToken(credential))).not.toEqual(
+      Buffer.from(digester.deriveCsrfToken(other)),
+    );
+    // Domain separation: CSRF material never equals the session lookup
+    // digest, and neither reveals the raw credential.
+    const csrf = digester.deriveCsrfToken(credential);
+    const sessionDigest = digester.digestSessionToken(credential);
+    expect(csrf.length).toBe(32);
+    expect(sessionDigest.length).toBe(32);
+    expect(Buffer.from(csrf).equals(Buffer.from(sessionDigest))).toBe(false);
+    expect(Buffer.from(csrf).equals(Buffer.from(credential))).toBe(false);
+    expect(Buffer.from(sessionDigest).equals(Buffer.from(credential))).toBe(false);
+    // The stored CSRF digest covers the derived token, not the session
+    // credential, and stays distinct from the session digest.
+    const stored = digester.digest(csrf);
+    expect(Buffer.from(stored).equals(Buffer.from(sessionDigest))).toBe(false);
+    expect(digester.matches(csrf, stored)).toBe(true);
+    expect(digester.matches(credential, stored)).toBe(false);
+  });
 });
 
 describe('NodeSecureRandom', () => {

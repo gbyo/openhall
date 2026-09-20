@@ -43,9 +43,22 @@ function tenantContext(tenantId: string): TenantTransactionContext {
   return { tenantId } as TenantTransactionContext;
 }
 
-/** Identity digester: digest is the raw bytes, matching is byte equality. */
+/**
+ * Identity digester with explicit domain separation for the mock: generic
+ * digests are the raw bytes, session digests are the raw bytes, and derived
+ * CSRF material is visibly distinct (prefixed) so tests can prove the two
+ * domains never collide. Matching is byte equality.
+ */
 const digester: CredentialDigester = {
   digest: (credential) => credential,
+  digestSessionToken: (credential) => credential,
+  deriveCsrfToken: (credential) => {
+    const prefix = new TextEncoder().encode('csrf:v1:');
+    const derived = new Uint8Array(prefix.length + credential.length);
+    derived.set(prefix, 0);
+    derived.set(credential, prefix.length);
+    return derived;
+  },
   matches: (first, second) =>
     first.length === second.length && first.every((value, index) => value === second[index]),
 };
@@ -132,9 +145,6 @@ function sessionHarness(): SessionHarness {
   const ranTenants: string[] = [];
   const sessions: SessionRepository = {
     create: () => {
-      throw new Error('not used');
-    },
-    rotateCsrfToken: () => {
       throw new Error('not used');
     },
     touchLastSeen: (_context, sessionId, lastSeenAt) => {
@@ -345,9 +355,6 @@ describe('logout', () => {
       create: () => {
         throw new Error('not used');
       },
-      rotateCsrfToken: () => {
-        throw new Error('not used');
-      },
       touchLastSeen: () => {
         throw new Error('not used');
       },
@@ -380,9 +387,6 @@ describe('logout', () => {
     const events: { action: string }[] = [];
     const sessions: SessionRepository = {
       create: () => {
-        throw new Error('not used');
-      },
-      rotateCsrfToken: () => {
         throw new Error('not used');
       },
       touchLastSeen: () => {
@@ -537,7 +541,6 @@ describe('completeOidcLogin canonical lookup', () => {
         created.push(createdRecord);
         return Promise.resolve(createdRecord);
       },
-      rotateCsrfToken: () => Promise.resolve(),
       touchLastSeen: () => Promise.resolve(),
       revokeSession: () => Promise.resolve(),
       revokeAllForAccount: () => Promise.resolve(0),

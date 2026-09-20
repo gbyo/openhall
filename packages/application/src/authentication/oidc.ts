@@ -366,18 +366,20 @@ async function finalizeLogin(
     await directory.updateIdentityEmailSnapshot(context, identity.id, input.email);
   }
   const now = dependencies.clock.now();
-  // Digests cover the raw credential bytes. Verification decodes the
-  // base64url cookie/header back to these same bytes before digesting, so
-  // both sides must use the raw form, never the encoded string.
+  // Stable per-session CSRF: derived deterministically from the opaque
+  // session credential via domain-separated HMAC ("csrf-token:v1"), while
+  // the lookup digest uses "session-digest:v1". Same session always yields
+  // the same CSRF token; different sessions yield different tokens. Only
+  // the generic digest of the derived CSRF value rests server-side.
   const sessionTokenBytes = dependencies.random.randomBytes(32);
-  const csrfTokenBytes = dependencies.random.randomBytes(32);
+  const csrfTokenBytes = dependencies.digester.deriveCsrfToken(sessionTokenBytes);
   const sessionToken = toBase64Url(sessionTokenBytes);
   const csrfToken = toBase64Url(csrfTokenBytes);
   const session = await dependencies.sessions.create(context, {
     tenantId: input.tenantId,
     accountId: account.id,
     identityProviderId: input.providerId,
-    tokenDigest: dependencies.digester.digest(sessionTokenBytes),
+    tokenDigest: dependencies.digester.digestSessionToken(sessionTokenBytes),
     csrfTokenDigest: dependencies.digester.digest(csrfTokenBytes),
     accountSessionRevision: account.sessionRevision,
     authenticationMethod: 'oidc',
