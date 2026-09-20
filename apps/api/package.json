@@ -1,0 +1,21 @@
+{
+  "name": "@openhall/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "openapi:generate": "tsx scripts/generate-openapi.ts",
+    "openapi:check": "tsx scripts/generate-openapi.ts --check"
+  },
+  "dependencies": {
+    "@fastify/static": "10.1.4",
+    "@fastify/swagger": "9.8.1",
+    "@fastify/type-provider-typebox": "6.1.0",
+    "@openhall/config": "workspace:*",
+    "@openhall/contracts": "workspace:*",
+    "@openhall/db": "workspace:*",
+    "fastify": "5.12.5"
+  }
+}

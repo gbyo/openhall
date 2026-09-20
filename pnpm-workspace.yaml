@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+
+minimumReleaseAgeExclude:
+  - tsx@4.23.15
+
+allowBuilds:
+  esbuild: true

@@ -1,0 +1,42 @@
+{
+  "name": "openhall",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "build": "pnpm clean && tsc -b && pnpm --filter @openhall/web build",
+    "clean": "find apps packages -type d -name dist -prune -exec rm -rf {} +",
+    "dev": "concurrently -n api,web -c blue,green \"pnpm --filter @openhall/api dev\" \"pnpm --filter @openhall/web dev\"",
+    "start": "node apps/api/dist/server.js",
+    "typecheck": "tsc -b && tsc -p tsconfig.tests.json",
+    "lint": "eslint . --max-warnings 0 && prettier --check .",
+    "format": "prettier --write .",
+    "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test": "pnpm test:unit && pnpm test:integration",
+    "db:migrate": "pnpm --filter @openhall/db migrate",
+    "db:generate": "pnpm --filter @openhall/db generate",
+    "db:types:check": "./scripts/check-generated-db-types.sh",
+    "openapi:generate": "pnpm --filter @openhall/api openapi:generate",
+    "openapi:check": "pnpm --filter @openhall/api openapi:check"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.6",
+    "concurrently": "10.0.5",
+    "eslint": "10.11.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.12.0",
+    "prettier": "3.9.8",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.1"
+  }
+}

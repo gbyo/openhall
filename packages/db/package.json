@@ -1,0 +1,26 @@
+{
+  "name": "@openhall/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "migrate": "tsx src/cli.ts",
+    "generate": "kysely-codegen --dialect postgres --url \"$DATABASE_URL\" --out-file src/database.generated.ts"
+  },
+  "dependencies": {
+    "@openhall/application": "workspace:*",
+    "@openhall/domain": "workspace:*",
+    "kysely": "0.29.6",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1",
+    "kysely-codegen": "0.20.0"
+  }
+}
