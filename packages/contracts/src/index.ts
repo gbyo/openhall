@@ -158,3 +158,197 @@ export const RecoveryResponseSchema = Type.Object(
 );
 
 export const OkSchema = Type.Object({ ok: Type.Literal(true) }, { $id: 'Ok' });
+
+/**
+ * Closed public capability vocabulary. The application owns the canonical
+ * list; a parity test proves these literals stay identical. Never weaken
+ * this to an arbitrary string to avoid that test.
+ */
+export const CapabilitySchema = Type.Union(
+  [
+    Type.Literal('self.read'),
+    Type.Literal('organization.context.read'),
+    Type.Literal('pass.request.self'),
+    Type.Literal('pass.create.student'),
+    Type.Literal('pass.approve.section'),
+    Type.Literal('pass.view.section_live'),
+    Type.Literal('pass.view.school_live'),
+    Type.Literal('pass.view.school_history'),
+    Type.Literal('scheduled_authorization.manage'),
+    Type.Literal('destination.station.manage'),
+    Type.Literal('destination.manage'),
+    Type.Literal('schedule.view'),
+    Type.Literal('schedule.manage'),
+    Type.Literal('people.view'),
+    Type.Literal('people.manage'),
+    Type.Literal('policy.manage'),
+    Type.Literal('authorization.manage'),
+    Type.Literal('integration.manage'),
+    Type.Literal('incident.view'),
+    Type.Literal('incident.manage'),
+    Type.Literal('audit.view'),
+    Type.Literal('identity.manage'),
+    Type.Literal('system.manage'),
+  ],
+  // No $id: this schema is embedded several times inside one response
+  // schema, and Fastify rejects duplicate $id definitions.
+);
+
+export const AffiliationSchema = Type.Union([
+  Type.Literal('student'),
+  Type.Literal('staff'),
+  Type.Literal('other'),
+]);
+
+export const MyOrganizationEntrySchema = Type.Object(
+  {
+    id: UuidSchema,
+    name: Type.String(),
+    slug: SlugSchema,
+    timeZone: Type.String(),
+    affiliations: Type.Array(AffiliationSchema),
+  },
+  { $id: 'MyOrganizationEntry', additionalProperties: false },
+);
+
+export const MyOrganizationsSchema = Type.Object(
+  { organizations: Type.Array(MyOrganizationEntrySchema) },
+  { $id: 'MyOrganizations', additionalProperties: false },
+);
+
+export const TeachingSectionContextSchema = Type.Object(
+  {
+    id: UuidSchema,
+    code: Type.Union([Type.String(), Type.Null()]),
+    title: Type.String(),
+    capabilities: Type.Array(CapabilitySchema),
+  },
+  { $id: 'TeachingSectionContext', additionalProperties: false },
+);
+
+export const StaffedDestinationContextSchema = Type.Object(
+  {
+    id: UuidSchema,
+    displayName: Type.String(),
+    serviceType: Type.String(),
+    capabilities: Type.Array(CapabilitySchema),
+  },
+  { $id: 'StaffedDestinationContext', additionalProperties: false },
+);
+
+const PlacementBlockSchema = Type.Object(
+  {
+    id: UuidSchema,
+    code: Type.String(),
+    displayName: Type.String(),
+    kind: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+const PlacementSectionSchema = Type.Object(
+  {
+    id: UuidSchema,
+    code: Type.Union([Type.String(), Type.Null()]),
+    title: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+const PlacementLocationSchema = Type.Object(
+  {
+    id: UuidSchema,
+    name: Type.String(),
+    code: Type.Union([Type.String(), Type.Null()]),
+    kind: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+/**
+ * Data-minimized public projection of the Phase 2 ExpectedPlacementResolver
+ * result. Internal diagnostics (candidate IDs, configuration messages,
+ * teacher lists, grant/account details) never reach the wire.
+ */
+export const ExpectedPlacementContextSchema = Type.Union(
+  [
+    Type.Object(
+      {
+        kind: Type.Literal('resolved'),
+        block: PlacementBlockSchema,
+        section: PlacementSectionSchema,
+        expectedLocation: Type.Union([PlacementLocationSchema, Type.Null()]),
+        beginsAt: InstantSchema,
+        endsAt: InstantSchema,
+        elapsedSeconds: Type.Number(),
+        remainingSeconds: Type.Number(),
+      },
+      { additionalProperties: false },
+    ),
+    Type.Object(
+      {
+        kind: Type.Literal('block_only'),
+        block: PlacementBlockSchema,
+        beginsAt: InstantSchema,
+        endsAt: InstantSchema,
+        elapsedSeconds: Type.Number(),
+        remainingSeconds: Type.Number(),
+      },
+      { additionalProperties: false },
+    ),
+    Type.Object({ kind: Type.Literal('outside_schedule') }, { additionalProperties: false }),
+    Type.Object(
+      {
+        kind: Type.Literal('non_instructional_day'),
+        dayKind: Type.Union([Type.Literal('non_instructional'), Type.Literal('closed')]),
+      },
+      { additionalProperties: false },
+    ),
+    Type.Object({ kind: Type.Literal('calendar_not_configured') }, { additionalProperties: false }),
+    Type.Object({ kind: Type.Literal('not_member') }, { additionalProperties: false }),
+    Type.Object(
+      {
+        kind: Type.Literal('ambiguous'),
+        reason: Type.Union([
+          Type.Literal('multiple_placements'),
+          Type.Literal('overlapping_unassigned_slots'),
+        ]),
+      },
+      { additionalProperties: false },
+    ),
+    Type.Object(
+      {
+        kind: Type.Literal('configuration_error'),
+        code: Type.Union([
+          Type.Literal('school_not_found'),
+          Type.Literal('organization_not_school'),
+          Type.Literal('invalid_school_time_zone'),
+          Type.Literal('instructional_day_missing_template'),
+          Type.Literal('invalid_slot_wall_time'),
+        ]),
+      },
+      { additionalProperties: false },
+    ),
+  ],
+  { $id: 'ExpectedPlacementContext' },
+);
+
+export const MyOrganizationContextSchema = Type.Object(
+  {
+    organization: Type.Object(
+      {
+        id: UuidSchema,
+        name: Type.String(),
+        slug: SlugSchema,
+        timeZone: Type.String(),
+      },
+      { additionalProperties: false },
+    ),
+    affiliations: Type.Array(AffiliationSchema),
+    capabilities: Type.Array(CapabilitySchema),
+    expectedPlacement: Type.Union([ExpectedPlacementContextSchema, Type.Null()]),
+    teachingSections: Type.Array(TeachingSectionContextSchema),
+    staffedDestinations: Type.Array(StaffedDestinationContextSchema),
+  },
+  { $id: 'MyOrganizationContext', additionalProperties: false },
+);

@@ -56,3 +56,24 @@ transaction cannot pair a tenant with another tenant's provider). Expiry
 columns carry `expires_at > created_at` CHECKs; session and grant digests
 carry uniqueness indexes. Temporal values cross the boundary as text with a
 UTC-pinned session for deterministic rendering.
+
+## Authorization relationships (migration 004)
+
+Migration 004 makes the relationship/grant distinction structural:
+`authorization_grant.role` narrows to `destination_staff`, `counselor`,
+`office_staff`, `school_admin`, and `system_admin` (legacy
+student/teacher rows refuse the migration rather than being reinterpreted),
+and a role/scope CHECK pins `system_admin` to tenant scope,
+`school_admin`/`counselor`/`office_staff` to organization scope, and
+`destination_staff` to destination scope. Section scope has no valid Phase
+4 role; the legacy columns stay physically present but unusable.
+
+Two justified indexes serve the actual Phase 4 query shapes: a
+person-first partial index on `organization_membership
+(tenant_id, person_id, organization_id, affiliation) WHERE status =
+'active'` (the existing semantic uniqueness is organization-first, while
+authorization loads by person across schools), and an active-grant lookup
+on `authorization_grant (tenant_id, account_id, role, scope_kind) WHERE
+status = 'active'`. Grant validity is half-open instant semantics
+evaluated in memory with `Temporal.Instant`; membership validity is
+inclusive on the school-local date.

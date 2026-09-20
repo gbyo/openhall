@@ -69,3 +69,31 @@ tenant-scoped `system_admin` grant), and lockouts are recoverable through
 one-time recovery grants into short-lived sessions. Operator Bearer [REDACTED] travel
 in the `Authorization` header under strict per-process rate limits, which are
 abuse resistance rather than the security boundary. See ADR 0012 and ADR 0013.
+
+## Authorization and user context (Phase 4)
+
+Authentication owns the Principal; authorization consumes it. The Phase 3
+deny-all stub is replaced by an in-process typed evaluator
+(`RelationshipAuthorizationService`) backed by canonical PostgreSQL facts
+through a purpose-built `AuthorizationFactsRepository` port. Ordinary
+queries use `TenantTransactionContext` with `connectionFor`; there is no
+system/unscoped authorization access, no external authorization service,
+and no cross-request grant cache.
+
+The model is a hybrid: relationship facts (student/staff membership,
+teacher section relationships), attributes (grant instants, school-local
+dates, resource status, session authentication method), and small explicit
+grants for duties without a canonical relationship. A closed capability
+vocabulary with compile-time capability/resource compatibility replaces
+permission strings; enforcement and UI hints share the same mapping, and
+decisions are structured (allow basis or denial reason) defaulting to
+deny. See ADR 0014.
+
+`GET /api/v1/me/organizations` and
+`GET /api/v1/me/organizations/:organizationId/context` are thin use-case
+wrappers (`UserContextService`) combining the Principal, authorization
+snapshot, and the Phase 2 `ExpectedPlacementResolver` at one clock
+instant, mapped to minimized public DTOs. Object existence stays
+concealed as 404; recovery-session restrictions stay 403. Capability
+hints are never accepted back as authority, and no generic `/authorize`
+oracle exists.

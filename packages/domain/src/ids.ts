@@ -10,3 +10,4 @@ export type ScheduleTemplateId = string;
 export type ScheduleSlotId = string;
 export type SectionMeetingId = string;
 export type CalendarDayId = string;
+export type DestinationId = string;

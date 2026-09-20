@@ -12,10 +12,12 @@ import type { AppConfig } from '@openhall/config';
 import type { DB as Database, ReadinessProbe } from '@openhall/db';
 import type { Kysely } from 'kysely';
 import { createAuthDependencies } from './auth/dependencies.js';
+import { createAuthorizationDependencies } from './authorization/dependencies.js';
 import { registerSessionContext } from './auth/session-context.js';
 import { carriedStatus, safeRequestPath, scrubForLog } from './http-privacy.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerBootstrapRoutes } from './routes/bootstrap.js';
+import { registerMeRoutes } from './routes/me.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerSystemRoutes } from './routes/system.js';
 
@@ -235,6 +237,10 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   registerSystemRoutes(typedApp);
   registerAuthRoutes(typedApp, dependencies);
   registerBootstrapRoutes(typedApp, dependencies);
+  registerMeRoutes(
+    typedApp,
+    createAuthorizationDependencies(options.database, dependencies.tenantRunner),
+  );
 
   typedApp.get(
     '/api/openapi.json',
