@@ -75,7 +75,7 @@ export function registerBootstrapRoutes(
         // Operator endpoints take the one-time credential in the
         // Authorization header (`Bootstrap <token>` here), never query.
         security: [{ operatorCredential: [] as string[] }],
-        body: schemaRef(BootstrapPrepareSchema),
+        body: BootstrapPrepareSchema,
         response: {
           200: schemaRef(BootstrapPrepareResponseSchema),
           400: {
