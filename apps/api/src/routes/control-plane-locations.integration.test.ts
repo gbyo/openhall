@@ -477,6 +477,7 @@ describe('control-plane locations', () => {
     });
     expect(crossSchool.statusCode).toBe(400);
     expect(cycle.json<{ code: string }>().code).toBe('invalid_location_parent');
+    expect(crossSchool.json<{ code: string }>().code).toBe('invalid_location_parent');
   });
 
   it('refuses to archive a location still required by live references', async () => {
