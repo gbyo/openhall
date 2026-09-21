@@ -1,11 +1,10 @@
-import { useState, type SubmitEvent } from 'react';
+import { useEffect, useState, type SubmitEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { Alert } from '../../design-system/primitives/Alert';
 import { TextField } from '../../design-system/primitives/TextField';
 import { AppFrame } from '../../app/AppFrame';
 import { queryClient } from '../../app/query-client';
 import { ApiProblem } from '../../api/problems';
-import { useFocusField } from '../setup/SetupLayout';
 import { consumeRecoveryCode } from '../setup/setup-api';
 
 /** Unauthenticated recovery entry: trades a recovery code for a session. */
@@ -14,7 +13,9 @@ export function RecoveryAccessPage() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  useFocusField(error ? 'recovery-access-code' : null);
+  useEffect(() => {
+    if (error) document.getElementById('recovery-access-code')?.focus({ preventScroll: true });
+  }, [error]);
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();

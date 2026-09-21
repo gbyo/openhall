@@ -98,28 +98,48 @@ async function unlock(page: Page): Promise<void> {
   await page.goto('/setup');
   await page.getByLabel('Setup code').fill('test-setup-code');
   await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Tell us about your school' })).toBeVisible();
+  await expect(page.getByText('What is your school called?')).toBeVisible();
 }
 
-async function fillSchool(page: Page): Promise<void> {
+async function answerSchoolName(page: Page): Promise<void> {
   await page.getByLabel('School name').fill('Ninety Six High School');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Who will manage WayPass?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What time zone is your school in?')).toBeVisible();
 }
 
-async function fillAdministrator(page: Page): Promise<void> {
+async function answerTimeZone(page: Page): Promise<void> {
+  await page.getByLabel('Time zone').click();
+  await page.getByRole('option', { name: /America\/Denver/ }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is the administrator’s first name?')).toBeVisible();
+}
+
+async function answerAdministrator(page: Page): Promise<void> {
   await page.getByLabel('First name').fill('Gibson');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is the administrator’s last name?')).toBeVisible();
   await page.getByLabel('Last name').fill('Bell');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'How should people sign in?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('How should people sign in?')).toBeVisible();
 }
 
-test('setup code unlock advances to the school step', async ({ page }) => {
+async function answerSchool(page: Page): Promise<void> {
+  await answerSchoolName(page);
+  await answerTimeZone(page);
+}
+
+async function chooseLaterAndContinue(page: Page): Promise<void> {
+  await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('Review and create WayPass')).toBeVisible();
+}
+
+test('setup code unlock advances to the first question', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await page.goto('/setup');
   await expect(page.getByRole('heading', { name: "Let's set up WayPass" })).toBeVisible();
   await unlock(page);
-  await expect(page.getByText('Question 1 of 4')).toBeVisible();
+  await expect(page.getByText('Question 1 of 6')).toBeVisible();
 });
 
 test('invalid setup code stays on the unlock screen', async ({ page }) => {
@@ -144,57 +164,90 @@ test('invalid setup code stays on the unlock screen', async ({ page }) => {
   await expect(page.getByRole('heading', { name: "Let's set up WayPass" })).toBeVisible();
 });
 
-test('school step defaults the timezone and hides advanced settings', async ({ page }) => {
+test('school name is its own question with native required validation', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is your school called?')).toBeVisible();
+  await expect(page.getByText('Question 1 of 6')).toBeVisible();
+  await answerSchoolName(page);
+  await expect(page.getByText('Question 2 of 6')).toBeVisible();
+});
+
+test('time zone defaults and answers through the combobox', async ({ page }) => {
+  await guidedShell(page, { initialized: false, sessionMethod: null });
+  await unlock(page);
+  await answerSchoolName(page);
   const selected = await page.getByLabel('Time zone').inputValue();
   expect(selected.length).toBeGreaterThan(0);
-  await expect(page.getByLabel('Organization name')).toBeHidden();
-  await fillSchool(page);
+  await expect(page.getByLabel('Organization name')).toHaveCount(0);
+  await answerTimeZone(page);
 });
 
-test('administrator step derives the display name', async ({ page }) => {
+test('administrator first and last names are separate questions', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
-  await fillSchool(page);
+  await answerSchool(page);
+  await expect(page.getByText('Question 3 of 6')).toBeVisible();
   await page.getByLabel('First name').fill('Gibson');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('Question 4 of 6')).toBeVisible();
   await page.getByLabel('Last name').fill('Bell');
-  await page.getByText('Customize display name').click();
-  await expect(page.getByLabel('Display name')).toHaveAttribute('placeholder', /Gibson Bell/);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'How should people sign in?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('Question 5 of 6')).toBeVisible();
 });
 
-test('google choice exposes only client ID and secret', async ({ page }) => {
+test('google choice asks client ID then client secret', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
+  await answerSchool(page);
+  await answerAdministrator(page);
   await page.getByRole('radio', { name: 'Google Workspace' }).click();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is your Google client ID?')).toBeVisible();
+  await expect(page.getByText('Question 6 of 8')).toBeVisible();
   await expect(page.getByLabel('Client ID')).toBeVisible();
-  await expect(page.getByLabel('Client secret')).toBeVisible();
-  await expect(page.getByLabel('Provider issuer URL')).toHaveCount(0);
-  await expect(page.getByLabel('Scopes')).toHaveCount(0);
+  await expect(page.getByLabel('Client secret')).toBeHidden();
+  await expect(page.getByLabel('Provider name')).toHaveCount(0);
+  await page.getByLabel('Client ID').fill('google-id');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is your Google client secret?')).toBeVisible();
+  await expect(page.getByText('Question 7 of 8')).toBeVisible();
+  await page.getByLabel('Client secret').fill('google-secret');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('Review and create WayPass')).toBeVisible();
+  await expect(page.getByText('Question 8 of 8')).toBeVisible();
 });
 
-test('generic choice reveals fields with advanced settings hidden', async ({ page }) => {
+test('generic choice asks provider questions in order', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
+  await answerSchool(page);
+  await answerAdministrator(page);
   await page.getByRole('radio', { name: 'Another OpenID Connect provider' }).click();
-  await expect(page.getByLabel('Provider name')).toBeVisible();
-  await expect(page.getByLabel('Issuer URL')).toBeVisible();
-  await expect(page.getByLabel('Provider key')).toBeHidden();
-  await page.getByText('Advanced provider settings').click();
-  await expect(page.getByLabel('Provider key')).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is your sign-in provider called?')).toBeVisible();
+  await expect(page.getByText('Question 6 of 10')).toBeVisible();
+  await page.getByLabel('Provider name').fill('Fabrikam sign-in');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is your provider’s issuer URL?')).toBeVisible();
+  await page.getByLabel('Issuer URL').fill('https://login.fabrikam.example');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is your provider’s client ID?')).toBeVisible();
+  await page.getByLabel('Client ID').fill('fabrikam-id');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What is your provider’s client secret?')).toBeVisible();
+  await page.getByLabel('Client secret').fill('fabrikam-secret');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('Review and create WayPass')).toBeVisible();
+  await expect(page.getByText('Question 10 of 10')).toBeVisible();
 });
 
 test('set-up-later is a first-class choice with calm copy', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
+  await answerSchool(page);
+  await answerAdministrator(page);
   await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
   await expect(page.getByText(/temporary setup access expires/)).toBeVisible();
 });
@@ -202,12 +255,13 @@ test('set-up-later is a first-class choice with calm copy', async ({ page }) => 
 test('sign-in choice is keyboard operable', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
+  await answerSchool(page);
+  await answerAdministrator(page);
   await page.getByRole('radio', { name: 'Google Workspace' }).focus();
   await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('radio', { name: 'Another OpenID Connect provider' })).toBeChecked();
-  await expect(page.getByText('Question 3 of 4')).toBeVisible();
+  await expect(page.getByText('Question 5 of 10')).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
   await expect(page.getByLabel('Provider name')).toBeVisible();
 });
 
@@ -215,51 +269,49 @@ test('focus follows the current questionnaire item', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
   await page.getByLabel('School name').fill('Ninety Six High School');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Who will manage WayPass?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What time zone is your school in?')).toBeVisible();
   const forward = await page.evaluate(() => {
     const item = document.activeElement?.closest('[data-slot="questionnaire-item"]');
-    return item?.querySelector('h1')?.textContent ?? null;
+    return item?.querySelector('legend')?.textContent ?? null;
   });
-  expect(forward).toBe('Who will manage WayPass?');
-  await page.getByRole('button', { name: 'Back' }).click();
-  await expect(page.getByRole('heading', { name: 'Tell us about your school' })).toBeVisible();
+  expect(forward).toBe('What time zone is your school in?');
+  await page.getByRole('button', { name: 'Previous' }).click();
+  await expect(page.getByText('What is your school called?')).toBeVisible();
   const backward = await page.evaluate(() => {
     const item = document.activeElement?.closest('[data-slot="questionnaire-item"]');
-    return item?.querySelector('h1')?.textContent ?? null;
+    return item?.querySelector('legend')?.textContent ?? null;
   });
-  expect(backward).toBe('Tell us about your school');
+  expect(backward).toBe('What is your school called?');
 });
 
 test('setup tolerates 200 percent text scaling without horizontal scrolling', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await page.setViewportSize({ width: 640, height: 800 });
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
-  await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Ready to set up WayPass' })).toBeVisible();
+  await answerSchool(page);
+  await answerAdministrator(page);
+  await chooseLaterAndContinue(page);
   await page.evaluate(() => {
     document.body.style.zoom = '200%';
   });
-  await expect(page.getByRole('heading', { name: 'Ready to set up WayPass' })).toBeVisible();
+  await expect(page.getByText('Review and create WayPass')).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBe(0);
 });
 
-test('back preserves previously entered school details', async ({ page }) => {
+test('back preserves previously entered answers', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
   await page.getByLabel('School name').fill('Ninety Six High School');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Who will manage WayPass?' })).toBeVisible();
-  await expect(page.getByText('Question 2 of 4')).toBeVisible();
-  await page.getByRole('button', { name: 'Back' }).click();
-  await expect(page.getByRole('heading', { name: 'Tell us about your school' })).toBeVisible();
-  await expect(page.getByText('Question 1 of 4')).toBeVisible();
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.getByText('What time zone is your school in?')).toBeVisible();
+  await expect(page.getByText('Question 2 of 6')).toBeVisible();
+  await page.getByRole('button', { name: 'Previous' }).click();
+  await expect(page.getByText('What is your school called?')).toBeVisible();
+  await expect(page.getByText('Question 1 of 6')).toBeVisible();
   await expect(page.getByLabel('School name')).toHaveValue('Ninety Six High School');
 });
 
@@ -267,12 +319,10 @@ test('review summarizes without secrets and creates with setup-later', async ({ 
   const state: GuidedMocks = { initialized: false, sessionMethod: 'setup' };
   await guidedShell(page, state);
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
-  await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Ready to set up WayPass' })).toBeVisible();
-  await expect(page.getByText('Question 4 of 4')).toBeVisible();
+  await answerSchool(page);
+  await answerAdministrator(page);
+  await chooseLaterAndContinue(page);
+  await expect(page.getByText('Question 6 of 6')).toBeVisible();
   const summary = page.getByRole('list', { name: 'Setup answers' });
   await expect(summary.getByText('Ninety Six High School')).toBeVisible();
   await expect(summary.getByText('Gibson Bell')).toBeVisible();
@@ -280,6 +330,19 @@ test('review summarizes without secrets and creates with setup-later', async ({ 
   await expect(page.getByText('test-setup-code')).toHaveCount(0);
   await page.getByRole('button', { name: 'Create WayPass' }).click();
   await expect(page.getByText('Finish setting up school sign-in')).toBeVisible();
+});
+
+test('review edit returns to the matching question', async ({ page }) => {
+  const state: GuidedMocks = { initialized: false, sessionMethod: 'setup' };
+  await guidedShell(page, state);
+  await unlock(page);
+  await answerSchool(page);
+  await answerAdministrator(page);
+  await chooseLaterAndContinue(page);
+  const summary = page.getByRole('list', { name: 'Setup answers' });
+  await summary.getByRole('button', { name: 'Edit' }).first().click();
+  await expect(page.getByText('What is your school called?')).toBeVisible();
+  await expect(page.getByLabel('School name')).toHaveValue('Ninety Six High School');
 });
 
 test('submit disables while creating to prevent duplicate submit', async ({ page }) => {
@@ -300,11 +363,9 @@ test('submit disables while creating to prevent duplicate submit', async ({ page
     );
   });
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
-  await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Ready to set up WayPass' })).toBeVisible();
+  await answerSchool(page);
+  await answerAdministrator(page);
+  await chooseLaterAndContinue(page);
   await page.getByRole('button', { name: 'Create WayPass' }).click();
   await expect(page.getByRole('button', { name: 'Creating…', exact: true })).toBeDisabled();
   await expect(page.getByText('Finish setting up school sign-in')).toBeVisible();
@@ -363,18 +424,16 @@ test('setup keyboard flow completes the unlock with Enter', async ({ page }) => 
   await page.goto('/setup');
   await page.getByLabel('Setup code').fill('test-setup-code');
   await page.getByLabel('Setup code').press('Enter');
-  await expect(page.getByRole('heading', { name: 'Tell us about your school' })).toBeVisible();
+  await expect(page.getByText('What is your school called?')).toBeVisible();
 });
 
 test('review reflows at 320px without horizontal scrolling', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await page.setViewportSize({ width: 320, height: 568 });
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
-  await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(page.getByRole('heading', { name: 'Ready to set up WayPass' })).toBeVisible();
+  await answerSchool(page);
+  await answerAdministrator(page);
+  await chooseLaterAndContinue(page);
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
@@ -388,8 +447,8 @@ test('setup progress exposes progress under forced colors', async ({ page }) => 
   const progress = page.getByRole('progressbar', { name: 'Questionnaire progress' });
   await expect(progress).toBeVisible();
   await expect(progress).toHaveAttribute('aria-valuenow', '1');
-  await expect(progress).toHaveAttribute('aria-valuemax', '4');
-  await expect(page.getByText('Question 1 of 4')).toBeVisible();
+  await expect(progress).toHaveAttribute('aria-valuemax', '6');
+  await expect(page.getByText('Question 1 of 6')).toBeVisible();
 });
 
 async function settleForAxe(page: Page): Promise<void> {
@@ -408,8 +467,8 @@ test('guided setup has no serious axe findings', async ({ page }) => {
     welcome.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? '')),
   ).toEqual([]);
   await unlock(page);
-  await fillSchool(page);
-  await fillAdministrator(page);
+  await answerSchool(page);
+  await answerAdministrator(page);
   await settleForAxe(page);
   const signin = await new AxeBuilder({ page }).analyze();
   expect(signin.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))).toEqual(

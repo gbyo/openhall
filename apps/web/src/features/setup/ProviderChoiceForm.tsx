@@ -6,11 +6,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
-import {
-  QuestionnaireChoice,
-  QuestionnaireChoiceDescription,
-  QuestionnaireChoices,
-} from '@/components/ui/questionnaire';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { ProviderDraft, SignInChoice } from './setup-state';
 
@@ -114,39 +109,6 @@ export function ProviderChoiceCards({
         />
       ))}
     </RadioGroup>
-  );
-}
-
-/** Sign-in options as canonical Questionnaire choices. The checked state is
- * fully controlled by the single setup-state choice; Questionnaire mirrors
- * it as its item answer without becoming a second source of truth. */
-export function ProviderQuestionnaireChoices({
-  choice,
-  allowLater,
-  onChoice,
-}: ProviderChoiceGroupProps) {
-  return (
-    <QuestionnaireChoices aria-label="Sign-in options">
-      {choiceOptions(allowLater).map((option) => (
-        <QuestionnaireChoice
-          key={option.value}
-          value={option.value}
-          checked={choice === option.value}
-          // The canonical hover wash (input/40) drops the muted description
-          // text to ~4.46:1. muted/50 keeps hover feedback while holding
-          // ≥4.5:1. This overrides via className merge, not a parallel style.
-          className="hover:bg-muted/50"
-          onChange={() => {
-            onChoice(option.value);
-          }}
-        >
-          {option.title}
-          <QuestionnaireChoiceDescription className="group-data-checked/questionnaire-choice:text-foreground">
-            {option.description}
-          </QuestionnaireChoiceDescription>
-        </QuestionnaireChoice>
-      ))}
-    </QuestionnaireChoices>
   );
 }
 
