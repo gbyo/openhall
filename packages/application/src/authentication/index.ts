@@ -1,4 +1,5 @@
 export * from './bootstrap.js';
+export * from './enrollment.js';
 export * from './errors.js';
 export * from './oidc.js';
 export type * from './ports.js';

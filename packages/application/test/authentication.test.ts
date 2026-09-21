@@ -491,6 +491,7 @@ describe('completeOidcLogin canonical lookup', () => {
       tenantId: 'tenant-1',
       identityProviderId: 'provider-1',
       bootstrapSetupId: null,
+      identityEnrollmentGrantId: null,
       purpose: 'login',
       providerRevision: 1,
       stateDigest: bytes('test-state'),

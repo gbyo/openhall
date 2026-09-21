@@ -67,6 +67,19 @@ export function fingerprintStaffRequest(studentId: string, destinationId: string
   return hex(['pass.request.student:v1', studentId, destinationId]);
 }
 
+export function fingerprintScheduledRequest(
+  scheduledAuthorizationId: string,
+  expectedRevision: bigint,
+): string {
+  // The authorization row plus the observed revision fully determines the
+  // semantic input: destination, window, and mode are server-owned state.
+  return hex([
+    'pass.request.scheduled:v1',
+    scheduledAuthorizationId,
+    expectedRevision.toString(10),
+  ]);
+}
+
 export function fingerprintSelfCancel(passId: string, expectedRevision: bigint): string {
   return hex(['pass.cancel.self:v1', passId, expectedRevision.toString(10)]);
 }

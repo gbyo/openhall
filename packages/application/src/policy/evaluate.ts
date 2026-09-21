@@ -3,7 +3,11 @@ import type { PassPolicyProjection } from '../passes/representations.js';
 import type { ExpectedPlacementResult } from '../scheduling/index.js';
 import type { TenantTransactionContext } from '../persistence.js';
 import { isPolicyOverrideMode } from './configurations.js';
-import type { PolicyEvaluationContext, PolicyRuleInput } from './context.js';
+import type {
+  PolicyEvaluationContext,
+  PolicyRuleInput,
+  ScheduledPreapprovalEvidence,
+} from './context.js';
 import { evaluatePolicy, type PolicyEvaluationOutcome } from './engine.js';
 import type {
   PersistedPolicyEvaluation,
@@ -96,6 +100,7 @@ export async function evaluateAndPersistPolicy(
     readonly placement: ExpectedPlacementResult;
     readonly at: Temporal.Instant;
     readonly stage: PolicyEvaluationStage;
+    readonly scheduledPreapprovals?: readonly ScheduledPreapprovalEvidence[];
   },
 ): Promise<PersistedPolicyDecision> {
   const rules = await policy.listEnabledRules(context, input.pass.organizationId);
@@ -108,6 +113,7 @@ export async function evaluateAndPersistPolicy(
     rules,
     approvals,
     overrides,
+    scheduledPreapprovals: input.scheduledPreapprovals ?? [],
   };
   const outcome = evaluatePolicy(evaluationContext);
   const evaluationId = await policy.createEvaluation(context, {

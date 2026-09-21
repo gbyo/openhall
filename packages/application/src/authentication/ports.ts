@@ -241,7 +241,7 @@ export interface TenantDirectory {
   countCanonical(): Promise<number>;
 }
 
-export type OidcTransactionPurpose = 'login' | 'bootstrap';
+export type OidcTransactionPurpose = 'login' | 'bootstrap' | 'enrollment';
 export type OidcTransactionStatus = 'pending' | 'processing' | 'consumed' | 'failed';
 
 export interface OidcTransactionRecord {
@@ -249,6 +249,7 @@ export interface OidcTransactionRecord {
   readonly tenantId: TenantId | null;
   readonly identityProviderId: string | null;
   readonly bootstrapSetupId: string | null;
+  readonly identityEnrollmentGrantId: string | null;
   readonly purpose: OidcTransactionPurpose;
   readonly providerRevision: number | null;
   readonly stateDigest: Uint8Array;
@@ -267,6 +268,7 @@ export interface OidcTransactionStore {
       readonly tenantId: TenantId | null;
       readonly identityProviderId: string | null;
       readonly bootstrapSetupId: string | null;
+      readonly identityEnrollmentGrantId: string | null;
       readonly purpose: OidcTransactionPurpose;
       readonly providerRevision: number | null;
       readonly stateDigest: Uint8Array;

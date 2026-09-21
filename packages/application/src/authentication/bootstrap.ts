@@ -245,6 +245,7 @@ export async function prepareBootstrap(
       tenantId: null,
       identityProviderId: null,
       bootstrapSetupId: setup.id,
+      identityEnrollmentGrantId: null,
       purpose: 'bootstrap',
       providerRevision: null,
       stateDigest: dependencies.digester.digest(new TextEncoder().encode(state)),

@@ -1,5 +1,8 @@
+import { Temporal } from '@js-temporal/polyfill';
 import type { Clock } from '@openhall/domain';
 import type { TenantTransactionContext, TenantTransactionRunner } from '../persistence.js';
+import { schoolDateFor } from '../control-plane/shared.js';
+import type { EnrollmentRepository } from '../control-plane/ports.js';
 import { AuthenticationError } from './errors.js';
 import type {
   AuditWriter,
@@ -12,38 +15,15 @@ import type {
   SessionRecord,
   SessionRepository,
   Sha256Hasher,
-  TenantDirectory,
 } from './ports.js';
-import {
-  assertIssuerShape,
-  assertOidcScopes,
-  fromBase64Url,
-  normalizeReturnPath,
-  toBase64Url,
-} from './validation.js';
+import { assertIssuerShape, assertOidcScopes, fromBase64Url, toBase64Url } from './validation.js';
+import { pkceChallenge } from './oidc.js';
 
-/** Login transactions expire after ten minutes. */
-export const OIDC_TRANSACTION_TTL_SECONDS = 10 * 60;
-
-export interface BeginLoginInput {
-  readonly tenantSlug: string;
-  readonly providerKey: string;
-  readonly returnPath: unknown;
-  /** Raw browser-binding value from the (HttpOnly) binding cookie. */
-  readonly browserBinding: string;
-}
-
-export interface BegunLogin {
-  readonly authorizationUrl: string;
-  /** Raw state for the provider round trip; only its digest is stored. */
-  readonly state: string;
-}
-
-export interface OidcUseCaseDependencies {
-  readonly tenants: TenantDirectory;
+export interface EnrollmentAuthDependencies {
   readonly directory: IdentityDirectory;
   readonly transactions: OidcTransactionStore;
   readonly sessions: SessionRepository;
+  readonly enrollments: EnrollmentRepository;
   readonly audit: AuditWriter;
   readonly adapter: OidcProtocolAdapter;
   readonly random: SecureRandomSource;
@@ -56,9 +36,17 @@ export interface OidcUseCaseDependencies {
   readonly allowInsecureHttp: boolean;
 }
 
-/** PKCE S256 code challenge for a verifier. */
-export function pkceChallenge(verifier: string, hasher: Sha256Hasher): string {
-  return toBase64Url(hasher.hash(new TextEncoder().encode(verifier)));
+export interface StartEnrollmentInput {
+  /** Raw base64url enrollment token from the Authorization header. */
+  readonly enrollmentToken: string;
+  /** Raw browser-binding value from the (HttpOnly) binding cookie. */
+  readonly browserBinding: string;
+}
+
+export interface StartedEnrollment {
+  readonly authorizationUrl: string;
+  /** Raw state for the provider round trip; only its digest is stored. */
+  readonly state: string;
 }
 
 function transactionSecretContext(tenantId: string, providerId: string): string {
@@ -69,26 +57,61 @@ function providerSecretContext(tenantId: string, providerId: string): string {
   return `provider-secret:v1:${tenantId}:${providerId}`;
 }
 
-/**
- * Starts a normal OIDC login: validates tenant/provider, persists a durable
- * login transaction holding only digests plus an encrypted PKCE
- * verifier/nonce bundle, and returns the provider authorization URL. The
- * database transaction is never held open across provider network calls:
- * persistence completes first, then discovery/URL building runs outside it.
- */
-export async function beginOidcLogin(
-  input: BeginLoginInput,
-  dependencies: OidcUseCaseDependencies,
-): Promise<BegunLogin> {
-  const tenant = await dependencies.tenants.findBySlug(input.tenantSlug.trim().toLowerCase());
-  if (tenant?.status !== 'active') {
-    throw new AuthenticationError('auth_provider_unavailable');
+function decodeToken(raw: string): Uint8Array {
+  if (raw.length === 0) {
+    throw new AuthenticationError('auth_transaction_invalid');
   }
-  const prepared = await dependencies.runner.run(tenant.id, async (context) => {
-    const provider = await dependencies.directory.findProviderByKey(
-      context,
-      input.providerKey.trim().toLowerCase(),
-    );
+  try {
+    return fromBase64Url(raw);
+  } catch {
+    throw new AuthenticationError('auth_transaction_invalid');
+  }
+}
+
+function decodeBinding(raw: string): Uint8Array {
+  if (raw.length === 0) {
+    throw new AuthenticationError('auth_transaction_invalid');
+  }
+  try {
+    return fromBase64Url(raw);
+  } catch {
+    throw new AuthenticationError('auth_transaction_invalid');
+  }
+}
+
+/**
+ * Starts an OIDC enrollment: validates the one-time invitation digest
+ * without consuming it, binds the exact account/provider, and returns the
+ * provider authorization URL. A valid token may retry start until the grant
+ * is consumed, revoked, or expired; consumption happens only at callback.
+ */
+export async function startIdentityEnrollment(
+  input: StartEnrollmentInput,
+  dependencies: EnrollmentAuthDependencies,
+): Promise<StartedEnrollment> {
+  const tokenHash = dependencies.digester.digest(decodeToken(input.enrollmentToken));
+  const grant = await dependencies.enrollments.loadGrantByTokenDigest(tokenHash);
+  if (grant === null) {
+    throw new AuthenticationError('auth_transaction_invalid');
+  }
+  const now = dependencies.clock.now();
+  if (
+    grant.consumedAt !== null ||
+    grant.revokedAt !== null ||
+    Temporal.Instant.compare(grant.expiresAt, now) <= 0
+  ) {
+    const code =
+      grant.consumedAt !== null || grant.revokedAt !== null
+        ? 'auth_transaction_invalid'
+        : 'auth_transaction_expired';
+    throw new AuthenticationError(code);
+  }
+  const prepared = await dependencies.runner.run(grant.tenantId, async (context) => {
+    const account = await dependencies.directory.findAccount(context, grant.accountId);
+    if (account?.status !== 'active') {
+      throw new AuthenticationError('auth_transaction_invalid');
+    }
+    const provider = await dependencies.directory.findProvider(context, grant.identityProviderId);
     if (provider?.status !== 'active') {
       throw new AuthenticationError('auth_provider_unavailable');
     }
@@ -96,29 +119,29 @@ export async function beginOidcLogin(
       allowInsecureHttp: dependencies.allowInsecureHttp,
     });
     const scopes = assertOidcScopes(provider.scopes);
-    const now = dependencies.clock.now();
     const state = toBase64Url(dependencies.random.randomBytes(32));
     const nonce = toBase64Url(dependencies.random.randomBytes(32));
     const verifier = toBase64Url(dependencies.random.randomBytes(32));
     const binding = decodeBinding(input.browserBinding);
     const transactionSecret = dependencies.protector.protect(
       JSON.stringify({ verifier, nonce }),
-      transactionSecretContext(tenant.id, provider.id),
+      transactionSecretContext(grant.tenantId, provider.id),
     );
     await dependencies.transactions.create(context, {
-      tenantId: tenant.id,
+      tenantId: grant.tenantId,
       identityProviderId: provider.id,
       bootstrapSetupId: null,
-      identityEnrollmentGrantId: null,
-      purpose: 'login',
+      identityEnrollmentGrantId: grant.id,
+      purpose: 'enrollment',
       providerRevision: provider.revision,
       stateDigest: dependencies.digester.digest(new TextEncoder().encode(state)),
       browserBindingDigest: dependencies.digester.digest(binding),
       transactionSecret,
-      returnPath: normalizeReturnPath(input.returnPath),
-      expiresAt: now.add({ seconds: OIDC_TRANSACTION_TTL_SECONDS }),
+      returnPath: '/',
+      expiresAt: now.add({ seconds: 10 * 60 }),
     });
     return {
+      tenantId: grant.tenantId,
       issuer,
       providerId: provider.id,
       clientId: provider.clientId,
@@ -132,7 +155,7 @@ export async function beginOidcLogin(
   });
   const clientSecret = dependencies.protector.reveal(
     prepared.clientSecret,
-    providerSecretContext(tenant.id, prepared.providerId),
+    providerSecretContext(prepared.tenantId, prepared.providerId),
   );
   const authorizationUrl = await dependencies.adapter.buildAuthorizationUrl({
     configuration: {
@@ -151,14 +174,7 @@ export async function beginOidcLogin(
   return { authorizationUrl, state: prepared.state };
 }
 
-function decodeBinding(raw: string): Uint8Array {
-  if (raw.length === 0) {
-    throw new AuthenticationError('auth_transaction_invalid');
-  }
-  return fromBase64Url(raw);
-}
-
-export interface CompleteLoginInput {
+export interface CompleteEnrollmentInput {
   /** Raw state returned by the provider. */
   readonly state: string;
   /** Raw browser-binding value from the binding cookie. */
@@ -166,11 +182,9 @@ export interface CompleteLoginInput {
   /** Full callback URL as received (query included for code extraction). */
   readonly callbackUrl: string;
   readonly requestId: string;
-  /** Previously valid session presenting this browser, if any. */
-  readonly supersededSession: SessionRecord | undefined;
 }
 
-export interface CompletedLogin {
+export interface CompletedEnrollment {
   readonly sessionToken: string;
   readonly csrfToken: string;
   readonly returnPath: string;
@@ -178,23 +192,30 @@ export interface CompletedLogin {
 }
 
 /**
- * Completes a normal OIDC login. Claims the transaction atomically before
- * any network call; the database transaction is never held open across the
- * provider exchange. Mix-up protection comes from binding the transaction to
- * its exact provider and validating against that provider's configuration.
+ * Completes an OIDC enrollment. Claims the transaction atomically, then
+ * atomically links the verified issuer+subject to the predetermined account
+ * and consumes the invitation. A verified identity already linked to a
+ * different account fails closed with identity_link_conflict; the same
+ * account re-binding is accepted safely. Exactly one of two racing
+ * callbacks consumes the grant.
  */
-export async function completeOidcLogin(
-  input: CompleteLoginInput,
-  dependencies: OidcUseCaseDependencies,
-): Promise<CompletedLogin> {
+export async function completeIdentityEnrollment(
+  input: CompleteEnrollmentInput,
+  dependencies: EnrollmentAuthDependencies,
+): Promise<CompletedEnrollment> {
   const now = dependencies.clock.now();
   const stateDigest = dependencies.digester.digest(new TextEncoder().encode(input.state));
   const transaction = await dependencies.transactions.claimByStateDigest(stateDigest, now);
-  if (transaction?.purpose !== 'login' || transaction.tenantId === null) {
+  if (
+    transaction?.purpose !== 'enrollment' ||
+    transaction.tenantId === null ||
+    transaction.identityEnrollmentGrantId === null
+  ) {
     throw new AuthenticationError('auth_transaction_invalid');
   }
   const tenantId = transaction.tenantId;
   const providerId = transaction.identityProviderId;
+  const enrollmentId = transaction.identityEnrollmentGrantId;
   return dependencies.runner.run(tenantId, async (context) => {
     const markFailed = async (): Promise<void> => {
       await dependencies.transactions.markFailed(transaction.id, dependencies.clock.now());
@@ -265,12 +286,12 @@ export async function completeOidcLogin(
         expectedNonce: secret.nonce,
       });
     } catch (error) {
-      await denyAndThrow(context, dependencies, transaction.id, input.requestId, error);
+      await denyEnrollment(context, dependencies, transaction.id, input.requestId, error);
       throw new AuthenticationError('auth_provider_unavailable');
     }
     // Explicit mix-up check: the verified issuer must be the transaction's provider.
     if (identity.issuer !== provider.issuer && identity.issuer !== issuer.issuer) {
-      await denyAndThrow(
+      await denyEnrollment(
         context,
         dependencies,
         transaction.id,
@@ -278,23 +299,22 @@ export async function completeOidcLogin(
         new AuthenticationError('auth_transaction_invalid', 'Issuer mismatch'),
       );
     }
-    return finalizeLogin(context, dependencies, {
+    return finalizeEnrollment(context, dependencies, {
       transactionId: transaction.id,
       tenantId,
       providerId: provider.id,
+      enrollmentId,
       issuer: provider.issuer,
       subject: identity.subject,
       email: identity.email ?? null,
-      returnPath: transaction.returnPath,
       requestId: input.requestId,
-      supersededSession: input.supersededSession,
     });
   });
 }
 
-async function denyAndThrow(
+async function denyEnrollment(
   context: TenantTransactionContext,
-  dependencies: OidcUseCaseDependencies,
+  dependencies: EnrollmentAuthDependencies,
   transactionId: string,
   requestId: string,
   error: unknown,
@@ -302,7 +322,7 @@ async function denyAndThrow(
   await dependencies.transactions.markFailed(transactionId, dependencies.clock.now());
   const now = dependencies.clock.now();
   await dependencies.audit.append(context, {
-    action: 'auth.sign_in_denied',
+    action: 'auth.enrollment_denied',
     actorKind: 'system',
     targetKind: 'oidc_login_transaction',
     targetId: transactionId,
@@ -319,59 +339,88 @@ async function denyAndThrow(
   throw new AuthenticationError('auth_provider_unavailable');
 }
 
-async function finalizeLogin(
+async function finalizeEnrollment(
   context: TenantTransactionContext,
-  dependencies: OidcUseCaseDependencies,
+  dependencies: EnrollmentAuthDependencies,
   input: {
     readonly transactionId: string;
     readonly tenantId: string;
     readonly providerId: string;
+    readonly enrollmentId: string;
     readonly issuer: string;
     readonly subject: string;
     readonly email: string | null;
-    readonly returnPath: string;
     readonly requestId: string;
-    readonly supersededSession: SessionRecord | undefined;
   },
-): Promise<CompletedLogin> {
+): Promise<CompletedEnrollment> {
+  const now = dependencies.clock.now();
+  // Lock the invitation first: exactly one racing callback observes it live.
+  const grant = await dependencies.enrollments.loadGrantForUpdate(context, input.enrollmentId);
+  if (
+    grant?.tenantId !== input.tenantId ||
+    grant.consumedAt !== null ||
+    grant.revokedAt !== null ||
+    Temporal.Instant.compare(grant.expiresAt, now) <= 0
+  ) {
+    await dependencies.transactions.markFailed(input.transactionId, dependencies.clock.now());
+    throw new AuthenticationError('auth_transaction_invalid');
+  }
   const directory = dependencies.directory;
-  const tenant = await directory.findTenant(context, input.tenantId);
-  // Every resolution failure maps to the same generic code so login never
-  // reveals whether an identity, account, or person exists or is disabled.
-  const identity = await directory.findIdentity(context, input.issuer, input.subject);
-  const account =
-    identity === undefined ? undefined : await directory.findAccount(context, identity.accountId);
+  const account = await directory.findAccount(context, grant.accountId);
   const person =
     account === undefined ? undefined : await directory.findPerson(context, account.personId);
-  if (
-    tenant?.status !== 'active' ||
-    identity === undefined ||
-    account?.status !== 'active' ||
-    person?.status !== 'active'
-  ) {
-    await dependencies.transactions.consume(input.transactionId, dependencies.clock.now());
-    const now = dependencies.clock.now();
-    await dependencies.audit.append(context, {
-      action: 'auth.sign_in_denied',
-      actorKind: 'system',
-      targetKind: 'oidc_login_transaction',
-      targetId: input.transactionId,
-      outcome: 'denied',
-      occurredAt: now,
-      requestId: input.requestId,
-      metadata: { reason: 'identity_not_linked' },
+  if (account?.status !== 'active' || person?.status !== 'active') {
+    await dependencies.transactions.markFailed(input.transactionId, dependencies.clock.now());
+    throw new AuthenticationError('auth_transaction_invalid');
+  }
+  const timeZone = await dependencies.enrollments.loadSchoolTimeZone(context, grant.organizationId);
+  const today = timeZone === null ? null : schoolDateFor(now, timeZone);
+  const membership =
+    today === null
+      ? null
+      : await dependencies.enrollments.loadActiveMembership(
+          context,
+          person.id,
+          grant.organizationId,
+          today.toString(),
+        );
+  if (membership === null) {
+    await dependencies.transactions.markFailed(input.transactionId, dependencies.clock.now());
+    throw new AuthenticationError('auth_transaction_invalid');
+  }
+  // Collision check on the canonical external identity: a verified
+  // issuer+subject bound to a different account fails closed without
+  // disclosing which person, account, or school owns it.
+  const existing = await directory.findIdentity(context, input.issuer, input.subject);
+  if (existing !== undefined && existing.accountId !== account.id) {
+    await denyEnrollment(
+      context,
+      dependencies,
+      input.transactionId,
+      input.requestId,
+      new AuthenticationError('identity_link_conflict'),
+    );
+  }
+  if (existing === undefined) {
+    await directory.createIdentity(context, {
+      accountId: account.id,
+      issuer: input.issuer,
+      providerSubject: input.subject,
+      emailSnapshot: input.email,
     });
-    throw new AuthenticationError('identity_not_linked');
+  } else if ((existing.emailSnapshot ?? null) !== input.email) {
+    await directory.updateIdentityEmailSnapshot(context, existing.id, input.email);
   }
-  if ((identity.emailSnapshot ?? null) !== input.email) {
-    await directory.updateIdentityEmailSnapshot(context, identity.id, input.email);
+  const consumed = await dependencies.enrollments.consumeGrant(
+    context,
+    grant.id,
+    grant.revision,
+    now,
+  );
+  if (consumed === null) {
+    await dependencies.transactions.markFailed(input.transactionId, dependencies.clock.now());
+    throw new AuthenticationError('auth_transaction_invalid');
   }
-  const now = dependencies.clock.now();
-  // Stable per-session CSRF: derived deterministically from the opaque
-  // session credential via domain-separated HMAC ("csrf-token:v1"), while
-  // the lookup digest uses "session-digest:v1". Same session always yields
-  // the same CSRF token; different sessions yield different tokens. Only
-  // the generic digest of the derived CSRF value rests server-side.
   const sessionTokenBytes = dependencies.random.randomBytes(32);
   const csrfTokenBytes = dependencies.digester.deriveCsrfToken(sessionTokenBytes);
   const sessionToken = toBase64Url(sessionTokenBytes);
@@ -388,20 +437,8 @@ async function finalizeLogin(
     idleExpiresAt: now.add({ seconds: 12 * 60 * 60 }),
     absoluteExpiresAt: now.add({ seconds: 7 * 24 * 60 * 60 }),
   });
-  if (
-    input.supersededSession !== undefined &&
-    input.supersededSession.id !== session.id &&
-    input.supersededSession.tenantId === input.tenantId
-  ) {
-    await dependencies.sessions.revokeSession(
-      context,
-      input.supersededSession.id,
-      'superseded',
-      now,
-    );
-  }
   await dependencies.audit.append(context, {
-    action: 'auth.sign_in_succeeded',
+    action: 'auth.enrollment_linked',
     actorKind: 'account',
     actorId: account.id,
     targetKind: 'auth_session',
@@ -411,5 +448,5 @@ async function finalizeLogin(
     requestId: input.requestId,
   });
   await dependencies.transactions.consume(input.transactionId, now);
-  return { sessionToken, csrfToken, returnPath: input.returnPath, session };
+  return { sessionToken, csrfToken, returnPath: '/', session };
 }
