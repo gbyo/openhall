@@ -26,7 +26,9 @@ export function ErrorPage() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button render={<Link to="/" />}>Return to WayPass</Button>
+            <Button nativeButton={false} render={<Link to="/" />}>
+              Return to WayPass
+            </Button>
           </EmptyContent>
         </Empty>
       </div>

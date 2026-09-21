@@ -94,7 +94,12 @@ export function LoginPage() {
                   An administrator needs to finish WayPass setup for {tenant.name}.
                 </AlertDescription>
                 <div className="pt-2">
-                  <Button variant="secondary" size="sm" render={<Link to="/recovery/access" />}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link to="/recovery/access" />}
+                  >
                     Continue with recovery access
                   </Button>
                 </div>
@@ -274,7 +279,7 @@ export function EnrollPage() {
               {state === 'provider-unavailable' && token && (
                 <Button onClick={() => void startEnrollment(token)}>Try again</Button>
               )}
-              <Button variant="link" render={<Link to="/login" />}>
+              <Button variant="link" nativeButton={false} render={<Link to="/login" />}>
                 Return to sign in
               </Button>
             </CardContent>

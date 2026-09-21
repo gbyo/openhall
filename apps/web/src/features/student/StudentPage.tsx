@@ -391,6 +391,12 @@ export function StudentPage() {
                 const starting =
                   startScheduled.isPending &&
                   startScheduled.variables.body.scheduledAuthorizationId === item.id;
+                const fromMs = Date.parse(item.validFrom);
+                const untilMs = Date.parse(item.validUntil);
+                const notYet = Number.isFinite(fromMs) && Date.now() < fromMs;
+                const ended = Number.isFinite(untilMs) && Date.now() >= untilMs;
+                const startable = !notYet && !ended;
+                const opensLabel = time(item.validFrom) ?? 'soon';
                 return (
                   <Item role="listitem" key={item.id}>
                     <ItemContent>
@@ -404,8 +410,15 @@ export function StudentPage() {
                     <ItemActions>
                       <Button
                         size="sm"
-                        disabled={startScheduled.isPending}
+                        disabled={startScheduled.isPending || !startable}
                         aria-busy={starting}
+                        title={
+                          notYet
+                            ? `Opens ${opensLabel}`
+                            : ended
+                              ? 'This appointment has ended'
+                              : undefined
+                        }
                         onClick={() => {
                           startScheduled.mutate(
                             scheduledCommands.begin(

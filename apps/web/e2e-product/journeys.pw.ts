@@ -63,8 +63,8 @@ test('student starts a scheduled appointment from Upcoming', async ({ page }) =>
     id: '00000000-0000-4000-8000-000000000030',
     organizationId: ORG,
     status: 'active',
-    validFrom: '2026-09-21T15:00:00Z',
-    validUntil: '2026-09-21T16:00:00Z',
+    validFrom: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    validUntil: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
     authorizationEtag: '"auth:test:1"',
   };

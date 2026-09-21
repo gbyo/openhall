@@ -63,9 +63,9 @@ export function UserMenu({ variant = 'sidebar' }: { variant?: 'sidebar' | 'heade
       side={variant === 'header' ? 'bottom' : 'top'}
       className="w-56"
     >
-      <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
-      <DropdownMenuSeparator />
       <DropdownMenuGroup>
+        <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link to="/schools" />}>View all schools</DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />

@@ -401,7 +401,9 @@ test('zero-provider login names recovery instead of an empty list', async ({ pag
   await guidedShell(page, { initialized: true, sessionMethod: null });
   await page.goto('/login');
   await expect(page.getByText("School sign-in hasn't been connected yet")).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Continue with recovery access' })).toBeVisible();
+  const recoveryAccess = page.getByRole('button', { name: 'Continue with recovery access' });
+  await expect(recoveryAccess).toBeVisible();
+  await expect(recoveryAccess).toHaveAttribute('href', '/recovery/access');
 });
 
 test('recovery access trades a code for the connect screen', async ({ page }) => {

@@ -24,7 +24,7 @@ async function recreateDatabase(): Promise<void> {
   }
 }
 
-const seedSql = `
+export const demoSeedSql = `
 INSERT INTO tenant (id, name, slug) VALUES ('10000000-0000-4000-8000-000000000001', 'Northstar Public Schools', 'northstar-demo');
 INSERT INTO organization (id, tenant_id, kind, name, slug, time_zone) VALUES
 ('10000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 'school', 'Northstar Middle School', 'northstar-middle', 'America/New_York');
@@ -79,12 +79,12 @@ INSERT INTO section_meeting (id,tenant_id,section_id,schedule_block_id,location_
 INSERT INTO calendar_day (id,tenant_id,organization_id,date,day_kind,schedule_template_id) VALUES ('10000000-0000-4000-8000-000000000705','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002',current_date,'instructional','10000000-0000-4000-8000-000000000702');
 
 INSERT INTO policy_rule (id,tenant_id,organization_id,name,rule_type,scope_kind,scope_organization_id,priority,configuration,override_mode) VALUES
-('10000000-0000-4000-8000-000000000801','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','Protect instructional time','schedule_boundary','organization','10000000-0000-4000-8000-000000000002',100,'{"schemaVersion":1,"firstMinutes":5,"lastMinutes":5}','authorized');
+('10000000-0000-4000-8000-000000000801','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','Protect instructional time','schedule_boundary','organization','10000000-0000-4000-8000-000000000002',100,'{"schemaVersion":1,"firstMinutes":5,"lastMinutes":5,"blockKinds":["instructional"],"requestSources":["student_web","staff_web","scheduled"]}','authorized');
 INSERT INTO policy_rule (id,tenant_id,organization_id,name,rule_type,scope_kind,scope_section_id,priority,configuration,override_mode) VALUES
-('10000000-0000-4000-8000-000000000802','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','Teacher approval for science','approval_requirement','section','10000000-0000-4000-8000-000000000303',50,'{"schemaVersion":1,"requiredApprover":"current_section_teacher"}','never');
+('10000000-0000-4000-8000-000000000802','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','Teacher approval for science','approval_requirement','section','10000000-0000-4000-8000-000000000303',50,'{"schemaVersion":1,"requestSources":["student_web","staff_web","scheduled"],"approver":"current_section_teacher"}','never');
 
 INSERT INTO scheduled_authorization (id,tenant_id,organization_id,student_id,destination_id,created_by_person_id,created_by_account_id,valid_from,valid_until,approval_mode,origin_strategy,display_category) VALUES
-('10000000-0000-4000-8000-000000000901','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000203','10000000-0000-4000-8000-000000000503','10000000-0000-4000-8000-000000000201','10000000-0000-4000-8000-000000000101',now()+interval '1 hour',now()+interval '3 hours','preapproved','expected','Counselor appointment'),
+('10000000-0000-4000-8000-000000000901','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000203','10000000-0000-4000-8000-000000000503','10000000-0000-4000-8000-000000000201','10000000-0000-4000-8000-000000000101',now()-interval '30 minutes',now()+interval '2 hours','preapproved','expected','Counselor appointment'),
 ('10000000-0000-4000-8000-000000000902','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000205','10000000-0000-4000-8000-000000000501','10000000-0000-4000-8000-000000000201','10000000-0000-4000-8000-000000000101',now()+interval '1 day',now()+interval '1 day 2 hours','approval_required','expected','Medication');
 
 INSERT INTO pass (id,tenant_id,organization_id,student_id,origin_location_id,origin_section_id,destination_id,return_location_id,request_source,requested_by_person_id,requested_at,lifecycle_state,expected_return_at,revision,departure_check_in_mode,departure_destination_revision) VALUES
@@ -95,7 +95,7 @@ INSERT INTO pass (id,tenant_id,organization_id,student_id,origin_location_id,ori
 INSERT INTO policy_evaluation (id,tenant_id,pass_id,stage,decision,pass_revision,context_snapshot,evaluated_at) VALUES
 ('10000000-0000-4000-8000-000000001101','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000001001','request','approval_required',1,'{}',now()-interval '3 minutes'),
 ('10000000-0000-4000-8000-000000001102','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000001002','request','allow',2,'{}',now()-interval '6 minutes'),
-('10000000-0000-4000-8000-000000001103','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000001003','request','queue',2,'{}',now()-interval '4 minutes');
+('10000000-0000-4000-8000-000000001103','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000001003','request','allow',1,'{}',now()-interval '4 minutes');
 INSERT INTO policy_evaluation_result (id,tenant_id,evaluation_id,policy_rule_id,policy_rule_revision,outcome,reason_code,override_mode,rule_snapshot,contribution) VALUES
 ('10000000-0000-4000-8000-000000001111','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000001101','10000000-0000-4000-8000-000000000802',1,'fail','current_section_teacher_approval_required','never','{}','approval_required');
 INSERT INTO pass_approval (id,tenant_id,organization_id,pass_id,origin_evaluation_result_id,policy_rule_id,policy_rule_revision,required_section_id) VALUES
@@ -122,15 +122,23 @@ async function reset(): Promise<void> {
   const handle = createDatabase(demoUrl.toString(), { max: 2 });
   try {
     await migrateToLatest(handle.database);
-    await handle.pool.query(seedSql);
+    await handle.pool.query(demoSeedSql);
   } finally {
     await handle.destroy();
   }
   process.stdout.write(`OpenHall demo database reset: ${demoUrl.pathname.slice(1)}\n`);
 }
 
-await reset();
-if (process.argv.includes('--serve')) {
+// Import-safe: tests import demoSeedSql from this module. Only reset/serve
+// when invoked directly via `tsx src/demo.ts`.
+const invokedAsScript =
+  process.argv[1] !== undefined &&
+  (process.argv[1].endsWith('/demo.ts') || process.argv[1].endsWith('\\demo.ts'));
+
+if (invokedAsScript) {
+  await reset();
+}
+if (invokedAsScript && process.argv.includes('--serve')) {
   const child = spawn(
     'pnpm',
     [
