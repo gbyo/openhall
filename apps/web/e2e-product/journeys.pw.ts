@@ -657,6 +657,98 @@ test('admin cancels a scheduled pass only after confirmation', async ({ page }) 
   await expect(page.getByText('Alex Rivera')).toHaveCount(0);
 });
 
+test('admin manages locations through dialog and sheet, not inline forms', async ({ page }) => {
+  await shell(page, ADMIN);
+  let locs: Record<string, unknown>[] = [
+    {
+      id: '00000000-0000-4000-8000-000000000015',
+      organizationId: ORG,
+      parentLocationId: null,
+      kind: 'room',
+      name: 'Health Office',
+      code: null,
+      floorLabel: '1',
+      status: 'active',
+      revision: '1',
+      createdAt: '2026-09-21T14:00:00Z',
+      updatedAt: '2026-09-21T14:00:00Z',
+    },
+  ];
+  await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
+    route.fulfill({ json: { locations: locs } }),
+  );
+  let created = false;
+  await page.unroute(`**/api/v1/organizations/${ORG}/locations`);
+  await page.route(`**/api/v1/organizations/${ORG}/locations`, async (route) => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().headers()['idempotency-key']).toBeTruthy();
+      created = true;
+      locs = [
+        ...locs,
+        {
+          id: '00000000-0000-4000-8000-000000000021',
+          organizationId: ORG,
+          parentLocationId: null,
+          kind: 'room',
+          name: 'Gym',
+          code: null,
+          floorLabel: null,
+          status: 'active',
+          revision: '1',
+          createdAt: '2026-09-21T14:00:00Z',
+          updatedAt: '2026-09-21T14:00:00Z',
+        },
+      ];
+      await route.fulfill({ json: { id: '00000000-0000-4000-8000-000000000021' } });
+      return;
+    }
+    await route.fulfill({ json: { locations: locs } });
+  });
+  await page.route(`**/api/v1/locations/00000000-0000-4000-8000-000000000015`, async (route) => {
+    if (route.request().method() === 'PUT') {
+      expect(route.request().headers()['if-match']).toBe('"loc:test:1"');
+      locs = [{ ...locs[0], name: 'Health Office Updated' }];
+      await route.fulfill({ json: { location: locs[0] } });
+      return;
+    }
+    await route.fulfill({ json: { location: locs[0] }, headers: { ETag: '"loc:test:1"' } });
+  });
+  await page.route(
+    `**/api/v1/locations/00000000-0000-4000-8000-000000000015/archive`,
+    async (route) => {
+      locs = [{ ...locs[0], status: 'archived' }];
+      await route.fulfill({ json: { location: locs[0] } });
+    },
+  );
+  await page.goto(`/schools/${ORG}/admin/locations`);
+  await expect(page.getByRole('heading', { name: 'Locations' })).toBeVisible();
+  await expect(page.getByText('Health Office')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add location' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'New location' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New location' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Name').fill('Gym');
+  await dialog.getByRole('button', { name: 'Create location' }).click();
+  expect(created).toBe(true);
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Gym')).toBeVisible();
+  await page.getByRole('button', { name: 'Actions for Health Office' }).click();
+  await page.getByRole('menuitem', { name: 'Edit location' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Edit Health Office' });
+  await expect(sheet).toBeVisible();
+  await sheet.getByLabel('Name').fill('Health Office Updated');
+  await sheet.getByRole('button', { name: 'Save changes' }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText('Health Office Updated')).toBeVisible();
+  await page.getByRole('button', { name: 'Actions for Health Office Updated' }).click();
+  await page.getByRole('menuitem', { name: 'Archive location' }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Archive location' }).click();
+  await expect.poll(() => locs[0]?.status).toBe('archived');
+  await expect(page.getByText('Archived')).toBeVisible();
+});
+
 test('admin people page is a directory with sign-in management, not roster editing', async ({
   page,
 }) => {
@@ -733,7 +825,9 @@ test('admin locations list school places', async ({ page }) => {
   );
   await page.goto(`/schools/${ORG}/admin/locations`);
   await expect(page.getByRole('heading', { name: 'Locations' })).toBeVisible();
-  await expect(page.locator('.data-table__row', { hasText: 'Health Office' })).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Locations' }).getByText('Health Office'),
+  ).toBeVisible();
 });
 
 test('school chooser lists schools and index routes a student to their pass', async ({ page }) => {
