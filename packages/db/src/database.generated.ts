@@ -74,9 +74,13 @@ export interface AuthIdentity {
 export interface AuthorizationGrant {
   account_id: string;
   created_at: Generated<string>;
+  created_by_account_id: string | null;
   destination_id: string | null;
   id: Generated<string>;
   organization_id: string | null;
+  revision: Generated<Int8>;
+  revoked_at: string | null;
+  revoked_by_account_id: string | null;
   role: string;
   scope_kind: string;
   section_id: string | null;
@@ -163,9 +167,11 @@ export interface Destination {
   queue_enabled: Generated<boolean>;
   queue_timeout_seconds: Generated<number>;
   ready_claim_timeout_seconds: Generated<number>;
+  revision: Generated<Int8>;
   service_type: string;
   status: Generated<string>;
   tenant_id: string;
+  updated_at: Generated<string>;
 }
 
 export interface DestinationReservation {
@@ -206,6 +212,22 @@ export interface IdempotencyRecord {
   response_body: Json;
   response_status: number;
   tenant_id: string;
+}
+
+export interface IdentityEnrollmentGrant {
+  account_id: string;
+  consumed_at: string | null;
+  created_at: Generated<string>;
+  created_by_account_id: string | null;
+  expires_at: string;
+  id: Generated<string>;
+  identity_provider_id: string;
+  organization_id: string;
+  revision: Generated<Int8>;
+  revoked_at: string | null;
+  revoked_by_account_id: string | null;
+  tenant_id: string;
+  token_hash: Buffer;
 }
 
 export interface IdentityProvider {
@@ -280,6 +302,7 @@ export interface Location {
   name: string;
   organization_id: string;
   parent_location_id: string | null;
+  revision: Generated<Int8>;
   status: Generated<string>;
   tenant_id: string;
   updated_at: Generated<string>;
@@ -292,6 +315,7 @@ export interface OidcLoginTransaction {
   created_at: Generated<string>;
   expires_at: string;
   id: Generated<string>;
+  identity_enrollment_grant_id: string | null;
   identity_provider_id: string | null;
   processing_started_at: string | null;
   provider_revision: number | null;
@@ -360,6 +384,8 @@ export interface OutboxEvent {
 
 export interface Pass {
   created_at: Generated<string>;
+  departure_check_in_mode: string | null;
+  departure_destination_revision: Int8 | null;
   destination_id: string;
   expected_return_at: string | null;
   id: Generated<string>;
@@ -463,6 +489,7 @@ export interface PolicyEvaluationResult {
 }
 
 export interface PolicyRule {
+  archived_at: string | null;
   configuration: Json;
   created_at: Generated<string>;
   enabled: Generated<boolean>;
@@ -509,18 +536,25 @@ export interface ScheduleBlock {
 
 export interface ScheduledAuthorization {
   approval_mode: string;
+  cancelled_at: string | null;
+  cancelled_by_account_id: string | null;
   created_at: Generated<string>;
+  created_by_account_id: string | null;
   created_by_person_id: string;
   destination_id: string;
   display_category: string | null;
   id: Generated<string>;
+  last_attempt_at: string | null;
   organization_id: string;
   origin_location_id: string | null;
   origin_strategy: string;
+  revision: Generated<Int8>;
   status: Generated<string>;
   student_id: string;
   tenant_id: string;
   updated_at: Generated<string>;
+  used_at: string | null;
+  used_by_account_id: string | null;
   valid_from: string;
   valid_until: string;
 }
@@ -542,6 +576,15 @@ export interface ScheduleTemplate {
   organization_id: string;
   status: Generated<string>;
   tenant_id: string;
+}
+
+export interface SchoolScheduleConfiguration {
+  created_at: Generated<string>;
+  id: Generated<string>;
+  organization_id: string;
+  revision: Generated<Int8>;
+  tenant_id: string;
+  updated_at: Generated<string>;
 }
 
 export interface Section {
@@ -615,6 +658,7 @@ export interface DB {
   destination_reservation: DestinationReservation;
   external_reference: ExternalReference;
   idempotency_record: IdempotencyRecord;
+  identity_enrollment_grant: IdentityEnrollmentGrant;
   identity_provider: IdentityProvider;
   incident_affected_pass: IncidentAffectedPass;
   incident_presence_report: IncidentPresenceReport;
@@ -639,6 +683,7 @@ export interface DB {
   schedule_slot: ScheduleSlot;
   schedule_template: ScheduleTemplate;
   scheduled_authorization: ScheduledAuthorization;
+  school_schedule_configuration: SchoolScheduleConfiguration;
   section: Section;
   section_meeting: SectionMeeting;
   section_membership: SectionMembership;

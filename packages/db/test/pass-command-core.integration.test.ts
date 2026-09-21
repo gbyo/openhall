@@ -148,8 +148,8 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
 }
 
 describe('migration 005 pass command core', () => {
-  it('advances the expected migration marker to 007', () => {
-    expect(EXPECTED_MIGRATION).toBe('007_destination_flow_and_movement');
+  it('advances the expected migration marker to 008', () => {
+    expect(EXPECTED_MIGRATION).toBe('008_school_control_plane');
   });
 
   it('migrates a blank database 001 -> 005 with same-school hardening', async () => {
