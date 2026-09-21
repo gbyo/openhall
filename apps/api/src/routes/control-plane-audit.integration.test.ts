@@ -233,7 +233,7 @@ afterAll(async () => {
     base.pathname = '/postgres';
     const client = new Client({ connectionString: base.toString() });
     await client.connect();
-    await client.query(`DROP DATABASE ${quotedIdentifier(databaseName)}`);
+    await client.query(`DROP DATABASE IF EXISTS ${quotedIdentifier(databaseName)} WITH (FORCE)`);
     await client.end();
   }
 });

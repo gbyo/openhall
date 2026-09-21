@@ -38,6 +38,11 @@ export interface SystemTransactionContext {
  */
 export type TransactionContext = TenantTransactionContext;
 
+export interface TenantTransactionSettings {
+  readonly isolationLevel?: 'read uncommitted' | 'read committed' | 'repeatable read' | 'serializable';
+  readonly accessMode?: 'read only' | 'read write';
+}
+
 /**
  * Runs a unit of work inside one tenant-scoped PostgreSQL transaction.
  * Implementations must not hold the transaction open across outbound network
@@ -47,6 +52,7 @@ export interface TenantTransactionRunner {
   run<TResult>(
     tenantId: TenantId,
     operation: (context: TenantTransactionContext) => Promise<TResult>,
+    settings?: TenantTransactionSettings,
   ): Promise<TResult>;
 }
 

@@ -4,6 +4,7 @@ import type {
   SystemTransactionRunner,
   TenantTransactionContext,
   TenantTransactionRunner,
+  TenantTransactionSettings,
 } from '@openhall/application';
 import type { TenantId as DomainTenantId } from '@openhall/domain';
 import type { Kysely, Transaction } from 'kysely';
@@ -48,8 +49,16 @@ export class PostgresTenantTransactionRunner implements TenantTransactionRunner 
   async run<TResult>(
     tenantId: DomainTenantId,
     operation: (context: TenantTransactionContext) => Promise<TResult>,
+    settings?: TenantTransactionSettings,
   ): Promise<TResult> {
-    return this.database.transaction().execute(async (transaction) => {
+    let transactionBuilder = this.database.transaction();
+    if (settings?.isolationLevel !== undefined) {
+      transactionBuilder = transactionBuilder.setIsolationLevel(settings.isolationLevel);
+    }
+    if (settings?.accessMode !== undefined) {
+      transactionBuilder = transactionBuilder.setAccessMode(settings.accessMode);
+    }
+    return transactionBuilder.execute(async (transaction) => {
       const context = tenantContext(tenantId);
       transactionConnections.set(context, transaction);
       try {

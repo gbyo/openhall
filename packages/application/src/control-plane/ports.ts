@@ -247,6 +247,11 @@ export interface ScheduleConfigurationRecord {
 
 /** Purpose-built schedule administration port; the aggregate row is the lock. */
 export interface ScheduleAdminRepository {
+  /** Reads the school schedule configuration without taking a write lock. */
+  loadConfiguration(
+    context: TenantTransactionContext,
+    organizationId: string,
+  ): Promise<ScheduleConfigurationRecord | null>;
   /** Locks the school schedule configuration row; null when the school has none. */
   loadConfigurationForUpdate(
     context: TenantTransactionContext,
@@ -360,6 +365,12 @@ export interface ScheduleAdminRepository {
     organizationId: string,
     date: string,
   ): Promise<CalendarDayRecord | null>;
+  listDaysInRange(
+    context: TenantTransactionContext,
+    organizationId: string,
+    from: string,
+    through: string,
+  ): Promise<readonly CalendarDayRecord[]>;
   upsertDay(
     context: TenantTransactionContext,
     input: {

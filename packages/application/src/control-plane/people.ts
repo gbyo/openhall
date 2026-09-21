@@ -81,7 +81,7 @@ function encodeCursor(value: Record<string, string>): string {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
 }
 
-function decodePersonCursor(
+export function decodePersonCursor(
   cursor: unknown,
 ): { readonly displayName: string; readonly personId: string } | null {
   if (cursor === null || cursor === undefined) return null;

@@ -38,6 +38,17 @@ function rule(overrides: Partial<PolicyRuleInput> = {}): PolicyRuleInput {
   };
 }
 
+function approvalRule(): PolicyRuleInput {
+  return rule({
+    id: 'approval-rule',
+    ruleType: 'approval_requirement',
+    configuration: {
+      schemaVersion: 1,
+      requestSources: ['student_web'],
+    },
+  });
+}
+
 function resolvedPlacement(at: Temporal.Instant, sectionId = SECTION_P3): ExpectedPlacementResult {
   const beginsAt = Temporal.Instant.from('2026-09-21T12:00:00Z');
   const endsAt = Temporal.Instant.from('2026-09-21T13:00:00Z');
@@ -76,6 +87,7 @@ function contextAt(
   instant: string,
   rules: readonly PolicyRuleInput[] = [rule()],
   placement?: ExpectedPlacementResult,
+  scheduledPreapprovals: PolicyEvaluationContext['scheduledPreapprovals'] = [],
 ): PolicyEvaluationContext {
   const at = Temporal.Instant.from(instant);
   return {
@@ -95,9 +107,55 @@ function contextAt(
     rules,
     approvals: [],
     overrides: [],
-    scheduledPreapprovals: [],
+    scheduledPreapprovals,
   };
 }
+
+describe('scheduled preapproval evaluation', () => {
+  const matchingEvidence = [
+    {
+      scheduledAuthorizationId: 'scheduled-1',
+      studentId: STUDENT,
+      destinationId: DESTINATION,
+    },
+  ] as const;
+
+  it('satisfies the matching student and destination approval requirement', () => {
+    const outcome = evaluatePolicy(
+      contextAt('2026-09-21T12:30:00Z', [approvalRule()], undefined, matchingEvidence),
+    );
+    expect(outcome.decision).toBe('allow');
+    expect(outcome.results[0]?.reasonCode).toBe('scheduled_preapproval_satisfied');
+  });
+
+  it('does not satisfy an approval requirement for mismatched evidence', () => {
+    const outcome = evaluatePolicy(
+      contextAt('2026-09-21T12:30:00Z', [approvalRule()], undefined, [
+        {
+          scheduledAuthorizationId: 'scheduled-2',
+          studentId: STUDENT,
+          destinationId: 'different-destination',
+        },
+      ]),
+    );
+    expect(outcome.decision).toBe('approval_required');
+    expect(outcome.results[0]?.reasonCode).toBe('current_section_teacher_approval_required');
+  });
+
+  it('does not bypass a schedule-boundary deny', () => {
+    const outcome = evaluatePolicy(
+      contextAt(
+        '2026-09-21T12:00:00Z',
+        [approvalRule(), rule({ id: 'boundary-rule' })],
+        undefined,
+        matchingEvidence,
+      ),
+    );
+    expect(outcome.results[0]?.reasonCode).toBe('scheduled_preapproval_satisfied');
+    expect(outcome.decision).toBe('deny');
+    expect(outcome.results[1]?.reasonCode).toBe('schedule_boundary_blackout');
+  });
+});
 
 describe('schedule boundary evaluation', () => {
   it.each([

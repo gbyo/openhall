@@ -19,6 +19,7 @@ import type {
   ScheduledAuthRecord,
   ScheduledAuthRepository,
 } from './ports.js';
+import { decodePersonCursor } from './people.js';
 import { requireNormalSession, requireOrganizationCapability, schoolDateFor } from './shared.js';
 
 export interface ScheduledDependencies {
@@ -720,10 +721,7 @@ export async function listScheduledStudents(
       q: query.q === null || query.q.trim().length === 0 ? null : query.q.trim().slice(0, 100),
       affiliation: 'student',
       limit: query.limit,
-      cursor:
-        typeof query.cursor === 'object' && query.cursor !== null
-          ? (query.cursor as { displayName: string; personId: string })
-          : null,
+      cursor: decodePersonCursor(query.cursor),
     });
     const page = rows.slice(0, query.limit);
     const last = page[page.length - 1];

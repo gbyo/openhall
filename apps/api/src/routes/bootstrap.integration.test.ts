@@ -351,6 +351,13 @@ describe('bootstrap', () => {
     expect(
       (await pool.query<{ count: string }>('SELECT count(*) AS count FROM account')).rows[0]?.count,
     ).toBe('1');
+    expect(
+      (
+        await pool.query<{ count: string }>(
+          'SELECT count(*) AS count FROM school_schedule_configuration',
+        )
+      ).rows[0]?.count,
+    ).toBe('1');
     const status = await app.inject({ method: 'GET', url: '/api/v1/bootstrap/status' });
     expect(status.json()).toEqual({ initialized: true });
     const me = await app.inject({
