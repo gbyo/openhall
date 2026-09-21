@@ -20,7 +20,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'pnpm dev --host 127.0.0.1 --port 4177',
-    url: 'http://127.0.0.1:4177/__wayfinder',
+    url: 'http://127.0.0.1:4177/__ui',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

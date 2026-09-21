@@ -4,27 +4,26 @@ import { expect, test, type Page } from '@playwright/test';
 async function openReference(page: Page) {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/__wayfinder');
+  await page.goto('/__ui');
   await expect(
-    page.getByRole('heading', { name: 'Clear movement. Honest evidence.' }),
+    page.getByRole('heading', { name: 'WayPass, built with shadcn Maia' }),
   ).toBeVisible();
   return errors;
 }
 
-test('loads the development reference and every canonical state', async ({ page }) => {
+test('loads the UI 0.3 reference and its required state groups', async ({ page }) => {
   const errors = await openReference(page);
   for (const heading of [
-    'Foundations',
-    'Accessible primitives',
-    'WayPass patterns',
-    'Canonical student states',
-    'Accessibility & resilience',
+    'Foundation',
+    'Controls and fields',
+    'Async and feedback states',
+    'Task-appropriate content',
+    'Task surfaces',
   ]) {
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
   }
-  await expect(
-    page.getByTestId('canonical-student-states').locator('.wf-student-state-example'),
-  ).toHaveCount(11);
+  await expect(page.getByRole('button', { name: 'Saving…' })).toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByText('No matching students', { exact: true })).toBeVisible();
   const overflow = await page
     .locator('html')
     .evaluate((element) => element.scrollWidth > element.clientWidth);
@@ -43,148 +42,97 @@ test('has no serious or critical axe violations', async ({ page }) => {
   expect(blocking).toEqual([]);
 });
 
-test('representative controls work from the keyboard', async ({ page }) => {
+test('Base UI task surfaces work from the keyboard and restore focus', async ({ page }) => {
   await openReference(page);
-  const start = page.getByRole('button', { name: 'Start pass' }).first();
-  await start.focus();
-  await expect(start).toBeFocused();
-  expect(await start.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe(
-    'none',
-  );
 
-  const combo = page.getByRole('combobox', { name: 'Destination' });
-  await combo.focus();
-  await combo.pressSequentially('Res');
-  await expect(page.getByRole('option', { name: /Restroom/ })).toBeVisible();
-  await page.keyboard.press('ArrowDown');
+  const primary = page.getByRole('button', { name: 'Create pass', exact: true }).first();
+  await primary.focus();
+  await expect(primary).toBeFocused();
+  const focusStyles = await primary.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { outline: style.outlineStyle, shadow: style.boxShadow };
+  });
+  expect(focusStyles.outline !== 'none' || focusStyles.shadow !== 'none').toBe(true);
+
+  const tableTab = page.getByRole('tab', { name: 'Table' });
+  await tableTab.focus();
   await page.keyboard.press('Enter');
-  await expect(combo).toHaveValue('Restroom');
+  await expect(tableTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('cell', { name: 'Avery Johnson' })).toBeVisible();
 
-  const statusTab = page.getByRole('tab', { name: 'Status' });
-  await statusTab.focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'Rules' })).toHaveAttribute('aria-selected', 'true');
-
-  const menuTrigger = page.getByRole('button', { name: 'Actions' });
+  const menuTrigger = page.getByRole('button', { name: 'Open row actions' });
   await menuTrigger.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('menuitem', { name: /Rename destination/ })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Edit destination' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(menuTrigger).toBeFocused();
 
-  const dialogTrigger = page.getByRole('button', { name: 'Close Nurse' });
+  const dialogTrigger = page.getByRole('button', { name: 'New destination' });
   await dialogTrigger.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('dialog', { name: 'Close Nurse?' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'New destination' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialogTrigger).toBeFocused();
 });
 
-test('reflows without horizontal overflow at 320 CSS pixels', async ({ page }) => {
+test('pending dialog actions stay in place and prevent duplicate submit', async ({ page }) => {
+  await openReference(page);
+  await page.getByRole('button', { name: 'New destination' }).click();
+  const submit = page.getByRole('button', { name: 'Create destination' });
+  await submit.click();
+  const pending = page.getByRole('button', { name: 'Creating…' });
+  await expect(pending).toBeDisabled();
+  await expect(pending).toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByRole('dialog', { name: 'New destination' })).toBeVisible();
+  await expect(page.getByLabel('Name')).toHaveValue('Library');
+});
+
+test('associates local search status copy with its input', async ({ page }) => {
+  await openReference(page);
+  const search = page.getByRole('textbox', { name: 'Search people' });
+  await expect(search).toHaveAttribute('aria-describedby', 'reference-search-description');
+  await expect(page.locator('#reference-search-description')).toHaveText(
+    'Current results remain visible during refresh.',
+  );
+});
+
+test('reflows without horizontal page overflow at 320 CSS pixels', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 900 });
   await openReference(page);
   const overflow = await page
     .locator('html')
     .evaluate((element) => element.scrollWidth > element.clientWidth);
   expect(overflow).toBe(false);
-  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Start pass' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New destination' })).toBeVisible();
+  await expect(page.getByText('No matching students', { exact: true })).toBeVisible();
 });
 
 test('renders coherently at a Chromebook-sized viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
   const errors = await openReference(page);
-  await expect(page.getByRole('heading', { name: 'WayPass patterns' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Task-appropriate content' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
-test('honors reduced motion', async ({ page }) => {
+test('reduces component motion without removing state feedback', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openReference(page);
-  await expect(page.locator('.wf-motion-demo span')).toHaveCSS('animation-name', 'none');
-  await expect(page.locator('.wf-connection-status__pulse').first()).toHaveCSS(
-    'animation-name',
-    'none',
+  await expect(page.locator('[data-slot="spinner"]').first()).toHaveCSS(
+    'animation-duration',
+    '0.001s',
   );
-  expect(
-    await page
-      .locator('html')
-      .evaluate((element) =>
-        getComputedStyle(element).getPropertyValue('--wf-motion-standard').trim(),
-      ),
-  ).toBe('1ms');
+  await expect(page.getByRole('button', { name: 'Saving…' })).toBeVisible();
 });
 
-test('preserves controls and truthful route structure in forced colors', async ({ page }) => {
+test('keeps semantic controls and states visible in forced colors', async ({ page }) => {
   await page.emulateMedia({ forcedColors: 'active' });
   await openReference(page);
-  await expect(page.getByRole('button', { name: 'Start pass' }).first()).toBeVisible();
-  await expect(page.getByText('Departed', { exact: true }).first()).toBeVisible();
-  await expect(page.getByText('Destination', { exact: true }).first()).toBeVisible();
-  await expect(page.locator('.wf-route-stop__marker').first()).toHaveCSS(
-    'border-top-style',
-    'solid',
-  );
-  await expect(page.locator('.wf-route-stop--intended .wf-route-stop__marker').first()).toHaveCSS(
-    'border-top-style',
-    'dashed',
-  );
-});
-
-test('renders no enabled action without its handler', async ({ page }) => {
-  await openReference(page);
-  await expect(page.getByRole('button', { name: 'Review latest version' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
-});
-
-test('associates the search field description with its input', async ({ page }) => {
-  await openReference(page);
-  const search = page.getByRole('searchbox', { name: 'Search destinations' });
-  const descriptionText = await search.evaluate((element) => {
-    const firstId = (element.getAttribute('aria-describedby') ?? '')
-      .split(' ')
-      .slice(0, 1)
-      .join('');
-    return document.getElementById(firstId)?.textContent ?? '';
-  });
-  expect(descriptionText).toBe('Results update as you type.');
-});
-
-test('declares pass cards as inline-size query containers', async ({ page }) => {
-  await openReference(page);
-  await expect(page.locator('.wf-pass-card').first()).toHaveCSS('container-type', 'inline-size');
-});
-
-test('keeps selected options legible in forced colors', async ({ page }) => {
-  await page.emulateMedia({ forcedColors: 'active' });
-  await openReference(page);
-  const selectors = await page.evaluate(() => {
-    const found: string[] = [];
-    for (const sheet of document.styleSheets) {
-      let rules: CSSRuleList;
-      try {
-        rules = sheet.cssRules;
-      } catch {
-        continue;
-      }
-      for (const rule of rules) {
-        if (rule instanceof CSSMediaRule && rule.conditionText.includes('forced-colors')) {
-          for (const inner of rule.cssRules) {
-            if (
-              inner instanceof CSSStyleRule &&
-              inner.selectorText.includes('[data-selected]') &&
-              (inner.selectorText.includes('.wf-listbox__item') ||
-                inner.selectorText.includes('.wf-menu__item'))
-            ) {
-              found.push(inner.selectorText);
-            }
-          }
-        }
-      }
-    }
-    return found;
-  });
-  expect(selectors.length).toBeGreaterThan(0);
+  await expect(
+    page.getByRole('button', { name: 'Create pass', exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByText('Ready', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Action required', { exact: true })).toBeVisible();
+  await expect(page.getByRole('alert').first()).toBeVisible();
 });
 
 test('keeps content and controls usable at 200 percent text size', async ({ page }) => {
@@ -192,10 +140,10 @@ test('keeps content and controls usable at 200 percent text size', async ({ page
   await page.locator('html').evaluate((element) => {
     element.style.fontSize = '200%';
   });
-  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Start pass' }).first()).toBeVisible();
-  const clipped = await page
-    .locator('[data-testid="canonical-student-states"]')
+  await expect(page.getByRole('heading', { name: 'Controls and fields' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New destination' })).toBeVisible();
+  const overflow = await page
+    .locator('html')
     .evaluate((element) => element.scrollWidth > element.clientWidth);
-  expect(clipped).toBe(false);
+  expect(overflow).toBe(false);
 });

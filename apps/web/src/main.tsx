@@ -17,6 +17,8 @@ import './styles.css';
 import { queryClient } from './app/query-client';
 import { router } from './app/router';
 import { onSessionExpired } from './api/session';
+import { Toaster } from './components/ui/sonner';
+import { TooltipProvider } from './components/ui/tooltip';
 
 const container = document.getElementById('root');
 if (container === null) throw new Error('WayPass root element is missing.');
@@ -28,20 +30,28 @@ onSessionExpired(() => {
   void router.navigate(`/login?return_path=${encodeURIComponent(returnPath)}`, { replace: true });
 });
 
-if (import.meta.env.DEV && window.location.pathname === '/__wayfinder') {
-  const { WayfinderReferencePage } =
-    await import('./design-system/reference/WayfinderReferencePage');
+const isUiReference =
+  import.meta.env.DEV && ['/__ui', '/__wayfinder'].includes(window.location.pathname);
+
+if (isUiReference) {
+  const { UIReferencePage } = await import('./design-system/reference/UIReferencePage');
   root.render(
     <StrictMode>
-      <WayfinderReferencePage />
+      <TooltipProvider>
+        <UIReferencePage />
+        <Toaster theme="light" />
+      </TooltipProvider>
     </StrictMode>,
   );
 } else {
   root.render(
     <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>
+      <TooltipProvider>
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+          <Toaster theme="light" />
+        </QueryClientProvider>
+      </TooltipProvider>
     </StrictMode>,
   );
 }
