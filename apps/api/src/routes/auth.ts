@@ -471,7 +471,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
           'Revokes every session for the account by bumping session_revision. Requires the session cookie, the X-CSRF-Token header, and a same-origin request.',
         security: CSRF_SECURITY,
         response: {
-          200: OkSchema,
+          200: schemaRef(OkSchema),
           401: {
             description: 'Unauthenticated',
             content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
