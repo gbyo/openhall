@@ -13,7 +13,7 @@ import type {
   OutboxWriter,
   TenantTransactionContext,
   TenantTransactionRunner,
-  type TenantTransactionSettings,
+  TenantTransactionSettings,
 } from '../persistence.js';
 import { ControlPlaneError } from './errors.js';
 import { etagForSchedule, parseResourceIfMatch } from './etags.js';
