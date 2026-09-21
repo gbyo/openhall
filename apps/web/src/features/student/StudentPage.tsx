@@ -110,6 +110,7 @@ export function StudentPage() {
   const [announcement, setAnnouncement] = useState('');
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewCategory, setReviewCategory] = useState<ReviewCategory | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const active = useQuery({
     queryKey: queryKeys.activeSelfPass,
     queryFn: async () => passResource(await api.GET('/api/v1/me/passes/active')),
@@ -128,6 +129,24 @@ export function StudentPage() {
     queryKey: queryKeys.selfScheduled,
     queryFn: () => confirmed(api.GET('/api/v1/me/scheduled-authorizations')),
   });
+  useEffect(() => {
+    const nextBoundary = (scheduled.data?.authorizations ?? [])
+      .filter((item) => item.organizationId === organizationId && item.status === 'active')
+      .flatMap((item) => [Date.parse(item.validFrom), Date.parse(item.validUntil)])
+      .filter((boundary) => Number.isFinite(boundary) && boundary > nowMs)
+      .reduce((earliest, boundary) => Math.min(earliest, boundary), Number.POSITIVE_INFINITY);
+    if (!Number.isFinite(nextBoundary)) return;
+
+    const timer = window.setTimeout(
+      () => {
+        setNowMs(Date.now());
+      },
+      Math.min(Math.max(0, nextBoundary - Date.now()) + 1, 2_147_483_647),
+    );
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [nowMs, organizationId, scheduled.data?.authorizations]);
   const pass = active.data?.pass ?? null;
   const presentation = pass ? presentStudentPass(pass) : null;
   const queue = useQuery({
@@ -393,8 +412,8 @@ export function StudentPage() {
                   startScheduled.variables.body.scheduledAuthorizationId === item.id;
                 const fromMs = Date.parse(item.validFrom);
                 const untilMs = Date.parse(item.validUntil);
-                const notYet = Number.isFinite(fromMs) && Date.now() < fromMs;
-                const ended = Number.isFinite(untilMs) && Date.now() >= untilMs;
+                const notYet = Number.isFinite(fromMs) && nowMs < fromMs;
+                const ended = Number.isFinite(untilMs) && nowMs >= untilMs;
                 const startable = !notYet && !ended;
                 const opensLabel = time(item.validFrom) ?? 'soon';
                 return (

@@ -89,19 +89,24 @@ export function RealtimeProvider({
   // (e.g. a route loader populating the cache during mount). Defer the state
   // updates past the current render so this provider never sets state during
   // another component's render pass.
-  useEffect(
-    () =>
-      queryClient.getQueryCache().subscribe((event) => {
-        if (event.query.state.status === 'success' && event.query.state.dataUpdatedAt > 0) {
-          const at = new Date(event.query.state.dataUpdatedAt);
-          queueMicrotask(() => {
-            setLastConfirmedAt((prev) => (prev?.getTime() === at.getTime() ? prev : at));
-          });
-        }
-      }),
-    [queryClient],
-  );
   useEffect(() => {
+    let active = true;
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.query.state.status === 'success' && event.query.state.dataUpdatedAt > 0) {
+        const at = new Date(event.query.state.dataUpdatedAt);
+        queueMicrotask(() => {
+          if (!active) return;
+          setLastConfirmedAt((prev) => (prev?.getTime() === at.getTime() ? prev : at));
+        });
+      }
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [organizationId, queryClient]);
+  useEffect(() => {
+    let active = true;
     const readRevision = () =>
       contextRevisionOf(
         queryClient.getQueryData<OrganizationContext>(
@@ -111,11 +116,16 @@ export function RealtimeProvider({
     const scheduleSyncRevision = () => {
       const next = readRevision();
       queueMicrotask(() => {
+        if (!active) return;
         setContextRevision((prev) => (prev === next ? prev : next));
       });
     };
     scheduleSyncRevision();
-    return queryClient.getQueryCache().subscribe(scheduleSyncRevision);
+    const unsubscribe = queryClient.getQueryCache().subscribe(scheduleSyncRevision);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [organizationId, queryClient]);
   useEffect(() => {
     const source = new EventSource(`/api/v1/organizations/${organizationId}/events`);

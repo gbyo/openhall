@@ -35,8 +35,24 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
-  await destroyHandle();
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+  const administration = new URL(process.env.DATABASE_URL);
+  administration.pathname = '/postgres';
+  try {
+    try {
+      await pool.end();
+    } finally {
+      await destroyHandle();
+    }
+  } finally {
+    const admin = new Client({ connectionString: administration.toString() });
+    await admin.connect();
+    try {
+      await admin.query(`DROP DATABASE IF EXISTS ${quotedIdentifier(databaseName)} WITH (FORCE)`);
+    } finally {
+      await admin.end();
+    }
+  }
 });
 
 /**
