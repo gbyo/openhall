@@ -18,6 +18,40 @@ export interface AdministratorDraft {
   customDisplayName: boolean;
 }
 
+const SETUP_TIME_ZONE_FALLBACK = 'America/Chicago';
+
+/**
+ * Normalize a guessed IANA zone against the supported list. Runtimes can
+ * report zones outside `supportedValuesOf('timeZone')` (for example `UTC`),
+ * which would otherwise leave the timezone question without a default.
+ */
+export function resolveTimeZoneDefault(
+  guessed: string | undefined,
+  supported: readonly string[],
+  fallback: string = SETUP_TIME_ZONE_FALLBACK,
+): string {
+  return guessed && supported.includes(guessed) ? guessed : fallback;
+}
+
+/** Browser default timezone, normalized so the question always has a default. */
+export function defaultTimeZone(): string {
+  if (typeof Intl === 'undefined') return SETUP_TIME_ZONE_FALLBACK;
+  return resolveTimeZoneDefault(
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    supportedTimeZones(),
+  );
+}
+
+const FALLBACK_TIME_ZONES = [
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Anchorage',
+  'Pacific/Honolulu',
+  'America/Puerto_Rico',
+];
+
 export interface ProviderDraft {
   clientId: string;
   clientSecret: string;
@@ -44,10 +78,7 @@ const initialState: SetupState = {
   unlocked: false,
   school: {
     name: '',
-    timeZone:
-      typeof Intl !== 'undefined'
-        ? Intl.DateTimeFormat().resolvedOptions().timeZone
-        : 'America/Chicago',
+    timeZone: defaultTimeZone(),
     organizationName: '',
     organizationSlug: '',
     schoolSlug: '',
@@ -140,16 +171,6 @@ export function deriveSlugDefault(name: string): string {
     .slice(0, 63);
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ? slug : '';
 }
-
-const FALLBACK_TIME_ZONES = [
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Anchorage',
-  'Pacific/Honolulu',
-  'America/Puerto_Rico',
-];
 
 /** Valid IANA zones where supported, with a small fallback otherwise. */
 export function supportedTimeZones(): string[] {
