@@ -1,5 +1,6 @@
-import { Button } from '../primitives/Button';
 import type { ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { ConnectionStatus } from '../patterns/ConnectionStatus';
 import { DestinationRow } from '../patterns/DestinationRow';
 import { PassCard } from '../patterns/PassCard';
@@ -93,8 +94,9 @@ export function ReadyState({ starting = false }: { starting?: boolean }) {
           </p>
         }
         primaryAction={
-          <Button pending={starting} pendingLabel="Starting…">
-            Start pass
+          <Button disabled={starting} aria-busy={starting}>
+            {starting ? <Spinner data-icon="inline-start" /> : null}
+            {starting ? 'Starting…' : 'Start pass'}
           </Button>
         }
       >

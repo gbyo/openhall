@@ -542,9 +542,10 @@ test('admin staff access shows duties in school language', async ({ page }) => {
   );
   await page.goto(`/schools/${ORG}/admin/staff-access`);
   await expect(page.getByRole('heading', { name: 'Staff access' })).toBeVisible();
-  await expect(
-    page.locator('.data-table__row', { hasText: 'Sam Patel' }).getByText('Destination staff'),
-  ).toBeVisible();
+  const grantRow = page
+    .getByRole('table', { name: 'Staff access grants' })
+    .getByRole('row', { name: /Sam Patel/ });
+  await expect(grantRow.getByText('Destination staff')).toBeVisible();
   await expect(page.getByLabel('Duty')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Grant access' })).toBeVisible();
 });

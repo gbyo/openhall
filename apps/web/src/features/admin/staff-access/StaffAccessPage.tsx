@@ -27,6 +27,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -251,6 +252,7 @@ export function Component() {
             </div>
             <div className="sm:col-span-2">
               <Button type="submit" disabled={issue.isPending}>
+                {issue.isPending ? <Spinner data-icon="inline-start" /> : null}
                 {issue.isPending ? 'Granting…' : 'Grant access'}
               </Button>
             </div>
@@ -287,7 +289,7 @@ export function Component() {
             </TableHeader>
             <TableBody>
               {list.map((grant) => (
-                <TableRow key={grant.id} className="data-table__row">
+                <TableRow key={grant.id}>
                   <TableCell className="font-medium">{grant.person.displayName}</TableCell>
                   <TableCell>{roleLabel[grant.role]}</TableCell>
                   <TableCell>{grant.destination?.displayName ?? 'Whole school'}</TableCell>

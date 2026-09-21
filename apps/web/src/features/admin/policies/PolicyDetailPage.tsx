@@ -125,6 +125,7 @@ export function Component() {
   const { organizationId, context } = useSchool();
   const queryClient = useQueryClient();
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
   const detail = useQuery({
     queryKey: queryKeys.policy(policyRuleId),
     queryFn: async () => {
@@ -481,6 +482,7 @@ export function Component() {
             </Field>
             <div className="flex flex-wrap gap-2 sm:col-span-2">
               <Button type="submit" disabled={mutate.isPending}>
+                {mutate.isPending ? <Spinner data-icon="inline-start" /> : null}
                 {mutate.isPending ? 'Saving…' : 'Save changes'}
               </Button>
               <Button
@@ -511,8 +513,7 @@ export function Component() {
           <Button
             variant="secondary"
             onClick={() => {
-              if (window.confirm(`Deactivate ${rule.name}? It will stop applying to new requests.`))
-                mutate.mutate({ kind: 'deactivate', key: crypto.randomUUID(), etag });
+              setConfirmingDeactivate(true);
             }}
           >
             Deactivate policy
@@ -529,6 +530,27 @@ export function Component() {
           </Button>
         )}
       </div>
+      <AlertDialog open={confirmingDeactivate} onOpenChange={setConfirmingDeactivate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate {rule.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It will stop applying to new requests. You can activate it again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep active</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmingDeactivate(false);
+                mutate.mutate({ kind: 'deactivate', key: crypto.randomUUID(), etag });
+              }}
+            >
+              Deactivate policy
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={confirmingArchive} onOpenChange={setConfirmingArchive}>
         <AlertDialogContent>
           <AlertDialogHeader>

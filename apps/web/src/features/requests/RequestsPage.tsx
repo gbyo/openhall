@@ -3,7 +3,7 @@ import { api, confirmed } from '../../api/client';
 import { productMessage, UncertainCommandError } from '../../api/problems';
 import { queryKeys } from '../../api/query-keys';
 import { getCsrfToken } from '../../api/session';
-import { StatusAnnouncer } from '../../design-system/primitives/StatusAnnouncer';
+import { StatusAnnouncer } from '../../components/StatusAnnouncer';
 import { useSchool } from '../../app/school/SchoolShell';
 import { PageHeader } from '../../components/workspace/PageHeader';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';

@@ -25,6 +25,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -327,6 +328,7 @@ export function Component() {
                 </div>
                 <div className="sm:col-span-2">
                   <Button type="submit" disabled={templateMutation.isPending}>
+                    {templateMutation.isPending ? <Spinner data-icon="inline-start" /> : null}
                     {templateMutation.isPending ? 'Creating…' : 'Create template'}
                   </Button>
                 </div>
@@ -466,6 +468,7 @@ export function Component() {
                 </Field>
                 <div className="sm:col-span-2">
                   <Button type="submit" disabled={calendarMutation.isPending}>
+                    {calendarMutation.isPending ? <Spinner data-icon="inline-start" /> : null}
                     {calendarMutation.isPending ? 'Applying…' : 'Review and apply range'}
                   </Button>
                 </div>
@@ -550,6 +553,7 @@ export function Component() {
             </Field>
             <DialogFooter>
               <Button type="submit" disabled={blockMutation.isPending}>
+                {blockMutation.isPending ? <Spinner data-icon="inline-start" /> : null}
                 {blockMutation.isPending ? 'Adding…' : 'Add block'}
               </Button>
             </DialogFooter>

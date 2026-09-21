@@ -10,7 +10,6 @@ import './design-system/tokens.css';
 import './design-system/reset.css';
 import './design-system/typography.css';
 import './design-system/motion.css';
-import './design-system/utilities.css';
 import './design-system/components.css';
 import './styles.css';
 import { queryClient } from './app/query-client';

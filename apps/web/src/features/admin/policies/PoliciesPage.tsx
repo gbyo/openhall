@@ -25,6 +25,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -398,6 +399,7 @@ export function Component() {
             </div>
             <DialogFooter>
               <Button type="submit" disabled={create.isPending}>
+                {create.isPending ? <Spinner data-icon="inline-start" /> : null}
                 {create.isPending ? 'Creating…' : 'Create inactive policy'}
               </Button>
             </DialogFooter>
