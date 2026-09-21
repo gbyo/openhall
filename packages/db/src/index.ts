@@ -1,6 +1,7 @@
 export * from './database.js';
 export type * from './database.generated.js';
 export * from './migrator.js';
+export * from './outbox-listener.js';
 export * from './readiness.js';
 export * from './repositories/audit-repository.js';
 export * from './repositories/auth-repository.js';
@@ -15,6 +16,7 @@ export * from './repositories/authorization-repository.js';
 export * from './repositories/destination-flow-repository.js';
 export * from './repositories/idempotency-repository.js';
 export * from './repositories/outbox-repository.js';
+export * from './repositories/operational-read-repository.js';
 export * from './repositories/pass-repository.js';
 export * from './repositories/policy-repository.js';
 export * from './repositories/schedule-repository.js';

@@ -77,6 +77,7 @@ describe('movement projection', () => {
       reservation: reservation(),
       queueEntry: null,
       reasonCode: null,
+      effectiveCheckInMode: null,
     });
     expect(ready).toEqual({
       readyUntil: AT.add({ seconds: 60 }).toString(),
@@ -84,6 +85,7 @@ describe('movement projection', () => {
       queueExpiresAt: null,
       expectedReturnAt: null,
       reasonCode: null,
+      effectiveCheckInMode: null,
     });
   });
 
@@ -94,6 +96,7 @@ describe('movement projection', () => {
       reservation: null,
       queueEntry: queueEntry(),
       reasonCode: 'ready_claim_expired',
+      effectiveCheckInMode: null,
     });
     expect(queued.queueEnteredAt).toBe(AT.toString());
     expect(queued.queueExpiresAt).toBe(AT.add({ seconds: 600 }).toString());
@@ -109,6 +112,7 @@ describe('movement projection', () => {
         reservation: null,
         queueEntry: null,
         reasonCode: null,
+        effectiveCheckInMode: 'optional',
       });
       expect(movement).toEqual({
         readyUntil: null,
@@ -116,6 +120,7 @@ describe('movement projection', () => {
         queueExpiresAt: null,
         expectedReturnAt: AT.add({ seconds: 300 }).toString(),
         reasonCode: null,
+        effectiveCheckInMode: 'optional',
       });
     }
   });
@@ -132,6 +137,7 @@ describe('movement projection', () => {
         reservation: null,
         queueEntry: null,
         reasonCode,
+        effectiveCheckInMode: null,
       });
       expect(movement.reasonCode).toBe(reasonCode);
       expect(movement.readyUntil).toBeNull();

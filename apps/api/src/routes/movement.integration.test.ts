@@ -1254,10 +1254,22 @@ describe('GET /api/v1/destinations/:destinationId/station', () => {
       };
       occupancy: { consumingReservations: number; availableCapacity: number | null };
       queueCount: number;
-      ready: { passId: string; student: { id: string; displayName: string }; readyUntil: string }[];
+      ready: {
+        passId: string;
+        passRevision: string;
+        passEtag: string;
+        student: { id: string; displayName: string };
+        readyUntil: string;
+      }[];
       outbound: unknown[];
       atDestination: unknown[];
-      queued: { passId: string; student: { id: string; displayName: string }; enteredAt: string }[];
+      queued: {
+        passId: string;
+        passRevision: string;
+        passEtag: string;
+        student: { id: string; displayName: string };
+        enteredAt: string;
+      }[];
     }>();
     expect(body.destination).toMatchObject({
       id: viewOffice,
@@ -1270,6 +1282,12 @@ describe('GET /api/v1/destinations/:destinationId/station', () => {
     expect(body.ready.map((entry) => entry.passId)).toHaveLength(1);
     expect(body.queued.map((entry) => entry.passId)).toEqual([secondPass.id]);
     expect(body.ready[0]?.student.displayName).toContain('StationFirst');
+    const readyEntry = body.ready[0];
+    const queuedEntry = body.queued[0];
+    if (readyEntry === undefined || queuedEntry === undefined)
+      throw new Error('station fixtures missing');
+    expect(readyEntry.passEtag).toBe(`"pass:${readyEntry.passId}:${readyEntry.passRevision}"`);
+    expect(queuedEntry.passEtag).toBe(`"pass:${queuedEntry.passId}:${queuedEntry.passRevision}"`);
     const raw = JSON.stringify(body);
     for (const leaked of ['authorization_grant', 'accountId', 'email', 'session', 'override']) {
       expect(raw.toLowerCase()).not.toContain(leaked);

@@ -22,10 +22,12 @@ interface GrantRow {
   tenant_id: string;
   account_id: string;
   person_id: string;
+  person_display_name: string;
   role: string;
   scope_kind: string;
   organization_id: string | null;
   destination_id: string | null;
+  destination_display_name: string | null;
   status: string;
   valid_from: string | null;
   valid_until: string | null;
@@ -42,10 +44,12 @@ function toRecord(row: GrantRow): GrantRecord {
     tenantId: row.tenant_id,
     accountId: row.account_id,
     personId: row.person_id,
+    personDisplayName: row.person_display_name,
     role: row.role,
     scopeKind: row.scope_kind,
     organizationId: row.organization_id,
     destinationId: row.destination_id,
+    destinationDisplayName: row.destination_display_name,
     status: row.status,
     validFrom: row.valid_from === null ? null : fromDatabaseInstant(row.valid_from),
     validUntil: row.valid_until === null ? null : fromDatabaseInstant(row.valid_until),
@@ -64,10 +68,12 @@ function grantSelection() {
     'authorization_grant.tenant_id',
     'authorization_grant.account_id',
     'account.person_id',
+    'person.display_name as person_display_name',
     'authorization_grant.role',
     'authorization_grant.scope_kind',
     'authorization_grant.organization_id',
     'authorization_grant.destination_id',
+    'destination.display_name as destination_display_name',
     'authorization_grant.status',
     'authorization_grant.valid_from',
     'authorization_grant.valid_until',
@@ -107,6 +113,11 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           .onRef('account.tenant_id', '=', 'authorization_grant.tenant_id')
           .onRef('account.id', '=', 'authorization_grant.account_id'),
       )
+      .innerJoin('person', (join) =>
+        join
+          .onRef('person.tenant_id', '=', 'account.tenant_id')
+          .onRef('person.id', '=', 'account.person_id'),
+      )
       .leftJoin('destination', (join) =>
         join
           .onRef('destination.tenant_id', '=', 'authorization_grant.tenant_id')
@@ -135,6 +146,16 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           .onRef('account.tenant_id', '=', 'authorization_grant.tenant_id')
           .onRef('account.id', '=', 'authorization_grant.account_id'),
       )
+      .innerJoin('person', (join) =>
+        join
+          .onRef('person.tenant_id', '=', 'account.tenant_id')
+          .onRef('person.id', '=', 'account.person_id'),
+      )
+      .leftJoin('destination', (join) =>
+        join
+          .onRef('destination.tenant_id', '=', 'authorization_grant.tenant_id')
+          .onRef('destination.id', '=', 'authorization_grant.destination_id'),
+      )
       .select(grantSelection())
       .where('authorization_grant.tenant_id', '=', context.tenantId)
       .where('authorization_grant.id', '=', grantId)
@@ -154,10 +175,20 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           .onRef('account.tenant_id', '=', 'authorization_grant.tenant_id')
           .onRef('account.id', '=', 'authorization_grant.account_id'),
       )
+      .innerJoin('person', (join) =>
+        join
+          .onRef('person.tenant_id', '=', 'account.tenant_id')
+          .onRef('person.id', '=', 'account.person_id'),
+      )
+      .leftJoin('destination', (join) =>
+        join
+          .onRef('destination.tenant_id', '=', 'authorization_grant.tenant_id')
+          .onRef('destination.id', '=', 'authorization_grant.destination_id'),
+      )
       .select(grantSelection())
       .where('authorization_grant.tenant_id', '=', context.tenantId)
       .where('authorization_grant.id', '=', grantId)
-      .forUpdate()
+      .forUpdate('authorization_grant')
       .executeTakeFirst();
     return row === undefined ? null : toRecord(row);
   }
@@ -271,6 +302,16 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
         join
           .onRef('account.tenant_id', '=', 'authorization_grant.tenant_id')
           .onRef('account.id', '=', 'authorization_grant.account_id'),
+      )
+      .innerJoin('person', (join) =>
+        join
+          .onRef('person.tenant_id', '=', 'account.tenant_id')
+          .onRef('person.id', '=', 'account.person_id'),
+      )
+      .leftJoin('destination', (join) =>
+        join
+          .onRef('destination.tenant_id', '=', 'authorization_grant.tenant_id')
+          .onRef('destination.id', '=', 'authorization_grant.destination_id'),
       )
       .select(grantSelection())
       .where('authorization_grant.tenant_id', '=', context.tenantId)

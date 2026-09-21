@@ -212,6 +212,7 @@ export interface DestinationFlowRepository {
 
 export interface StationPassEntry {
   readonly passId: string;
+  readonly passRevision: bigint;
   readonly studentId: string;
   readonly studentDisplayName: string;
   readonly expectedReturnAt: Temporal.Instant | null;

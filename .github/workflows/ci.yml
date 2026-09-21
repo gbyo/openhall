@@ -23,6 +23,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @openhall/web exec playwright install --with-deps chromium
       - run: pnpm test:wayfinder
+      - run: pnpm test:product
 
   verify:
     runs-on: ubuntu-latest
@@ -67,6 +68,7 @@ jobs:
       - run: pnpm test:integration
       - run: pnpm db:types:check
       - run: pnpm openapi:check
+      - run: pnpm api:types:check
       - run: pnpm build
 
   container:

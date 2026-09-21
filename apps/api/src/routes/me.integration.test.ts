@@ -406,6 +406,30 @@ describe('GET /api/v1/me/organizations/:organizationId/context', () => {
     expect(response.json<{ code: string }>().code).toBe('recovery_session_restricted');
   });
 
+  it('authorizes SSE against the exact school without leaking inaccessible schools', async () => {
+    const anonymous = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/events`,
+    });
+    expect(anonymous.statusCode).toBe(401);
+
+    const recovery = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/events`,
+      headers: cookieHeader(recoveryCookie),
+    });
+    expect(recovery.statusCode).toBe(403);
+    expect(recovery.json<{ code: string }>().code).toBe('recovery_session_restricted');
+
+    const crossTenant = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/events`,
+      headers: cookieHeader(otherTenantCookie),
+    });
+    expect(crossTenant.statusCode).toBe(404);
+    expect(crossTenant.json<{ code: string }>().code).toBe('not_found');
+  });
+
   it('documents cookie auth and stable operation IDs in OpenAPI', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/openapi.json' });
     expect(response.statusCode).toBe(200);

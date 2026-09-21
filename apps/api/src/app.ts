@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -9,7 +10,7 @@ import fastifyStatic from '@fastify/static';
 import { TypeBoxValidatorCompiler } from '@fastify/type-provider-typebox';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import type { AppConfig } from '@openhall/config';
-import type { DB as Database, ReadinessProbe } from '@openhall/db';
+import { PostgresOutboxListener, type DB as Database, type ReadinessProbe } from '@openhall/db';
 import type { Kysely } from 'kysely';
 import { createAuthDependencies } from './auth/dependencies.js';
 import { createAuthorizationDependencies } from './authorization/dependencies.js';
@@ -21,12 +22,15 @@ import { registerBootstrapRoutes } from './routes/bootstrap.js';
 import { registerControlPlaneRoutes } from './routes/control-plane.js';
 import { registerMeRoutes } from './routes/me.js';
 import { registerMovementRoutes } from './routes/movement.js';
+import { registerOperationalRoutes } from './routes/operations.js';
 import { registerPassesRoutes } from './routes/passes.js';
 import { registerPolicyRoutes } from './routes/policy.js';
 import { createControlPlaneDependencies } from './control-plane/dependencies.js';
 import { createPassDependencies } from './passes/dependencies.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerSystemRoutes } from './routes/system.js';
+import { registerRealtimeRoutes } from './routes/realtime.js';
+import { RealtimeHub } from './realtime/hub.js';
 
 export interface CreateAppOptions {
   readonly config: AppConfig;
@@ -50,6 +54,8 @@ export interface CreateAppOptions {
    * directly for deterministic wall-clock control.
    */
   readonly destinationFlowWorkerEnabled?: boolean;
+  /** Test hook: LISTEN uses a dedicated PostgreSQL client and is opt-in in tests. */
+  readonly realtimeEnabled?: boolean;
 }
 
 /**
@@ -236,36 +242,51 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   });
 
   typedApp.setNotFoundHandler((request, reply) => {
-    void reply
-      .status(404)
-      .type('application/problem+json')
-      .send({
-        type: 'https://openhall.dev/problems/not_found',
-        title: 'Not found',
-        status: 404,
-        instance: safeRequestPath(request.url),
-        code: 'not_found',
-        requestId: request.id,
-      });
+    const pathname = safeRequestPath(request.url);
+    const acceptsHtml = request.headers.accept?.includes('text/html') === true;
+    if (
+      options.webRoot &&
+      existsSync(options.webRoot) &&
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      !pathname.startsWith('/api/') &&
+      acceptsHtml &&
+      extname(pathname) === ''
+    ) {
+      return reply.type('text/html; charset=utf-8').sendFile('index.html');
+    }
+    return reply.status(404).type('application/problem+json').send({
+      type: 'https://openhall.dev/problems/not_found',
+      title: 'Not found',
+      status: 404,
+      instance: pathname,
+      code: 'not_found',
+      requestId: request.id,
+    });
   });
 
   typedApp.addHook('onSend', async (request, reply) => {
     const pathname = safeRequestPath(request.url);
-    if (NO_STORE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix))) {
+    const contentType = reply.getHeader('content-type');
+    if (
+      !(typeof contentType === 'string' && contentType.startsWith('text/event-stream')) &&
+      NO_STORE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix))
+    ) {
       void reply.header('Cache-Control', 'no-store');
     }
   });
 
   const dependencies = createAuthDependencies(options.config, options.database);
+  const authorizationDependencies = createAuthorizationDependencies(
+    options.database,
+    dependencies.tenantRunner,
+  );
+  const realtimeHub = new RealtimeHub();
   registerSessionContext(typedApp, { dependencies });
   registerHealthRoutes(typedApp, options.readinessProbe);
   registerSystemRoutes(typedApp);
   registerAuthRoutes(typedApp, dependencies);
   registerBootstrapRoutes(typedApp, dependencies);
-  registerMeRoutes(
-    typedApp,
-    createAuthorizationDependencies(options.database, dependencies.tenantRunner),
-  );
+  registerMeRoutes(typedApp, authorizationDependencies);
   const passDependencies = createPassDependencies(options.database);
   registerPassesRoutes(typedApp, {
     passes: passDependencies,
@@ -279,6 +300,8 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     passes: passDependencies,
     auth: dependencies,
   });
+  registerOperationalRoutes(typedApp, passDependencies);
+  registerRealtimeRoutes(typedApp, authorizationDependencies, realtimeHub);
   registerControlPlaneRoutes(typedApp, {
     controlPlane: createControlPlaneDependencies(options.database, {
       directory: dependencies.directory,
@@ -305,6 +328,21 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   typedApp.addHook('onClose', () => {
     destinationFlowWorker?.stop();
   });
+
+  const realtimeEnabled = options.realtimeEnabled ?? options.config.nodeEnv !== 'test';
+  const outboxListener = realtimeEnabled
+    ? new PostgresOutboxListener(options.config.databaseUrl)
+    : null;
+  if (outboxListener !== null) {
+    outboxListener.onEvent((event) => {
+      realtimeHub.observe(event);
+    });
+    outboxListener.onHealth((healthy) => {
+      realtimeHub.setListenerHealthy(healthy);
+    });
+    await outboxListener.start();
+    typedApp.addHook('onClose', async () => outboxListener.stop());
+  }
 
   typedApp.get(
     '/api/openapi.json',

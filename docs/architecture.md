@@ -30,10 +30,11 @@ tenant ID through `TenantDatabase`; unscoped access is deliberately named
 relational links. RLS is deferred until authenticated tenant context can be set reliably on every
 database session.
 
-PostgreSQL is the durable system of record. Transactions will update aggregates and append outbox
-events atomically. LISTEN/NOTIFY may later reduce latency but cannot replace the outbox. The HTTP API
-is command-oriented and schema-first under `/api/v1`; SSE, not WebSockets, is the planned realtime
-transport.
+PostgreSQL is the durable system of record. Transactions update aggregates and append outbox events
+atomically. A same-transaction `NOTIFY` containing only the outbox UUID wakes a dedicated listener
+on every API replica after commit; each listener loads the durable row and sends only authorized SSE
+invalidation topics. SSE never replaces the outbox, never carries resource DTOs, and never consumes
+`published_at`. The HTTP API remains the authoritative, schema-first interface under `/api/v1`.
 
 Times are modeled as instants (`timestamptz`/Temporal.Instant), school dates (`date`/
 Temporal.PlainDate), wall times (`time`/Temporal.PlainTime), and explicit IANA zones. Schedule-derived
@@ -148,3 +149,12 @@ endpoint kept outside the strong-ETag pass representation. New
 capabilities `pass.depart.self`, `pass.depart.student`, and
 `pass.progress.self` keep compile-time resource mapping and parity
 coverage. See ADR 0016. OpenHall remains not production-ready.
+
+## WayPass browser product and realtime (Phase 9)
+
+WayPass is the user-facing name for the OpenHall-backed product. React Router Data Mode owns stable
+URLs and route boundaries; TanStack Query owns the memory-only server-state cache; and
+`openapi-typescript` plus `openapi-fetch` keep the browser on the public HTTP contract. Session CSRF
+state remains runtime-only. One same-origin EventSource per active school shell accelerates refetches
+without becoming state authority. Student, teacher, school-operations, station, and capability-gated
+administrator shells expose different task-focused navigation. See ADR 0018.

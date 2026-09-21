@@ -236,6 +236,34 @@ export class PostgresEnrollmentRepository implements EnrollmentRepository {
     return row === undefined ? null : toRecord(row);
   }
 
+  async loadActiveGrantForPerson(
+    context: TenantTransactionContext,
+    organizationId: string,
+    personId: string,
+    at: Temporal.Instant,
+  ): Promise<EnrollmentRecord | null> {
+    const connection = connectionFor(context);
+    const row = await connection
+      .selectFrom('identity_enrollment_grant')
+      .innerJoin('account', (join) =>
+        join
+          .onRef('account.tenant_id', '=', 'identity_enrollment_grant.tenant_id')
+          .onRef('account.id', '=', 'identity_enrollment_grant.account_id'),
+      )
+      .select(enrollmentSelection())
+      .where('identity_enrollment_grant.tenant_id', '=', context.tenantId)
+      .where('identity_enrollment_grant.organization_id', '=', organizationId)
+      .where('account.person_id', '=', personId)
+      .where('identity_enrollment_grant.consumed_at', 'is', null)
+      .where('identity_enrollment_grant.revoked_at', 'is', null)
+      .where('identity_enrollment_grant.expires_at', '>', toDatabaseInstant(at))
+      .orderBy('identity_enrollment_grant.created_at', 'desc')
+      .orderBy('identity_enrollment_grant.id', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    return row === undefined ? null : toRecord(row);
+  }
+
   async loadGrantForUpdate(
     context: TenantTransactionContext,
     enrollmentId: string,

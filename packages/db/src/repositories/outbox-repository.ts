@@ -1,5 +1,6 @@
 import type { OutboxWriter } from '@openhall/application';
 import type { TenantTransactionContext } from '@openhall/application';
+import { sql } from 'kysely';
 import { connectionFor } from '../transactions.js';
 
 /**
@@ -21,7 +22,7 @@ export class PostgresOutboxWriter implements OutboxWriter {
     },
   ): Promise<void> {
     const connection = connectionFor(context);
-    await connection
+    const inserted = await connection
       .insertInto('outbox_event')
       .values({
         tenant_id: event.tenantId,
@@ -32,6 +33,12 @@ export class PostgresOutboxWriter implements OutboxWriter {
         payload: { ...(event.payload as Record<string, never>) },
         occurred_at: event.occurredAt,
       })
-      .execute();
+      .returning('id')
+      .executeTakeFirstOrThrow();
+
+    // PostgreSQL delivers transaction notifications only after commit. The
+    // UUID is a wake-up pointer to the durable row, never domain payload;
+    // rolled-back commands therefore cannot produce browser invalidations.
+    await sql`select pg_notify('openhall_outbox_v1', ${inserted.id})`.execute(connection);
   }
 }

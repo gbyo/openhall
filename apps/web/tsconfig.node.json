@@ -8,5 +8,11 @@
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "playwright.wayfinder.config.ts", "e2e-wayfinder"]
+  "include": [
+    "vite.config.ts",
+    "playwright.wayfinder.config.ts",
+    "playwright.product.config.ts",
+    "e2e-wayfinder",
+    "e2e-product"
+  ]
 }

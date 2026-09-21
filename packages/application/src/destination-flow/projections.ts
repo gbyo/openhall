@@ -26,11 +26,14 @@ interface MovementRow {
   readonly id: string;
   readonly lifecycleState: string;
   readonly expectedReturnAt: Temporal.Instant | null;
+  readonly departureCheckInMode: 'none' | 'optional' | 'required' | null;
+  readonly destinationCheckInMode: 'none' | 'optional' | 'required';
 }
 
 export interface MovementFacts {
   readonly lifecycleState: string;
   readonly expectedReturnAt: Temporal.Instant | null;
+  readonly effectiveCheckInMode: 'none' | 'optional' | 'required' | null;
   readonly reservation: FlowReservationRow | null;
   readonly queueEntry: FlowQueueEntryRow | null;
   /** Current operational reason from the latest immutable pass event. */
@@ -63,6 +66,7 @@ export function buildMovementProjection(facts: MovementFacts): MovementProjectio
       return {
         ...EMPTY_MOVEMENT,
         expectedReturnAt: facts.expectedReturnAt?.toString() ?? null,
+        effectiveCheckInMode: facts.effectiveCheckInMode,
       };
     case 'denied':
     case 'expired':
@@ -110,6 +114,12 @@ export async function loadMovementForRow(
   return buildMovementProjection({
     lifecycleState: row.lifecycleState,
     expectedReturnAt: row.expectedReturnAt,
+    effectiveCheckInMode:
+      row.lifecycleState === 'outbound' ||
+      row.lifecycleState === 'at_destination' ||
+      row.lifecycleState === 'returning'
+        ? (row.departureCheckInMode ?? row.destinationCheckInMode)
+        : null,
     reservation,
     queueEntry,
     reasonCode: reasonCodeFromMetadata(latest?.metadata),

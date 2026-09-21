@@ -33,7 +33,7 @@ test('sign-in keeps discovery and OIDC start behavior intact', async ({ page }) 
 test('bootstrap keeps every setup field and submit action available', async ({ page }) => {
   await mockBootstrap(page, false);
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Initialize OpenHall' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Set up WayPass' })).toBeVisible();
   for (const label of [
     'Operator token',
     'Organization name',
@@ -44,17 +44,19 @@ test('bootstrap keeps every setup field and submit action available', async ({ p
     'Administrator given name',
     'Administrator family name',
     'Administrator display name',
-    'Provider',
     'Provider key (lowercase)',
     'Provider display name',
     'Provider issuer URL',
     'Client ID',
     'Client secret',
-    'Client authentication',
     'Scopes (space separated)',
   ]) {
     await expect(page.getByLabel(label, { exact: true })).toBeVisible();
   }
+  await expect(page.getByRole('combobox', { name: 'Provider', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('combobox', { name: 'Client authentication', exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Validate and continue with the provider' }),
   ).toBeVisible();
@@ -87,7 +89,7 @@ test('recovery and logout-all preserve in-memory CSRF request behavior', async (
   await page.route('**/api/v1/auth/logout-all', (route) => route.fulfill({ status: 500 }));
 
   await page.goto('/');
-  await expect(page.getByText('Recovery access', { exact: true })).toBeVisible();
+  await expect(page.getByRole('alert').getByText('Recovery access', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Avery Johnson' })).toBeVisible();
 
   const requestPromise = page.waitForRequest('**/api/v1/auth/logout-all');

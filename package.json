@@ -19,13 +19,16 @@
     "format": "prettier --write .",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
     "test:wayfinder": "pnpm --filter @openhall/web test:wayfinder",
+    "test:product": "pnpm --filter @openhall/web test:product",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test": "pnpm test:unit && pnpm test:integration",
     "db:migrate": "pnpm --filter @openhall/db migrate",
     "db:generate": "pnpm --filter @openhall/db generate",
     "db:types:check": "./scripts/check-generated-db-types.sh",
     "openapi:generate": "pnpm --filter @openhall/api openapi:generate",
-    "openapi:check": "pnpm --filter @openhall/api openapi:check"
+    "openapi:check": "pnpm --filter @openhall/api openapi:check",
+    "api:types:generate": "pnpm --filter @openhall/web api:types:generate",
+    "api:types:check": "pnpm --filter @openhall/web api:types:check"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

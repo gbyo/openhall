@@ -123,6 +123,59 @@ export interface EnrollmentResult {
   readonly replayed: boolean;
 }
 
+export interface ActiveEnrollmentStatus {
+  readonly id: string;
+  readonly organizationId: string;
+  readonly personId: string;
+  readonly status: 'active';
+  readonly expiresAt: string;
+  readonly revision: string;
+}
+
+/**
+ * GET /organizations/:id/people/:personId/enrollment — narrow active
+ * invitation status. Raw token, digest, provider internals, account/session
+ * data, and historical invitations never cross this boundary.
+ */
+export async function getIdentityEnrollmentStatus(
+  principal: Principal,
+  organizationId: string,
+  personId: string,
+  dependencies: EnrollmentDependencies,
+): Promise<{ readonly enrollment: ActiveEnrollmentStatus | null; readonly etag?: string }> {
+  requireNormalSession(principal);
+  const now = dependencies.clock.now();
+  return dependencies.runner.run(principal.tenantId, async (context) => {
+    await requireOrganizationCapability(
+      context,
+      dependencies.authorization,
+      principal,
+      'identity.enroll',
+      organizationId,
+      now,
+      'identity_enrollment_not_found',
+    );
+    const row = await dependencies.enrollments.loadActiveGrantForPerson(
+      context,
+      organizationId,
+      personId,
+      now,
+    );
+    if (row === null) return { enrollment: null };
+    return {
+      enrollment: {
+        id: row.id,
+        organizationId: row.organizationId,
+        personId: row.personId,
+        status: 'active',
+        expiresAt: row.expiresAt.toString(),
+        revision: row.revision.toString(10),
+      },
+      etag: etagForEnrollment(row.id, row.revision),
+    };
+  });
+}
+
 async function appendEnrollmentAudit(
   dependencies: EnrollmentDependencies,
   context: TenantTransactionContext,

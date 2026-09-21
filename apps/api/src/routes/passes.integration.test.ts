@@ -558,6 +558,73 @@ describe('POST /api/v1/me/passes', () => {
   });
 });
 
+describe('Phase 9 operational reads', () => {
+  it('lets a teacher read only their canonical section roster and live passes', async () => {
+    if (teacher === null) throw new Error('teacher missing');
+    const student = await makeStudent(tenantA, schoolA, 'Operational');
+    await pool.query(
+      `INSERT INTO section_membership (tenant_id, section_id, person_id, role) VALUES ($1, $2, $3, 'student')`,
+      [tenantA, sectionA1, student.personId],
+    );
+    const created = await postSelfPass(student, destinationA, randomUUID());
+    expect(created.statusCode).toBe(201);
+
+    const roster = await app.inject({
+      method: 'GET',
+      url: `/api/v1/sections/${sectionA1}/students`,
+      headers: authHeaders(teacher),
+    });
+    expect(roster.statusCode).toBe(200);
+    expect(
+      roster.json<{ students: { id: string; displayName: string }[] }>().students,
+    ).toContainEqual({ id: student.personId, displayName: 'Operational Test' });
+
+    const live = await app.inject({
+      method: 'GET',
+      url: `/api/v1/sections/${sectionA1}/passes/live`,
+      headers: authHeaders(teacher),
+    });
+    expect(live.statusCode).toBe(200);
+    const entry = live
+      .json<{ passes: { student: { id: string }; passEtag: string }[] }>()
+      .passes.find((item) => item.student.id === student.personId);
+    expect(entry?.passEtag).toMatch(/^"pass:[0-9a-f-]{36}:2"$/);
+
+    const unrelated = await app.inject({
+      method: 'GET',
+      url: `/api/v1/sections/${sectionA2}/students`,
+      headers: authHeaders(teacher),
+    });
+    expect(unrelated.statusCode).toBe(404);
+  });
+
+  it('requires the exact school-live capability and conceals other schools', async () => {
+    if (teacher === null || counselor === null || schoolBCounselor === null) {
+      throw new Error('staff fixtures missing');
+    }
+    const allowed = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/passes/live`,
+      headers: authHeaders(counselor),
+    });
+    expect(allowed.statusCode).toBe(200);
+
+    const teacherDenied = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/passes/live`,
+      headers: authHeaders(teacher),
+    });
+    expect(teacherDenied.statusCode).toBe(404);
+
+    const otherSchoolDenied = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/passes/live`,
+      headers: authHeaders(schoolBCounselor),
+    });
+    expect(otherSchoolDenied.statusCode).toBe(404);
+  });
+});
+
 describe('POST /api/v1/students/:studentId/passes', () => {
   async function postStaffPass(
     session: { cookie: string; csrf: string },

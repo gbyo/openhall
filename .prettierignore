@@ -4,3 +4,4 @@ coverage
 pnpm-lock.yaml
 openapi/openapi.json
 packages/db/src/database.generated.ts
+apps/web/src/api/generated/openapi.d.ts

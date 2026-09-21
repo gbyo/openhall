@@ -181,11 +181,13 @@ function requiredEtag(response: { headers: Record<string, unknown> }): string {
 interface GrantBody {
   id: string;
   personId: string;
+  person: { id: string; displayName: string };
   accountId: string;
   role: string;
   scopeKind: string;
   organizationId: string | null;
   destinationId: string | null;
+  destination: { id: string; displayName: string } | null;
   status: string;
   validFrom: string | null;
   validUntil: string | null;
@@ -528,6 +530,18 @@ describe('control-plane authorization grants', () => {
     const grant = created.json<{ grant: GrantBody }>().grant;
     const etag = requiredEtag(created);
 
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/v1/authorization-grants/${grant.id}`,
+      headers: authHeaders(requireAdmin()),
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(requiredEtag(detail)).toBe(etag);
+    expect(detail.json<{ grant: GrantBody }>().grant.person).toEqual({
+      id: target.personId,
+      displayName: 'Relieved Test',
+    });
+
     const missing = await app.inject({
       method: 'POST',
       url: `/api/v1/authorization-grants/${grant.id}/revoke`,
@@ -584,6 +598,8 @@ describe('control-plane authorization grants', () => {
     expect(grants.length).toBeGreaterThan(0);
     for (const grant of grants) {
       expect(grant).not.toHaveProperty('updatedAt');
+      expect(grant.person.displayName).toBeTruthy();
+      if (grant.destinationId !== null) expect(grant.destination?.displayName).toBeTruthy();
     }
 
     if (adminB === null) throw new Error('admin fixture missing');

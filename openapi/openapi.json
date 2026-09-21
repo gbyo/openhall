@@ -3445,6 +3445,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -3486,6 +3487,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -4059,6 +4085,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -4100,6 +4127,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -4631,6 +4683,7 @@
                                 "queueEnteredAt",
                                 "queueExpiresAt",
                                 "expectedReturnAt",
+                                "effectiveCheckInMode",
                                 "reasonCode"
                               ],
                               "properties": {
@@ -4672,6 +4725,31 @@
                                     {
                                       "type": "string",
                                       "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "effectiveCheckInMode": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "none"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "optional"
+                                      ]
+                                    },
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "required"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -5102,6 +5180,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -5143,6 +5222,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -5517,6 +5621,7 @@
                       "items": {
                         "type": "object",
                         "required": [
+                          "organizationId",
                           "approvalId",
                           "passId",
                           "passRevision",
@@ -5527,6 +5632,10 @@
                           "requestedAt"
                         ],
                         "properties": {
+                          "organizationId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
                           "approvalId": {
                             "type": "string",
                             "format": "uuid"
@@ -6021,6 +6130,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -6062,6 +6172,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -6712,6 +6847,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -6753,6 +6889,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -7447,6 +7608,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -7488,6 +7650,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -8182,6 +8369,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -8223,6 +8411,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -8597,6 +8810,7 @@
                       "items": {
                         "type": "object",
                         "required": [
+                          "organizationId",
                           "overrideId",
                           "passId",
                           "passRevision",
@@ -8609,6 +8823,10 @@
                           "requestedAt"
                         ],
                         "properties": {
+                          "organizationId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
                           "overrideId": {
                             "type": "string",
                             "format": "uuid"
@@ -9189,6 +9407,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -9230,6 +9449,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -9880,6 +10124,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -9921,6 +10166,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -10571,6 +10841,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -10612,6 +10883,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -11262,6 +11558,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -11303,6 +11600,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -11953,6 +12275,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -11994,6 +12317,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -12644,6 +12992,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -12685,6 +13034,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -13335,6 +13709,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -13376,6 +13751,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -14035,6 +14435,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -14076,6 +14477,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -14735,6 +15161,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -14776,6 +15203,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -15435,6 +15887,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -15476,6 +15929,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"
@@ -16195,6 +16673,8 @@
                         "type": "object",
                         "required": [
                           "passId",
+                          "passRevision",
+                          "passEtag",
                           "student",
                           "readyUntil"
                         ],
@@ -16202,6 +16682,14 @@
                           "passId": {
                             "type": "string",
                             "format": "uuid"
+                          },
+                          "passRevision": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "passEtag": {
+                            "type": "string",
+                            "minLength": 1
                           },
                           "student": {
                             "type": "object",
@@ -16234,6 +16722,8 @@
                         "type": "object",
                         "required": [
                           "passId",
+                          "passRevision",
+                          "passEtag",
                           "student",
                           "departedAt",
                           "expectedReturnAt"
@@ -16242,6 +16732,14 @@
                           "passId": {
                             "type": "string",
                             "format": "uuid"
+                          },
+                          "passRevision": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "passEtag": {
+                            "type": "string",
+                            "minLength": 1
                           },
                           "student": {
                             "type": "object",
@@ -16285,6 +16783,8 @@
                         "type": "object",
                         "required": [
                           "passId",
+                          "passRevision",
+                          "passEtag",
                           "student",
                           "expectedReturnAt"
                         ],
@@ -16292,6 +16792,14 @@
                           "passId": {
                             "type": "string",
                             "format": "uuid"
+                          },
+                          "passRevision": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "passEtag": {
+                            "type": "string",
+                            "minLength": 1
                           },
                           "student": {
                             "type": "object",
@@ -16331,6 +16839,8 @@
                         "type": "object",
                         "required": [
                           "passId",
+                          "passRevision",
+                          "passEtag",
                           "student",
                           "enteredAt"
                         ],
@@ -16338,6 +16848,14 @@
                           "passId": {
                             "type": "string",
                             "format": "uuid"
+                          },
+                          "passRevision": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "passEtag": {
+                            "type": "string",
+                            "minLength": 1
                           },
                           "student": {
                             "type": "object",
@@ -16462,6 +16980,1055 @@
           },
           "404": {
             "description": "Concealed destination or station resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sections/{sectionId}/passes/live": {
+      "get": {
+        "operationId": "listSectionLivePasses",
+        "tags": [
+          "operations"
+        ],
+        "description": "Minimized active movement for a section, authorized only through the canonical teaching relationship or existing administrator capability. Cache-Control: no-store.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "sectionId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "passes"
+                  ],
+                  "properties": {
+                    "passes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "passId",
+                          "passRevision",
+                          "passEtag",
+                          "student",
+                          "destination",
+                          "lifecycleState",
+                          "requestedAt",
+                          "movement",
+                          "origin"
+                        ],
+                        "properties": {
+                          "passId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "passRevision": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "passEtag": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "student": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "displayName"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "destination": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "displayName",
+                              "serviceType"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "serviceType": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "lifecycleState": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "requested"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "queued"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "ready"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "outbound"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "at_destination"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "returning"
+                                ]
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "movement": {
+                            "type": "object",
+                            "required": [
+                              "readyUntil",
+                              "expectedReturnAt"
+                            ],
+                            "properties": {
+                              "readyUntil": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "expectedReturnAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "origin": {
+                            "type": "object",
+                            "required": [
+                              "sectionId"
+                            ],
+                            "properties": {
+                              "sectionId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false,
+                        "title": "LivePass"
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Recovery session restricted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown, inaccessible, or cross-school resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sections/{sectionId}/students": {
+      "get": {
+        "operationId": "listSectionStudents",
+        "tags": [
+          "operations"
+        ],
+        "description": "Current active students in an authorized teaching section. Returns names only; people.view is not required. Cache-Control: no-store.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "sectionId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "students"
+                  ],
+                  "properties": {
+                    "students": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "displayName"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Recovery session restricted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown, inaccessible, or cross-school resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/passes/live": {
+      "get": {
+        "operationId": "listSchoolLivePasses",
+        "tags": [
+          "operations"
+        ],
+        "description": "Minimized active movement across one school. Requires pass.view.school_live for that exact school. Cache-Control: no-store.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "organizationId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "passes"
+                  ],
+                  "properties": {
+                    "passes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "passId",
+                          "passRevision",
+                          "passEtag",
+                          "student",
+                          "destination",
+                          "lifecycleState",
+                          "requestedAt",
+                          "movement",
+                          "origin"
+                        ],
+                        "properties": {
+                          "passId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "passRevision": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "passEtag": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "student": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "displayName"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "destination": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "displayName",
+                              "serviceType"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "serviceType": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "lifecycleState": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "requested"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "queued"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "ready"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "outbound"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "at_destination"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "returning"
+                                ]
+                              }
+                            ]
+                          },
+                          "requestedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "movement": {
+                            "type": "object",
+                            "required": [
+                              "readyUntil",
+                              "expectedReturnAt"
+                            ],
+                            "properties": {
+                              "readyUntil": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "expectedReturnAt": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "origin": {
+                            "type": "object",
+                            "required": [
+                              "sectionId"
+                            ],
+                            "properties": {
+                              "sectionId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Recovery session restricted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown, inaccessible, or cross-school resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/events": {
+      "get": {
+        "operationId": "streamOrganizationEvents",
+        "tags": [
+          "realtime"
+        ],
+        "description": "Same-origin, cookie-authenticated SSE invalidation stream. Events contain topics only; REST remains authoritative and no durable replay is promised.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "organizationId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Recovery session restricted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible school",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -31288,11 +32855,13 @@
                         "required": [
                           "id",
                           "personId",
+                          "person",
                           "accountId",
                           "role",
                           "scopeKind",
                           "organizationId",
                           "destinationId",
+                          "destination",
                           "status",
                           "validFrom",
                           "validUntil",
@@ -31310,6 +32879,23 @@
                           "personId": {
                             "type": "string",
                             "format": "uuid"
+                          },
+                          "person": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "displayName"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
                           },
                           "accountId": {
                             "type": "string",
@@ -31376,6 +32962,30 @@
                               {
                                 "type": "string",
                                 "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "destination": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "displayName"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "displayName": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -31743,11 +33353,13 @@
                       "required": [
                         "id",
                         "personId",
+                        "person",
                         "accountId",
                         "role",
                         "scopeKind",
                         "organizationId",
                         "destinationId",
+                        "destination",
                         "status",
                         "validFrom",
                         "validUntil",
@@ -31765,6 +33377,23 @@
                         "personId": {
                           "type": "string",
                           "format": "uuid"
+                        },
+                        "person": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
                         },
                         "accountId": {
                           "type": "string",
@@ -31830,6 +33459,30 @@
                             {
                               "type": "string",
                               "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "destination": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "displayName"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -32242,13 +33895,13 @@
         }
       }
     },
-    "/api/v1/authorization-grants/{grantId}/revoke": {
-      "post": {
-        "operationId": "revokeAuthorizationGrant",
+    "/api/v1/authorization-grants/{grantId}": {
+      "get": {
+        "operationId": "getAuthorizationGrant",
         "tags": [
           "control-plane"
         ],
-        "description": "Revoke an explicit staff duty (semantic revoke; rows are never deleted). Requires Idempotency-Key and If-Match. Cache-Control: no-store.",
+        "description": "Read one explicit staff duty with its authoritative strong ETag. Requires authorization.manage for its canonical school. Cache-Control: no-store.",
         "parameters": [
           {
             "schema": {
@@ -32258,31 +33911,11 @@
             "in": "path",
             "name": "grantId",
             "required": true
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 255
-            },
-            "in": "header",
-            "name": "idempotency-key",
-            "required": true
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "in": "header",
-            "name": "if-match",
-            "required": false
           }
         ],
         "security": [
           {
-            "cookieAuth": [],
-            "csrfHeader": []
+            "cookieAuth": []
           }
         ],
         "responses": {
@@ -32301,11 +33934,13 @@
                       "required": [
                         "id",
                         "personId",
+                        "person",
                         "accountId",
                         "role",
                         "scopeKind",
                         "organizationId",
                         "destinationId",
+                        "destination",
                         "status",
                         "validFrom",
                         "validUntil",
@@ -32323,6 +33958,23 @@
                         "personId": {
                           "type": "string",
                           "format": "uuid"
+                        },
+                        "person": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
                         },
                         "accountId": {
                           "type": "string",
@@ -32388,6 +34040,451 @@
                             {
                               "type": "string",
                               "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "destination": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "displayName"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "active"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "revoked"
+                              ]
+                            }
+                          ]
+                        },
+                        "validFrom": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "validUntil": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "revision": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]*$"
+                        },
+                        "createdByAccountId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "revokedAt": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "revokedByAccountId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or recovery session restricted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Concealed or missing school resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/authorization-grants/{grantId}/revoke": {
+      "post": {
+        "operationId": "revokeAuthorizationGrant",
+        "tags": [
+          "control-plane"
+        ],
+        "description": "Revoke an explicit staff duty (semantic revoke; rows are never deleted). Requires Idempotency-Key and If-Match. Cache-Control: no-store.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "grantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "in": "header",
+            "name": "idempotency-key",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "in": "header",
+            "name": "if-match",
+            "required": false
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": [],
+            "csrfHeader": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "grant"
+                  ],
+                  "properties": {
+                    "grant": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "personId",
+                        "person",
+                        "accountId",
+                        "role",
+                        "scopeKind",
+                        "organizationId",
+                        "destinationId",
+                        "destination",
+                        "status",
+                        "validFrom",
+                        "validUntil",
+                        "revision",
+                        "createdByAccountId",
+                        "revokedAt",
+                        "revokedByAccountId",
+                        "createdAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "personId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "person": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "accountId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "role": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "destination_staff"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "counselor"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "office_staff"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "school_admin"
+                              ]
+                            }
+                          ]
+                        },
+                        "scopeKind": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "organization"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "destination"
+                              ]
+                            }
+                          ]
+                        },
+                        "organizationId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "destinationId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "destination": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "displayName"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "displayName": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -33225,6 +35322,240 @@
                       "anyOf": [
                         {
                           "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or recovery session restricted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Concealed or missing school resource",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "type",
+                    "title",
+                    "status",
+                    "code",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "format": "uri-reference"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/people/{personId}/enrollment": {
+      "get": {
+        "operationId": "getIdentityEnrollmentStatus",
+        "tags": [
+          "control-plane"
+        ],
+        "description": "Read the live sign-in invitation for one person, if present. Returns no token, digest, identity, or provider internals. Requires identity.enroll. Cache-Control: no-store.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "organizationId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "in": "path",
+            "name": "personId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "enrollment"
+                  ],
+                  "properties": {
+                    "enrollment": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "organizationId",
+                            "personId",
+                            "status",
+                            "expiresAt",
+                            "revision"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "organizationId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "personId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active"
+                              ]
+                            },
+                            "expiresAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "revision": {
+                              "type": "string",
+                              "pattern": "^[1-9][0-9]*$"
+                            }
+                          },
+                          "additionalProperties": false
                         },
                         {
                           "type": "null"
@@ -34350,13 +36681,16 @@
                           "id",
                           "organizationId",
                           "studentId",
+                          "student",
                           "destinationId",
+                          "destination",
                           "validFrom",
                           "validUntil",
                           "status",
                           "approvalMode",
                           "originStrategy",
                           "originLocationId",
+                          "originLocation",
                           "revision",
                           "createdByAccountId",
                           "createdAt",
@@ -34380,9 +36714,58 @@
                             "type": "string",
                             "format": "uuid"
                           },
+                          "student": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "displayName",
+                              "gradeLevel"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "gradeLevel": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          },
                           "destinationId": {
                             "type": "string",
                             "format": "uuid"
+                          },
+                          "destination": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "displayName",
+                              "serviceType"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "serviceType": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
                           },
                           "validFrom": {
                             "type": "string",
@@ -34457,6 +36840,30 @@
                               {
                                 "type": "string",
                                 "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "originLocation": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false
                               },
                               {
                                 "type": "null"
@@ -34832,13 +37239,16 @@
                         "id",
                         "organizationId",
                         "studentId",
+                        "student",
                         "destinationId",
+                        "destination",
                         "validFrom",
                         "validUntil",
                         "status",
                         "approvalMode",
                         "originStrategy",
                         "originLocationId",
+                        "originLocation",
                         "revision",
                         "createdByAccountId",
                         "createdAt",
@@ -34862,9 +37272,58 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "student": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName",
+                            "gradeLevel"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "gradeLevel": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "destinationId": {
                           "type": "string",
                           "format": "uuid"
+                        },
+                        "destination": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName",
+                            "serviceType"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "serviceType": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
                         },
                         "validFrom": {
                           "type": "string",
@@ -34939,6 +37398,30 @@
                             {
                               "type": "string",
                               "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "originLocation": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "name"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -35390,13 +37873,16 @@
                         "id",
                         "organizationId",
                         "studentId",
+                        "student",
                         "destinationId",
+                        "destination",
                         "validFrom",
                         "validUntil",
                         "status",
                         "approvalMode",
                         "originStrategy",
                         "originLocationId",
+                        "originLocation",
                         "revision",
                         "createdByAccountId",
                         "createdAt",
@@ -35420,9 +37906,58 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "student": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName",
+                            "gradeLevel"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "gradeLevel": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "destinationId": {
                           "type": "string",
                           "format": "uuid"
+                        },
+                        "destination": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName",
+                            "serviceType"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "serviceType": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
                         },
                         "validFrom": {
                           "type": "string",
@@ -35497,6 +38032,30 @@
                             {
                               "type": "string",
                               "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "originLocation": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "name"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -35788,13 +38347,16 @@
                         "id",
                         "organizationId",
                         "studentId",
+                        "student",
                         "destinationId",
+                        "destination",
                         "validFrom",
                         "validUntil",
                         "status",
                         "approvalMode",
                         "originStrategy",
                         "originLocationId",
+                        "originLocation",
                         "revision",
                         "createdByAccountId",
                         "createdAt",
@@ -35818,9 +38380,58 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "student": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName",
+                            "gradeLevel"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "gradeLevel": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "destinationId": {
                           "type": "string",
                           "format": "uuid"
+                        },
+                        "destination": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "displayName",
+                            "serviceType"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "serviceType": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
                         },
                         "validFrom": {
                           "type": "string",
@@ -35895,6 +38506,30 @@
                             {
                               "type": "string",
                               "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "originLocation": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "name"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -36586,17 +39221,23 @@
                         "type": "object",
                         "required": [
                           "id",
+                          "organizationId",
                           "validFrom",
                           "validUntil",
                           "status",
                           "approvalMode",
                           "originStrategy",
                           "revision",
+                          "authorizationEtag",
                           "destination",
                           "originLocation"
                         ],
                         "properties": {
                           "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "organizationId": {
                             "type": "string",
                             "format": "uuid"
                           },
@@ -36671,6 +39312,9 @@
                           "revision": {
                             "type": "string",
                             "pattern": "^[1-9][0-9]*$"
+                          },
+                          "authorizationEtag": {
+                            "type": "string"
                           },
                           "destination": {
                             "type": "object",
@@ -37125,6 +39769,7 @@
                             "queueEnteredAt",
                             "queueExpiresAt",
                             "expectedReturnAt",
+                            "effectiveCheckInMode",
                             "reasonCode"
                           ],
                           "properties": {
@@ -37166,6 +39811,31 @@
                                 {
                                   "type": "string",
                                   "format": "date-time"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "effectiveCheckInMode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "none"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "optional"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "required"
+                                  ]
                                 },
                                 {
                                   "type": "null"

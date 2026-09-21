@@ -17,7 +17,12 @@ import type {
 import type { TenantTransactionContext } from '@openhall/application';
 import type { Kysely } from 'kysely';
 import type { DB as Database } from '../database.generated.js';
-import { connectionFor, fromDatabaseInstant, toDatabaseInstant } from '../transactions.js';
+import {
+  connectionFor,
+  fromDatabaseInstant,
+  toBigInt,
+  toDatabaseInstant,
+} from '../transactions.js';
 
 interface ReservationCore {
   id: string;
@@ -632,6 +637,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
       )
       .select([
         'pass.id as pass_id',
+        'pass.revision as pass_revision',
         'pass.student_id as student_id',
         'person.display_name as student_display_name',
         'pass.expected_return_at as expected_return_at',
@@ -659,6 +665,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
       )
       .select([
         'pass.id as pass_id',
+        'pass.revision as pass_revision',
         'pass.student_id as student_id',
         'person.display_name as student_display_name',
         'pass.expected_return_at as expected_return_at',
@@ -679,6 +686,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
       )
       .select([
         'pass.id as pass_id',
+        'pass.revision as pass_revision',
         'pass.student_id as student_id',
         'person.display_name as student_display_name',
         'pass.expected_return_at as expected_return_at',
@@ -704,6 +712,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
       )
       .select([
         'pass.id as pass_id',
+        'pass.revision as pass_revision',
         'pass.student_id as student_id',
         'person.display_name as student_display_name',
         'pass.expected_return_at as expected_return_at',
@@ -725,6 +734,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
       queueCount: Number(queueRow.count),
       ready: readyRows.map((entry) => ({
         passId: entry.pass_id,
+        passRevision: toBigInt(entry.pass_revision),
         studentId: entry.student_id,
         studentDisplayName: entry.student_display_name,
         expectedReturnAt: null,
@@ -736,6 +746,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
         }
         return {
           passId: entry.pass_id,
+          passRevision: toBigInt(entry.pass_revision),
           studentId: entry.student_id,
           studentDisplayName: entry.student_display_name,
           expectedReturnAt:
@@ -747,6 +758,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
       }),
       atDestination: atDestinationRows.map((entry) => ({
         passId: entry.pass_id,
+        passRevision: toBigInt(entry.pass_revision),
         studentId: entry.student_id,
         studentDisplayName: entry.student_display_name,
         expectedReturnAt:
@@ -754,6 +766,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
       })),
       queued: queuedRows.map((entry) => ({
         passId: entry.pass_id,
+        passRevision: toBigInt(entry.pass_revision),
         studentId: entry.student_id,
         studentDisplayName: entry.student_display_name,
         expectedReturnAt: null,

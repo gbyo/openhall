@@ -786,6 +786,7 @@ export async function resolvePassOverride(
 }
 
 export interface PendingOverrideItem {
+  readonly organizationId: string;
   readonly overrideId: string;
   readonly passId: string;
   readonly passRevision: string;
@@ -827,6 +828,7 @@ export async function listPendingOverrides(
   for (const view of views) {
     if (await mayResolveOverride(principal, dependencies, view, at)) {
       items.push({
+        organizationId: view.organizationId,
         overrideId: view.overrideId,
         passId: view.passId,
         passRevision: view.passRevision.toString(10),

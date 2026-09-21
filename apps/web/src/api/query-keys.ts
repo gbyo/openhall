@@ -1,0 +1,34 @@
+export const queryKeys = {
+  bootstrap: ['bootstrap'] as const,
+  session: ['session'] as const,
+  me: ['me'] as const,
+  organizations: ['organizations'] as const,
+  organizationContext: (organizationId: string) =>
+    ['organization-context', organizationId] as const,
+  activeSelfPass: ['active-self-pass'] as const,
+  selfScheduled: ['self-scheduled'] as const,
+  destinations: (organizationId: string) => ['destinations', organizationId] as const,
+  destination: (destinationId: string) => ['destination', destinationId] as const,
+  queueStatus: (passId: string) => ['queue-status', passId] as const,
+  pendingApprovals: ['pending-approvals'] as const,
+  pendingOverrides: ['pending-overrides'] as const,
+  sectionLive: (sectionId: string) => ['section-live', sectionId] as const,
+  schoolLive: (organizationId: string) => ['school-live', organizationId] as const,
+  sectionStudents: (sectionId: string) => ['section-students', sectionId] as const,
+  station: (destinationId: string) => ['station', destinationId] as const,
+  locations: (organizationId: string) => ['locations', organizationId] as const,
+  scheduleBlocks: (organizationId: string) => ['schedule-blocks', organizationId] as const,
+  scheduleTemplates: (organizationId: string) => ['schedule-templates', organizationId] as const,
+  scheduleCalendar: (organizationId: string, from: string, to: string) =>
+    ['schedule-calendar', organizationId, from, to] as const,
+  policies: (organizationId: string) => ['policies', organizationId] as const,
+  policy: (policyId: string) => ['policy', policyId] as const,
+  grants: (organizationId: string) => ['grants', organizationId] as const,
+  grant: (grantId: string) => ['grant', grantId] as const,
+  scheduledAdmin: (organizationId: string) => ['scheduled-admin', organizationId] as const,
+  people: (organizationId: string, q: string, affiliation: string) =>
+    ['people', organizationId, q, affiliation] as const,
+  enrollment: (organizationId: string, personId: string) =>
+    ['enrollment', organizationId, personId] as const,
+  audit: (organizationId: string) => ['audit', organizationId] as const,
+};

@@ -1,4 +1,5 @@
 import {
+  getAuthorizationGrant,
   issueAuthorizationGrant,
   listAuthorizationGrants,
   revokeAuthorizationGrant,
@@ -86,6 +87,39 @@ export function registerGrantRoutes(
         ),
         status: 200,
       }));
+    },
+  );
+
+  typedApp.get(
+    '/api/v1/authorization-grants/:grantId',
+    {
+      schema: {
+        operationId: 'getAuthorizationGrant',
+        tags: ['control-plane'],
+        description:
+          'Read one explicit staff duty with its authoritative strong ETag. Requires authorization.manage for its canonical school. Cache-Control: no-store.',
+        security: COOKIE_SECURITY,
+        params: GrantIdParamsSchema,
+        response: {
+          200: AuthorizationGrantResponseSchema,
+          401: CONTROL_PLANE_ERRORS[401],
+          403: CONTROL_PLANE_ERRORS[403],
+          404: CONTROL_PLANE_ERRORS[404],
+        },
+      },
+      preHandler: async (request, reply) => requirePrincipal(request, reply),
+    },
+    async (request, reply) => {
+      const principal = request.principal;
+      if (principal === undefined) return unauthenticated(reply, request);
+      await handle(request, reply, async () => {
+        const result = await getAuthorizationGrant(
+          principal,
+          request.params.grantId,
+          controlPlane.grants,
+        );
+        return { body: { grant: result.grant }, etag: result.etag, status: 200 };
+      });
     },
   );
 

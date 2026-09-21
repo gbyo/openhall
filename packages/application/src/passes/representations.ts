@@ -19,6 +19,13 @@ export interface MovementProjection {
   readonly queueEnteredAt: string | null;
   readonly queueExpiresAt: string | null;
   readonly expectedReturnAt: string | null;
+  /**
+   * Check-in behavior governing this movement. Before departure there is no
+   * movement contract yet, so this is null. Active movement uses the
+   * departure snapshot, with the same live-destination fallback used by the
+   * command layer for legacy rows that predate snapshots.
+   */
+  readonly effectiveCheckInMode: DestinationCheckInMode | null;
   readonly reasonCode: string | null;
 }
 
@@ -27,6 +34,7 @@ export const EMPTY_MOVEMENT: MovementProjection = {
   queueEnteredAt: null,
   queueExpiresAt: null,
   expectedReturnAt: null,
+  effectiveCheckInMode: null,
   reasonCode: null,
 };
 

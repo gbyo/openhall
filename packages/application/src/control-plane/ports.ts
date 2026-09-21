@@ -502,10 +502,12 @@ export interface GrantRecord {
   readonly tenantId: string;
   readonly accountId: string;
   readonly personId: string;
+  readonly personDisplayName: string;
   readonly role: string;
   readonly scopeKind: string;
   readonly organizationId: string | null;
   readonly destinationId: string | null;
+  readonly destinationDisplayName: string | null;
   readonly status: string;
   readonly validFrom: Temporal.Instant | null;
   readonly validUntil: Temporal.Instant | null;
@@ -745,6 +747,13 @@ export interface EnrollmentRepository {
     context: TenantTransactionContext,
     enrollmentId: string,
   ): Promise<EnrollmentRecord | null>;
+  /** Latest still-live invitation for one person in one school, if any. */
+  loadActiveGrantForPerson(
+    context: TenantTransactionContext,
+    organizationId: string,
+    personId: string,
+    at: Temporal.Instant,
+  ): Promise<EnrollmentRecord | null>;
   loadGrantForUpdate(
     context: TenantTransactionContext,
     enrollmentId: string,
@@ -778,7 +787,11 @@ export interface ScheduledAuthRecord {
   readonly tenantId: string;
   readonly organizationId: string;
   readonly studentId: string;
+  readonly studentDisplayName: string;
+  readonly studentGradeLevel: string | null;
   readonly destinationId: string;
+  readonly destinationDisplayName: string;
+  readonly destinationServiceType: string;
   readonly createdByPersonId: string;
   readonly createdByAccountId: string | null;
   readonly validFrom: Temporal.Instant;
@@ -787,6 +800,7 @@ export interface ScheduledAuthRecord {
   readonly approvalMode: string;
   readonly originStrategy: string;
   readonly originLocationId: string | null;
+  readonly originLocationName: string | null;
   readonly displayCategory: string | null;
   readonly revision: bigint;
   readonly createdAt: Temporal.Instant;

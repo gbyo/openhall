@@ -3,6 +3,7 @@ import type { Principal } from '../authentication/principal.js';
 import type { RelationshipAuthorizationService } from '../authorization/index.js';
 import { PassApplicationError } from '../passes/errors.js';
 import type { DestinationCheckInMode, PassRepository } from '../passes/ports.js';
+import { etagForPass } from '../passes/representations.js';
 import type { TenantTransactionRunner } from '../persistence.js';
 import type { DestinationFlowRepository, StationAggregates } from './ports.js';
 
@@ -81,22 +82,30 @@ export interface StationViewResult {
   readonly queueCount: number;
   readonly ready: {
     readonly passId: string;
+    readonly passRevision: string;
+    readonly passEtag: string;
     readonly student: { readonly id: string; readonly displayName: string };
     readonly readyUntil: string;
   }[];
   readonly outbound: {
     readonly passId: string;
+    readonly passRevision: string;
+    readonly passEtag: string;
     readonly student: { readonly id: string; readonly displayName: string };
     readonly departedAt: string;
     readonly expectedReturnAt: string | null;
   }[];
   readonly atDestination: {
     readonly passId: string;
+    readonly passRevision: string;
+    readonly passEtag: string;
     readonly student: { readonly id: string; readonly displayName: string };
     readonly expectedReturnAt: string | null;
   }[];
   readonly queued: {
     readonly passId: string;
+    readonly passRevision: string;
+    readonly passEtag: string;
     readonly student: { readonly id: string; readonly displayName: string };
     readonly enteredAt: string;
   }[];
@@ -156,22 +165,30 @@ export async function getStationView(
     queueCount: aggregates.queueCount,
     ready: aggregates.ready.map((entry) => ({
       passId: entry.passId,
+      passRevision: entry.passRevision.toString(10),
+      passEtag: etagForPass(entry.passId, entry.passRevision),
       student: { id: entry.studentId, displayName: entry.studentDisplayName },
       readyUntil: entry.readyUntil.toString(),
     })),
     outbound: aggregates.outbound.map((entry) => ({
       passId: entry.passId,
+      passRevision: entry.passRevision.toString(10),
+      passEtag: etagForPass(entry.passId, entry.passRevision),
       student: { id: entry.studentId, displayName: entry.studentDisplayName },
       departedAt: entry.departedAt.toString(),
       expectedReturnAt: entry.expectedReturnAt?.toString() ?? null,
     })),
     atDestination: aggregates.atDestination.map((entry) => ({
       passId: entry.passId,
+      passRevision: entry.passRevision.toString(10),
+      passEtag: etagForPass(entry.passId, entry.passRevision),
       student: { id: entry.studentId, displayName: entry.studentDisplayName },
       expectedReturnAt: entry.expectedReturnAt?.toString() ?? null,
     })),
     queued: aggregates.queued.map((entry) => ({
       passId: entry.passId,
+      passRevision: entry.passRevision.toString(10),
+      passEtag: etagForPass(entry.passId, entry.passRevision),
       student: { id: entry.studentId, displayName: entry.studentDisplayName },
       enteredAt: entry.enteredAt.toString(),
     })),

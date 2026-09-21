@@ -422,6 +422,12 @@ export const PassMovementProjectionSchema = Type.Object(
     queueEnteredAt: Type.Union([InstantSchema, Type.Null()]),
     queueExpiresAt: Type.Union([InstantSchema, Type.Null()]),
     expectedReturnAt: Type.Union([InstantSchema, Type.Null()]),
+    effectiveCheckInMode: Type.Union([
+      Type.Literal('none'),
+      Type.Literal('optional'),
+      Type.Literal('required'),
+      Type.Null(),
+    ]),
     reasonCode: Type.Union([Type.String(), Type.Null()]),
   },
   { $id: 'PassMovementProjection', additionalProperties: false },
@@ -521,6 +527,7 @@ const DestinationDisplaySchema = Type.Object(
 /** Staff-facing pending approval: useful data only, no rule JSON or grants. */
 export const PendingApprovalSchema = Type.Object(
   {
+    organizationId: UuidSchema,
     approvalId: UuidSchema,
     passId: UuidSchema,
     passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
@@ -541,6 +548,7 @@ export const PendingApprovalListSchema = Type.Object(
 /** Staff-facing pending override: no rule configuration, no explanations. */
 export const PendingOverrideSchema = Type.Object(
   {
+    organizationId: UuidSchema,
     overrideId: UuidSchema,
     passId: UuidSchema,
     passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
@@ -602,6 +610,57 @@ export const QueueStatusSchema = Type.Object(
     expiresAt: InstantSchema,
   },
   { $id: 'QueueStatus', additionalProperties: false },
+);
+
+export const LivePassSchema = Type.Object(
+  {
+    passId: UuidSchema,
+    passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+    passEtag: Type.String({ minLength: 1 }),
+    student: Type.Object(
+      { id: UuidSchema, displayName: Type.String() },
+      { additionalProperties: false },
+    ),
+    destination: Type.Object(
+      { id: UuidSchema, displayName: Type.String(), serviceType: Type.String() },
+      { additionalProperties: false },
+    ),
+    lifecycleState: Type.Union([
+      Type.Literal('requested'),
+      Type.Literal('queued'),
+      Type.Literal('ready'),
+      Type.Literal('outbound'),
+      Type.Literal('at_destination'),
+      Type.Literal('returning'),
+    ]),
+    requestedAt: InstantSchema,
+    movement: Type.Object(
+      {
+        readyUntil: Type.Union([InstantSchema, Type.Null()]),
+        expectedReturnAt: Type.Union([InstantSchema, Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
+    origin: Type.Object(
+      { sectionId: Type.Union([UuidSchema, Type.Null()]) },
+      { additionalProperties: false },
+    ),
+  },
+  { $id: 'LivePass', additionalProperties: false },
+);
+
+export const LivePassListSchema = Type.Object(
+  { passes: Type.Array(LivePassSchema) },
+  { $id: 'LivePassList', additionalProperties: false },
+);
+
+export const SectionStudentListSchema = Type.Object(
+  {
+    students: Type.Array(
+      Type.Object({ id: UuidSchema, displayName: Type.String() }, { additionalProperties: false }),
+    ),
+  },
+  { $id: 'SectionStudentList', additionalProperties: false },
 );
 
 const StationPersonSchema = Type.Object(
@@ -938,11 +997,19 @@ export const AuthorizationGrantSchema = Type.Object(
   {
     id: UuidSchema,
     personId: UuidSchema,
+    person: Type.Object(
+      { id: UuidSchema, displayName: Type.String() },
+      { additionalProperties: false },
+    ),
     accountId: UuidSchema,
     role: AuthorizationGrantRoleSchema,
     scopeKind: Type.Union([Type.Literal('organization'), Type.Literal('destination')]),
     organizationId: Type.Union([UuidSchema, Type.Null()]),
     destinationId: Type.Union([UuidSchema, Type.Null()]),
+    destination: Type.Union([
+      Type.Object({ id: UuidSchema, displayName: Type.String() }, { additionalProperties: false }),
+      Type.Null(),
+    ]),
     status: Type.Union([Type.Literal('active'), Type.Literal('revoked')]),
     validFrom: Type.Union([InstantSchema, Type.Null()]),
     validUntil: Type.Union([InstantSchema, Type.Null()]),
@@ -1151,6 +1218,26 @@ export const IdentityEnrollmentResponseSchema = Type.Object(
   { $id: 'IdentityEnrollmentResponse', additionalProperties: false },
 );
 
+export const IdentityEnrollmentStatusResponseSchema = Type.Object(
+  {
+    enrollment: Type.Union([
+      Type.Object(
+        {
+          id: UuidSchema,
+          organizationId: UuidSchema,
+          personId: UuidSchema,
+          status: Type.Literal('active'),
+          expiresAt: InstantSchema,
+          revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+        },
+        { additionalProperties: false },
+      ),
+      Type.Null(),
+    ]),
+  },
+  { $id: 'IdentityEnrollmentStatusResponse', additionalProperties: false },
+);
+
 export const EnrollmentStartResponseSchema = Type.Object(
   { authorizationUrl: Type.String({ minLength: 1 }) },
   { $id: 'EnrollmentStartResponse', additionalProperties: false },
@@ -1189,7 +1276,19 @@ export const ScheduledAuthSchema = Type.Object(
     id: UuidSchema,
     organizationId: UuidSchema,
     studentId: UuidSchema,
+    student: Type.Object(
+      {
+        id: UuidSchema,
+        displayName: Type.String(),
+        gradeLevel: Type.Union([Type.String(), Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
     destinationId: UuidSchema,
+    destination: Type.Object(
+      { id: UuidSchema, displayName: Type.String(), serviceType: Type.String() },
+      { additionalProperties: false },
+    ),
     validFrom: InstantSchema,
     validUntil: InstantSchema,
     status: Type.Union([
@@ -1201,6 +1300,10 @@ export const ScheduledAuthSchema = Type.Object(
     approvalMode: Type.Union([Type.Literal('preapproved'), Type.Literal('approval_required')]),
     originStrategy: Type.Union([Type.Literal('expected'), Type.Literal('specific')]),
     originLocationId: Type.Union([UuidSchema, Type.Null()]),
+    originLocation: Type.Union([
+      Type.Object({ id: UuidSchema, name: Type.String() }, { additionalProperties: false }),
+      Type.Null(),
+    ]),
     revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
     createdByAccountId: Type.Union([UuidSchema, Type.Null()]),
     createdAt: InstantSchema,
@@ -1231,6 +1334,7 @@ export const ScheduledAuthResponseSchema = Type.Object(
 export const ScheduledAuthStudentViewSchema = Type.Object(
   {
     id: UuidSchema,
+    organizationId: UuidSchema,
     validFrom: InstantSchema,
     validUntil: InstantSchema,
     status: Type.Union([
@@ -1242,6 +1346,7 @@ export const ScheduledAuthStudentViewSchema = Type.Object(
     approvalMode: Type.Union([Type.Literal('preapproved'), Type.Literal('approval_required')]),
     originStrategy: Type.Union([Type.Literal('expected'), Type.Literal('specific')]),
     revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+    authorizationEtag: Type.String(),
     destination: Type.Object(
       {
         id: UuidSchema,
@@ -1347,6 +1452,8 @@ export const DestinationStationViewSchema = Type.Object(
       Type.Object(
         {
           passId: UuidSchema,
+          passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+          passEtag: Type.String({ minLength: 1 }),
           student: StationPersonSchema,
           readyUntil: InstantSchema,
         },
@@ -1357,6 +1464,8 @@ export const DestinationStationViewSchema = Type.Object(
       Type.Object(
         {
           passId: UuidSchema,
+          passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+          passEtag: Type.String({ minLength: 1 }),
           student: StationPersonSchema,
           departedAt: InstantSchema,
           expectedReturnAt: Type.Union([InstantSchema, Type.Null()]),
@@ -1368,6 +1477,8 @@ export const DestinationStationViewSchema = Type.Object(
       Type.Object(
         {
           passId: UuidSchema,
+          passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+          passEtag: Type.String({ minLength: 1 }),
           student: StationPersonSchema,
           expectedReturnAt: Type.Union([InstantSchema, Type.Null()]),
         },
@@ -1378,6 +1489,8 @@ export const DestinationStationViewSchema = Type.Object(
       Type.Object(
         {
           passId: UuidSchema,
+          passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+          passEtag: Type.String({ minLength: 1 }),
           student: StationPersonSchema,
           enteredAt: InstantSchema,
         },
