@@ -104,7 +104,7 @@ export function SchoolSwitcher({
     );
   }
 
-  const schools = data?.organizations ?? [];
+  const schools = data.organizations;
 
   async function switchSchool(nextId: string) {
     if (!nextId || nextId === organizationId) return;
