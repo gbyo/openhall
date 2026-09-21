@@ -125,9 +125,8 @@ describe('foundation HTTP API', () => {
       openapi.paths['/health/live']?.get?.responses?.['200']?.content?.['application/json']?.schema,
     ).toEqual({ $ref: '#/components/schemas/Liveness' });
     expect(
-      openapi.paths['/health/ready']?.get?.responses?.['503']?.content?.[
-        'application/problem+json'
-      ]?.schema,
+      openapi.paths['/health/ready']?.get?.responses?.['503']?.content?.['application/problem+json']
+        ?.schema,
     ).toEqual({ $ref: '#/components/schemas/ProblemDetails' });
 
     await app.close();
