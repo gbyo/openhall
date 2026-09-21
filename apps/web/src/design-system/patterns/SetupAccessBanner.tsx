@@ -1,4 +1,8 @@
+import { InformationCircleIcon } from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
 import { Link } from 'react-router';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 
 /** Absolute deadline label, e.g. "September 22 at 9:42 AM". No ticking countdown. */
 export function formatSetupDeadline(absoluteExpiresAt: string): string | undefined {
@@ -24,27 +28,24 @@ export interface SetupAccessBannerProps {
 
 export function SetupAccessBanner({ deadlineLabel, compact = false }: SetupAccessBannerProps) {
   return (
-    <aside
-      className={`wf-setup-access-banner${compact ? ' wf-setup-access-banner--compact' : ''}`}
-      aria-label="Temporary setup access"
-    >
-      <span className="wf-setup-access-banner__marker" aria-hidden="true">
-        <i />
-        <i />
-      </span>
-      <div>
-        <p className="wf-type-body-strong">Finish setting up school sign-in</p>
-        <p>
-          You&apos;re using temporary setup access on this browser. Connect your school&apos;s
-          sign-in so you can get back into WayPass normally.
-          {deadlineLabel ? ` Temporary access ends ${deadlineLabel}.` : ''}
-        </p>
-        <p className="wf-setup-access-banner__action">
-          <Link className="wf-button wf-button--secondary wf-button--compact" to="/connect-sign-in">
-            Connect sign-in
-          </Link>
-        </p>
+    <Alert className={compact ? 'py-2.5' : undefined}>
+      <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} aria-hidden="true" />
+      <AlertTitle>Finish setting up school sign-in</AlertTitle>
+      <AlertDescription>
+        You&apos;re using temporary setup access on this browser. Connect your school&apos;s sign-in
+        so you can get back into WayPass normally.
+        {deadlineLabel ? ` Temporary access ends ${deadlineLabel}.` : ''}
+      </AlertDescription>
+      <div className="col-start-2 mt-2">
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link to="/connect-sign-in" />}
+        >
+          Connect sign-in
+        </Button>
       </div>
-    </aside>
+    </Alert>
   );
 }

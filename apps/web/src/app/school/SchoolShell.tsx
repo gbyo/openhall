@@ -229,7 +229,7 @@ export function SchoolShell() {
     return (
       <RealtimeProvider organizationId={organizationId}>
         {setupSession ? (
-          <div className="border-b px-4 py-2">
+          <div className="px-4 py-2">
             <SetupAccessBanner
               compact
               deadlineLabel={formatSetupDeadline(setupSession.absoluteExpiresAt)}
@@ -271,7 +271,7 @@ export function SchoolShell() {
             </Breadcrumb>
           </header>
           {setupSession ? (
-            <div className="border-b px-4 py-2">
+            <div className="px-4 py-2">
               <SetupAccessBanner
                 compact
                 deadlineLabel={formatSetupDeadline(setupSession.absoluteExpiresAt)}

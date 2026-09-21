@@ -24,7 +24,7 @@ export function AppFrame({ children }: { children: ReactNode }) {
         <span className="app-frame__descriptor">School movement, clearly understood</span>
       </header>
       {setupSession ? (
-        <div className="app-frame__notice">
+        <div className="px-4 py-2 sm:px-6">
           <SetupAccessBanner
             compact
             deadlineLabel={formatSetupDeadline(setupSession.absoluteExpiresAt)}
