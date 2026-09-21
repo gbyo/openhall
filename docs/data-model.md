@@ -77,3 +77,22 @@ on `authorization_grant (tenant_id, account_id, role, scope_kind) WHERE
 status = 'active'`. Grant validity is half-open instant semantics
 evaluated in memory with `Temporal.Instant`; membership validity is
 inclusive on the school-local date.
+
+## Pass command core (migration 005)
+
+Migration 005 is forward-only integrity hardening for reliable pass
+commands. `pass.origin_schedule_block_id` (nullable, backfilled NULL)
+snapshots the active logical schedule block; no slot, calendar-day, or
+teacher ids are stored on the row. `destination`, `location`, `section`,
+and `schedule_block` carry `UNIQUE (tenant_id, organization_id, id)`
+so pass references (`destination_id`, `origin_location_id`,
+`return_location_id`, `origin_section_id`,
+`origin_schedule_block_id`) become same-school composite foreign keys
+against `pass.organization_id`. `student_id`,
+`requested_by_person_id`, and `scheduled_authorization_id` stay
+tenant-bound. Preflight fails loudly on existing cross-school
+references instead of rewriting history. `pass_event.sequence` mirrors
+the resulting `pass.revision`; idempotency rows are unique on
+`(tenant_id, actor_account_id, command, idempotency_key)` with
+`expires_at > created_at`. No `policy_evaluation`, reservation, or
+queue rows are written in this phase.

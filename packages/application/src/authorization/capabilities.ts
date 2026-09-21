@@ -10,6 +10,8 @@ export const CAPABILITIES = [
   'organization.context.read',
 
   'pass.request.self',
+  'pass.view.self',
+  'pass.cancel.self',
   'pass.create.student',
   'pass.approve.section',
   'pass.view.section_live',

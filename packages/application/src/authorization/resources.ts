@@ -55,6 +55,8 @@ export interface ResourceByCapability {
   'organization.context.read': OrganizationResource;
 
   'pass.request.self': StudentResource;
+  'pass.view.self': SelfResource;
+  'pass.cancel.self': SelfResource;
   'pass.create.student': StudentResource | StudentInSectionResource;
   'pass.approve.section': StudentInSectionResource;
 

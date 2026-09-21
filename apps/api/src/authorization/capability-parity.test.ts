@@ -39,6 +39,8 @@ describe('capability vocabulary parity', () => {
       organizationId: 'org-1',
       studentId: 'person-1',
     });
+    accepts('pass.view.self', { kind: 'self' });
+    accepts('pass.cancel.self', { kind: 'self' });
     accepts('pass.create.student', {
       kind: 'student',
       organizationId: 'org-1',

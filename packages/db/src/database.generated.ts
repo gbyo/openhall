@@ -359,6 +359,7 @@ export interface Pass {
   lifecycle_state: string;
   organization_id: string;
   origin_location_id: string | null;
+  origin_schedule_block_id: string | null;
   origin_section_id: string | null;
   request_source: string;
   requested_at: Generated<string>;
