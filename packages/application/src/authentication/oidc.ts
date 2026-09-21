@@ -109,6 +109,7 @@ export async function beginOidcLogin(
       tenantId: tenant.id,
       identityProviderId: provider.id,
       bootstrapSetupId: null,
+      identityEnrollmentGrantId: null,
       purpose: 'login',
       providerRevision: provider.revision,
       stateDigest: dependencies.digester.digest(new TextEncoder().encode(state)),

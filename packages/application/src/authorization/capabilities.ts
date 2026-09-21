@@ -45,6 +45,7 @@ export const CAPABILITIES = [
 
   'audit.view',
 
+  'identity.enroll',
   'identity.manage',
   'system.manage',
 ] as const;

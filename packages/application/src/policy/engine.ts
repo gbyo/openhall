@@ -278,6 +278,24 @@ function evaluateApprovalRequirement(
     const overridden = applyOverrideEvidence(rule, context, requiredSectionId);
     if (overridden !== null) return overridden;
   }
+  // A preapproved scheduled authorization satisfies only the classroom
+  // approval this rule would otherwise require for the exact scheduled
+  // movement. Deny contributions, overrides, and every other rule type are
+  // untouched: preapproval never bypasses them.
+  if (
+    context.scheduledPreapprovals.some(
+      (entry) =>
+        entry.studentId === context.pass.studentId &&
+        entry.destinationId === context.pass.destinationId,
+    )
+  ) {
+    return {
+      ...base,
+      outcome: 'pass',
+      contribution: 'none',
+      reasonCode: 'scheduled_preapproval_satisfied',
+    };
+  }
   return {
     ...base,
     outcome: 'fail',

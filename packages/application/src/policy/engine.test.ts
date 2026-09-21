@@ -95,6 +95,7 @@ function contextAt(
     rules,
     approvals: [],
     overrides: [],
+    scheduledPreapprovals: [],
   };
 }
 

@@ -245,6 +245,7 @@ export async function requestPassOverride(
         rules,
         approvals,
         overrides,
+        scheduledPreapprovals: [],
       });
       if (current.decision === 'deny') {
         throw new PassApplicationError(

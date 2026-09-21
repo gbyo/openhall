@@ -306,6 +306,13 @@ async function checkInModeFor(
   row: PassRow,
   principal: Principal,
 ): Promise<string> {
+  // Departure-time snapshot governs active movement: later destination
+  // configuration edits affect only new departures. Passes that departed
+  // before Phase 8 carry no snapshot and honestly fall back to the live
+  // destination setting instead of a backfilled fiction.
+  if (row.departureCheckInMode !== null) {
+    return row.departureCheckInMode;
+  }
   const destination = await passes.loadDestination(context, row.destinationId);
   if (destination?.tenantId !== principal.tenantId) {
     throw new PassApplicationError('destination_not_found', 'Destination not found.');

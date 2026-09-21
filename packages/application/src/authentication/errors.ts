@@ -12,6 +12,7 @@ export type AuthErrorCode =
   | 'auth_transaction_invalid'
   | 'auth_transaction_expired'
   | 'identity_not_linked'
+  | 'identity_link_conflict'
   | 'bootstrap_unavailable'
   | 'bootstrap_token_invalid'
   | 'invalid_bootstrap_draft'
