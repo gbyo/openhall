@@ -1,9 +1,10 @@
 import { useState, type SubmitEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Alert } from '../../design-system/primitives/Alert';
-import { Button } from '../../design-system/primitives/Button';
 import { AppFrame } from '../../app/AppFrame';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { meQuery, sessionQuery } from '../../app/queries';
 import { ApiProblem } from '../../api/problems';
 import { ProviderChoiceForm, type ProviderChoiceErrors } from '../setup/ProviderChoiceForm';
@@ -111,8 +112,9 @@ export function ConnectSignInPage() {
             : 'Connect the sign-in your school will use every day.'}
         </p>
         {failure ? (
-          <Alert tone="danger" role="alert" title="Sign-in could not connect">
-            <p>{failure}</p>
+          <Alert variant="destructive" role="alert">
+            <AlertTitle>Sign-in could not connect</AlertTitle>
+            <AlertDescription>{failure}</AlertDescription>
           </Alert>
         ) : null}
         <form onSubmit={(event) => void submit(event)} noValidate>
@@ -135,8 +137,9 @@ export function ConnectSignInPage() {
               <Button type="button" variant="secondary" onClick={() => void navigate('/')}>
                 I&apos;ll do this later
               </Button>
-              <Button type="submit" pending={pending} pendingLabel="Connecting…">
-                Connect and continue
+              <Button type="submit" disabled={pending}>
+                {pending ? <Spinner data-icon="inline-start" /> : null}
+                {pending ? 'Connecting…' : 'Connect and continue'}
               </Button>
             </div>
           </div>

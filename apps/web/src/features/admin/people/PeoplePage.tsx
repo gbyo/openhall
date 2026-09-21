@@ -24,6 +24,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Table,
   TableBody,
@@ -284,6 +285,7 @@ export function Component() {
                       revoke.mutate();
                     }}
                   >
+                    {revoke.isPending ? <Spinner data-icon="inline-start" /> : null}
                     {revoke.isPending ? 'Revoking…' : 'Revoke invitation'}
                   </Button>
                 </div>
@@ -300,6 +302,7 @@ export function Component() {
                         issue.mutate(provider.key);
                       }}
                     >
+                      {issue.isPending ? <Spinner data-icon="inline-start" /> : null}
                       {issue.isPending ? 'Creating…' : `Create ${provider.displayName} invitation`}
                     </Button>
                   ))}

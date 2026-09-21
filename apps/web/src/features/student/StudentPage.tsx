@@ -7,7 +7,7 @@ import { ApiProblem, productMessage, UncertainCommandError } from '../../api/pro
 import { queryKeys } from '../../api/query-keys';
 import { getCsrfToken } from '../../api/session';
 import type { Pass } from '../../api/types';
-import { StatusAnnouncer } from '../../design-system/primitives/StatusAnnouncer';
+import { StatusAnnouncer } from '../../components/StatusAnnouncer';
 import { QueuePosition } from '../../design-system/patterns/QueuePosition';
 import { Route, RouteStop } from '../../design-system/patterns/Route';
 import { useSchool } from '../../app/school/SchoolShell';
