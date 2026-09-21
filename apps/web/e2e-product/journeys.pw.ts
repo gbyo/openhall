@@ -980,17 +980,39 @@ test('staff account footer opens menu without routing or throwing', async ({ pag
   });
 
   await page.goto(`/schools/${ORG}`);
-  const before = page.url();
-  await page.getByRole('button', { name: /Account, signed in as/ }).click();
+  const beforeUrl = page.url();
+  const trigger = page.getByRole('button', { name: /Account, signed in as/ });
+  const beforeHtml = await trigger.evaluate((element) => element.outerHTML);
 
-  if (pageErrors.length > 0) {
+  await trigger.click();
+  await page.waitForTimeout(100);
+
+  const afterHtml = await trigger.evaluate((element) => element.outerHTML);
+  const contentCount = await page.locator('[data-slot="dropdown-menu-content"]').count();
+  const menuCount = await page.getByRole('menu').count();
+  const errorCount = await page.getByText('WayPass hit a problem').count();
+
+  if (
+    pageErrors.length > 0 ||
+    page.url() !== beforeUrl ||
+    contentCount === 0 ||
+    menuCount === 0 ||
+    errorCount > 0
+  ) {
     throw new Error(
-      `Opening account menu threw a page error at ${page.url()}:\n${pageErrors.join('\n---\n')}`,
+      [
+        `beforeUrl=${beforeUrl}`,
+        `afterUrl=${page.url()}`,
+        `pageErrors=${pageErrors.join('\n---\n') || '(none)'}`,
+        `contentCount=${String(contentCount)}`,
+        `menuCount=${String(menuCount)}`,
+        `errorCount=${String(errorCount)}`,
+        `beforeTrigger=${beforeHtml}`,
+        `afterTrigger=${afterHtml}`,
+      ].join('\n'),
     );
   }
 
-  await expect(page).toHaveURL(before);
   await expect(page.getByRole('menuitem', { name: 'View all schools' })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Sign out', exact: true })).toBeVisible();
-  await expect(page.getByText('WayPass hit a problem')).toHaveCount(0);
 });
