@@ -109,6 +109,61 @@ test('student sees future appointments without a premature Start action', async 
   await expect(page.getByRole('button', { name: 'Start WayPass' })).toHaveCount(0);
 });
 
+test('appointment presentation flips at the window boundary without reload', async ({ page }) => {
+  await shell(page, STUDENT);
+  const active: { current: ReturnType<typeof mockPass> | null } = { current: null };
+  await studentHomeApis(page, active, {
+    scheduled: [
+      {
+        id: '00000000-0000-4000-8000-000000000032',
+        organizationId: ORG,
+        status: 'active',
+        validFrom: new Date(Date.now() + 4000).toISOString(),
+        validUntil: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+        destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+        authorizationEtag: '"auth:test:3"',
+      },
+    ],
+  });
+  await page.goto(`/schools/${ORG}/pass`);
+  await expect(page.getByRole('heading', { name: 'Upcoming' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start WayPass' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Ready now' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Start WayPass' })).toBeVisible();
+});
+
+test('uncertain requests keep one idempotency key across Check again', async ({ page }) => {
+  await shell(page, STUDENT);
+  const active: { current: ReturnType<typeof mockPass> | null } = { current: null };
+  await studentHomeApis(page, active);
+  const keys: (string | null)[] = [];
+  let attempts = 0;
+  await page.route('**/api/v1/me/passes', async (route) => {
+    attempts += 1;
+    keys.push(route.request().headers()['idempotency-key'] ?? null);
+    if (attempts === 1) {
+      await route.abort('failed');
+      return;
+    }
+    active.current = mockPass('requested', null);
+    await route.fulfill({
+      status: 201,
+      json: { pass: active.current },
+      headers: { ETag: '"pass:test:1"' },
+    });
+  });
+  await page.goto(`/schools/${ORG}/pass`);
+  await page.getByRole('button', { name: 'Nurse' }).click();
+  await page.getByRole('button', { name: 'Request WayPass' }).click();
+  await expect(page.getByRole('button', { name: 'Check again' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Request a WayPass' })).toBeVisible();
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(page.getByRole('heading', { name: 'Request received' })).toBeVisible();
+  expect(attempts).toBe(2);
+  expect(keys[0]).toBeTruthy();
+  expect(keys[1]).toBe(keys[0]);
+});
+
 test('student home groups destinations into intent tiles without admin metadata', async ({
   page,
 }) => {
