@@ -36,6 +36,15 @@ describe('buildWorkspaceNav', () => {
     expect(groups.every((group) => group.items.length === 0)).toBe(true);
   });
 
+  it('does not classify mixed student/staff affiliations as student-only without mapped staff resources', () => {
+    const ctx = context({
+      affiliations: ['student', 'staff'],
+      capabilities: ['pass.request.self'],
+    });
+    expect(buildWorkspaceNav(ctx).every((group) => group.items.length === 0)).toBe(true);
+    expect(isStudentOnly(ctx)).toBe(false);
+  });
+
   it('exposes My WayPass inside the staff shell for mixed student/staff roles', () => {
     const ctx = context({
       affiliations: ['student', 'staff'],

@@ -126,6 +126,7 @@ export function buildWorkspaceNav(context: OrganizationContext): WorkspaceNavGro
 export function isStudentOnly(context: OrganizationContext): boolean {
   const student = context.affiliations.includes('student') && has(context, 'pass.request.self');
   if (!student) return false;
+  if (context.affiliations.some((affiliation) => affiliation !== 'student')) return false;
   return buildWorkspaceNav(context).every((group) => group.items.length === 0);
 }
 
