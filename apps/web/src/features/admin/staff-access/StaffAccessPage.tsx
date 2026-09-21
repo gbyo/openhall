@@ -21,7 +21,14 @@ import {
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -62,6 +69,7 @@ export function Component() {
   const { organizationId, context } = useSchool();
   const queryClient = useQueryClient();
   const [role, setRole] = useState<keyof typeof roleLabel>('destination_staff');
+  const [granting, setGranting] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState<Grant | null>(null);
   const grants = useQuery({
     queryKey: queryKeys.grants(organizationId),
@@ -111,7 +119,10 @@ export function Component() {
         }),
       );
     },
-    onSuccess: refresh,
+    onSuccess: () => {
+      setGranting(false);
+      refresh();
+    },
   });
   const revoke = useMutation({
     mutationFn: async (input: { grantId: string; key: string }) => {
@@ -160,6 +171,16 @@ export function Component() {
       <PageHeader
         title="Staff access"
         description="Assign a specific school duty. Teacher and student access comes from school records, not this page."
+        actions={
+          <Button
+            onClick={() => {
+              issue.reset();
+              setGranting(true);
+            }}
+          >
+            Grant access
+          </Button>
+        }
       />
       {(issue.isError || revoke.isError) && (
         <Alert variant="destructive">
@@ -193,12 +214,21 @@ export function Component() {
           )}
         </Alert>
       )}
-      <Card>
-        <CardHeader>
-          <CardTitle>Grant access</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>
+      <Dialog
+        open={granting}
+        onOpenChange={(open) => {
+          if (!issue.isPending) setGranting(open);
+        }}
+      >
+        <DialogContent aria-label="Grant access">
+          <DialogHeader>
+            <DialogTitle>Grant access</DialogTitle>
+            <DialogDescription>
+              Assign a duty to one staff member. Teacher and student access comes from school
+              records.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4" onSubmit={submit}>
             <Field>
               <FieldLabel htmlFor="grant-person">Staff member</FieldLabel>
               <NativeSelect id="grant-person" name="personId" required>
@@ -250,15 +280,15 @@ export function Component() {
                 <Input id="grant-until" type="datetime-local" name="validUntil" />
               </Field>
             </div>
-            <div className="sm:col-span-2">
+            <DialogFooter>
               <Button type="submit" disabled={issue.isPending}>
                 {issue.isPending ? <Spinner data-icon="inline-start" /> : null}
                 {issue.isPending ? 'Granting…' : 'Grant access'}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
       {grants.isPending ? (
         <div className="grid gap-2" role="status" aria-label="Loading access grants">
           <Skeleton className="h-10 w-full" />

@@ -546,8 +546,70 @@ test('admin staff access shows duties in school language', async ({ page }) => {
     .getByRole('table', { name: 'Staff access grants' })
     .getByRole('row', { name: /Sam Patel/ });
   await expect(grantRow.getByText('Destination staff')).toBeVisible();
-  await expect(page.getByLabel('Duty')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Grant access' })).toBeVisible();
+  await page.getByRole('button', { name: 'Grant access' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Grant access' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Duty')).toBeVisible();
+  await expect(dialog.getByLabel('Staff member')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
+test('admin destinations create in a dialog over the list', async ({ page }) => {
+  await shell(page, ADMIN);
+  await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
+    route.fulfill({ json: orgDestinations() }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
+    route.fulfill({ json: orgLocations() }),
+  );
+  await page.goto(`/schools/${ORG}/admin/destinations`);
+  await expect(page.getByRole('heading', { name: 'Destinations' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Destinations' }).getByText('Nurse')).toBeVisible();
+  await page.getByRole('button', { name: 'New destination' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New destination' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Display name')).toBeVisible();
+  await expect(dialog.getByLabel('Type')).toBeVisible();
+  await expect(dialog.getByLabel('Location')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
+test('admin schedules add blocks in a dialog over the list', async ({ page }) => {
+  await shell(page, ADMIN);
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/blocks`, (route) =>
+    route.fulfill({
+      json: {
+        blocks: [
+          {
+            id: 'block-1',
+            code: 'HR',
+            displayName: 'Homeroom',
+            kind: 'instructional',
+            status: 'active',
+          },
+        ],
+      },
+      headers: { ETag: '"schedule:test:1"' },
+    }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/templates`, (route) =>
+    route.fulfill({ json: { templates: [] } }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/calendar*`, (route) =>
+    route.fulfill({ json: { days: [] } }),
+  );
+  await page.goto(`/schools/${ORG}/admin/schedules`);
+  await expect(page.getByRole('heading', { name: 'Schedules' })).toBeVisible();
+  await page.getByRole('button', { name: 'New block' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New block' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Code')).toBeVisible();
+  await expect(dialog.getByLabel('Name')).toBeVisible();
+  await expect(dialog.getByLabel('Type')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
 });
 
 test('admin scheduled passes read like appointments', async ({ page }) => {
