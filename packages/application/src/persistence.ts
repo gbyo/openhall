@@ -39,7 +39,11 @@ export interface SystemTransactionContext {
 export type TransactionContext = TenantTransactionContext;
 
 export interface TenantTransactionSettings {
-  readonly isolationLevel?: 'read uncommitted' | 'read committed' | 'repeatable read' | 'serializable';
+  readonly isolationLevel?:
+    | 'read uncommitted'
+    | 'read committed'
+    | 'repeatable read'
+    | 'serializable';
   readonly accessMode?: 'read only' | 'read write';
 }
 
