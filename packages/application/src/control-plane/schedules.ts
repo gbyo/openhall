@@ -220,7 +220,10 @@ async function lockAggregate(
     now,
     'schedule_not_found',
   );
-  const configuration = await dependencies.schedules.loadConfiguration(context, organizationId);
+  const configuration = await dependencies.schedules.loadConfigurationForUpdate(
+    context,
+    organizationId,
+  );
   if (configuration === null) {
     // Never fabricate a missing aggregate: school provisioning owns creation.
     throw new ControlPlaneError('schedule_not_found', 'Schedule not found.');
@@ -470,10 +473,7 @@ async function readAggregate(
     now,
     'schedule_not_found',
   );
-  const configuration = await dependencies.schedules.loadConfigurationForUpdate(
-    context,
-    organizationId,
-  );
+  const configuration = await dependencies.schedules.loadConfiguration(context, organizationId);
   if (configuration === null) {
     throw new ControlPlaneError('schedule_not_found', 'Schedule not found.');
   }
