@@ -1,4 +1,4 @@
-import { createBrowserRouter, Outlet } from 'react-router';
+import { createBrowserRouter, Navigate, Outlet } from 'react-router';
 import { ErrorPage } from './ErrorPage';
 import {
   connectSignInLoader,
@@ -113,7 +113,7 @@ export const router = createBrowserRouter([
         element: <AdminLayout />,
         children: [
           { index: true, element: <AdminIndex /> },
-          { path: 'live', element: <LiveMovementPage /> },
+          { path: 'live', element: <Navigate replace to="../../movement" /> },
           { path: 'destinations', element: <DestinationsPage /> },
           { path: 'destinations/:destinationId', element: <DestinationDetailPage /> },
           { path: 'locations', lazy: () => import('../features/admin/locations/LocationsPage') },
@@ -129,7 +129,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'scheduled-passes',
-            lazy: () => import('../features/admin/scheduled-passes/ScheduledPassesPage'),
+            element: <Navigate replace to="../../scheduled-passes" />,
           },
           { path: 'people', lazy: () => import('../features/admin/people/PeoplePage') },
           { path: 'audit', lazy: () => import('../features/admin/audit/AuditPage') },
