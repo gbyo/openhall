@@ -25,7 +25,7 @@ import {
   useParams,
 } from 'react-router';
 import type { OrganizationContext } from '../../api/types';
-import { meQuery, sessionQuery } from '../queries';
+import { sessionQuery } from '../queries';
 import { RealtimeProvider } from '../realtime/RealtimeProvider';
 import {
   SetupAccessBanner,
@@ -94,7 +94,7 @@ function resolveCurrentLabel(
   const consider = (to: string, label: string) => {
     const absolute = `/schools/${organizationId}/${to}`;
     if (pathname === absolute || pathname.startsWith(`${absolute}/`)) {
-      if (absolute.length > bestLength) {
+      if (absolute.length >= bestLength) {
         best = label;
         bestLength = absolute.length;
       }
@@ -193,7 +193,6 @@ function FocusedStudentShell({
   context: OrganizationContext;
   organizationId: string;
 }) {
-  const { data: me } = useQuery(meQuery);
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <header className="flex h-14 shrink-0 items-center gap-4 border-b px-4">
@@ -204,10 +203,10 @@ function FocusedStudentShell({
         >
           WayPass
         </Link>
-        <span className="truncate text-sm text-muted-foreground">{context.organization.name}</span>
-        <span className="ml-auto truncate text-sm text-muted-foreground">
-          {me?.person.displayName}
-        </span>
+        <SchoolSwitcher schoolName={context.organization.name} variant="header" />
+        <div className="ml-auto min-w-0">
+          <UserMenu variant="header" />
+        </div>
       </header>
       <main className="mx-auto w-full max-w-[66rem] flex-1 px-4 py-6 sm:px-8">
         <Outlet context={{ context, organizationId } satisfies SchoolOutletContext} />
