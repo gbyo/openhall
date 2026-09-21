@@ -326,7 +326,13 @@ export function Component() {
 
   function submitCreate() {
     if (!createValid) return;
-    if (origin === 'specific' && locationId === null) return;
+    const originBody =
+      origin === 'expected'
+        ? { strategy: 'expected' as const }
+        : locationId === null
+          ? null
+          : { strategy: 'specific' as const, locationId };
+    if (originBody === null) return;
     create.mutate({
       key: crypto.randomUUID(),
       body: {
@@ -335,8 +341,7 @@ export function Component() {
         validFrom: instant(validFrom, timeZone),
         validUntil: instant(validUntil, timeZone),
         approvalMode,
-        origin:
-          origin === 'expected' ? { strategy: 'expected' } : { strategy: 'specific', locationId },
+        origin: originBody,
       },
     });
   }
@@ -373,7 +378,7 @@ export function Component() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  create.mutate(create.variables);
+                  if (create.variables) create.mutate(create.variables);
                 }}
               >
                 Check again
@@ -386,7 +391,7 @@ export function Component() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  cancel.mutate(cancel.variables);
+                  if (cancel.variables) cancel.mutate(cancel.variables);
                 }}
               >
                 Check again
@@ -415,7 +420,12 @@ export function Component() {
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="scheduled-status-filter">Status</Label>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              setStatusFilter(value ?? 'all');
+            }}
+          >
             <SelectTrigger id="scheduled-status-filter" className="w-44">
               <SelectValue />
             </SelectTrigger>

@@ -230,8 +230,8 @@ function NewLocationDialog({
                   name: name.trim(),
                   kind: kind.trim(),
                   parentLocationId: parent && parent.value !== NO_PARENT ? parent.value : null,
-                  code: code.trim() === '' ? null : code.trim(),
-                  floorLabel: floorLabel.trim() === '' ? null : floorLabel.trim(),
+                  code: code.trim(),
+                  floorLabel: floorLabel.trim(),
                 });
               }
             }}
@@ -519,7 +519,7 @@ export function Component() {
           if (!create.isPending) setCreating(false);
         }}
         onRetry={() => {
-          create.mutate(create.variables);
+          if (create.variables) create.mutate(create.variables);
         }}
       />
       <Sheet
