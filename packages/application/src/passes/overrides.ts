@@ -20,6 +20,8 @@ import {
   evaluatePolicy,
   isOverrideCategory,
   type OverrideCategory,
+  type PolicyOverrideMode,
+  type PolicyReasonCode,
   type PolicyRepository,
 } from '../policy/index.js';
 import { PassApplicationError } from './errors.js';
@@ -276,6 +278,18 @@ export async function requestPassOverride(
         }
       }
       if (blockers.some((blocker) => !resultIdFor.has(blocker.ruleId))) {
+        // The applicable rule set changed since the latest persisted
+        // evaluation (e.g. a time-windowed rule activated mid-pass). The
+        // one-evaluation-per-revision invariant forbids persisting a second
+        // evaluation at this revision, so fail closed instead of violating
+        // it: the approval path still advances the revision, after which
+        // overrides become requestable again.
+        if (latest !== null && latest.passRevision === row.revision) {
+          throw new PassApplicationError(
+            'override_not_available',
+            'Policy changed since the last evaluation; no overrideable blocker can be established.',
+          );
+        }
         await evaluateAndPersistPolicy(context, policy, {
           pass: passFacts,
           placement,
@@ -807,9 +821,9 @@ export interface PendingOverrideItem {
     readonly displayName: string;
     readonly serviceType: string;
   };
-  readonly category: string;
-  readonly overrideMode: string;
-  readonly reasonCode: string;
+  readonly category: OverrideCategory;
+  readonly overrideMode: PolicyOverrideMode;
+  readonly reasonCode: PolicyReasonCode;
   readonly requestedAt: string;
 }
 

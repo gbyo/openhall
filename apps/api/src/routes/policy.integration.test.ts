@@ -895,6 +895,70 @@ describe('override workflow', () => {
     ]);
   });
 
+  it('fails closed with 409 when rules change after the last evaluation', async () => {
+    if (counselor === null) throw new Error('fixture missing');
+    await clearRules();
+    await seedRule({
+      name: 'teacher approval',
+      ruleType: 'approval_requirement',
+      scopeKind: 'organization',
+      scopeId: schoolA,
+      configuration: APPROVAL_CONFIG,
+      overrideMode: 'authorized',
+    });
+    const student = await makePassStudent('RuleChange');
+    const created = await requestPass(student);
+    expect(created.statusCode).toBe(201);
+    const pass = created.json<{ pass: PassBody }>().pass;
+    expect(pass.policy?.decision).toBe('approval_required');
+    const evaluationsBefore = await tableCount('policy_evaluation');
+    // A second rule becomes applicable after the request-time evaluation was
+    // persisted at revision 1. The one-evaluation-per-revision invariant
+    // forbids a second evaluation row, so the request must fail closed with
+    // a domain conflict instead of an internal error.
+    await seedRule({
+      name: 'late blackout',
+      ruleType: 'schedule_boundary',
+      scopeKind: 'organization',
+      scopeId: schoolA,
+      configuration: BLACKOUT_OVERLAP,
+      overrideMode: 'authorized',
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/passes/${pass.id}/overrides`,
+      headers: authHeaders(counselor, randomUUID(), requiredEtag(created)),
+      payload: { category: 'safety' },
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json<{ code: string }>().code).toBe('override_not_available');
+    expect(await tableCount('policy_evaluation')).toBe(evaluationsBefore);
+  });
+
+  it('advances updated_at when a pass is cancelled', async () => {
+    await clearRules();
+    const student = await makePassStudent('CancelStamp');
+    const created = await requestPass(student);
+    expect(created.statusCode).toBe(201);
+    const pass = created.json<{ pass: PassBody }>().pass;
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/api/v1/me/passes/${pass.id}/cancel`,
+      headers: authHeaders(student, randomUUID(), requiredEtag(created)),
+    });
+    expect(cancelled.statusCode).toBe(200);
+    const rows = (
+      await pool.query<{ updated_at: Date; requested_at: Date }>(
+        `SELECT updated_at, requested_at FROM pass WHERE id = $1`,
+        [pass.id],
+      )
+    ).rows;
+    expect(rows).toHaveLength(1);
+    const row = rows[0];
+    if (row === undefined) throw new Error('Expected pass row');
+    expect(row.updated_at.getTime()).toBeGreaterThan(row.requested_at.getTime());
+  });
+
   it('cleans pending workflows when a pass is cancelled', async () => {
     await clearRules();
     await seedRule({

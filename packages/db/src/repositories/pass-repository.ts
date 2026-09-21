@@ -184,11 +184,16 @@ export class PostgresPassRepository implements PassRepository {
     context: TenantTransactionContext,
     passId: PassId,
     expectedRevision: bigint,
+    at: Temporal.Instant,
   ): Promise<PassRow | null> {
     const connection = connectionFor(context);
     const updated = await connection
       .updateTable('pass')
-      .set({ lifecycle_state: 'cancelled', revision: String(expectedRevision + 1n) })
+      .set({
+        lifecycle_state: 'cancelled',
+        revision: String(expectedRevision + 1n),
+        updated_at: toDatabaseInstant(at),
+      })
       .where('tenant_id', '=', context.tenantId)
       .where('id', '=', passId)
       .where('revision', '=', String(expectedRevision))

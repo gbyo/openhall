@@ -128,7 +128,7 @@ export async function cancelSelfPass(
           'This pass cannot be self-cancelled.',
         );
       }
-      const updated = await passes.updatePassToCancelled(context, row.id, row.revision);
+      const updated = await passes.updatePassToCancelled(context, row.id, row.revision, now);
       if (updated?.revision !== nextRevision) {
         throw new PassApplicationError(
           'stale_pass_revision',

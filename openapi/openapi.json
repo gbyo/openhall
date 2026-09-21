@@ -7596,13 +7596,112 @@
                             "additionalProperties": false
                           },
                           "category": {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "urgent"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "private"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "safety"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "staff_directed"
+                                ]
+                              }
+                            ]
                           },
                           "overrideMode": {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "never"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "authorized"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "approval_required"
+                                ]
+                              }
+                            ]
                           },
                           "reasonCode": {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "no_violation"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "schedule_boundary_blackout"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "current_section_teacher_approval_required"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "approval_context_unavailable"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "approval_satisfied"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "approval_denied"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "override_denied"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "rule_overridden"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "policy_configuration_error"
+                                ]
+                              }
+                            ]
                           },
                           "requestedAt": {
                             "type": "string",

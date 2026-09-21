@@ -1,6 +1,6 @@
 import type { Temporal } from '@js-temporal/polyfill';
 import type { TenantTransactionContext } from '../persistence.js';
-import type { PolicyOverrideMode } from './configurations.js';
+import type { OverrideCategory, PolicyOverrideMode } from './configurations.js';
 import type { PolicyApprovalEvidence, PolicyOverrideEvidence, PolicyRuleInput } from './context.js';
 import type { PolicyContribution, PolicyDecision, PolicyRuleOutcome } from './decisions.js';
 import type { PolicyReasonCode } from './reason-codes.js';
@@ -270,8 +270,8 @@ export interface PendingOverrideView {
   readonly destinationId: string;
   readonly destinationDisplayName: string;
   readonly destinationServiceType: string;
-  readonly category: string;
+  readonly category: OverrideCategory;
   readonly overrideMode: PolicyOverrideMode;
-  readonly reasonCode: string;
+  readonly reasonCode: PolicyReasonCode;
   readonly requestedAt: Temporal.Instant;
 }

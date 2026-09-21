@@ -102,6 +102,7 @@ export interface PassRepository {
     context: TenantTransactionContext,
     passId: PassId,
     expectedRevision: bigint,
+    at: Temporal.Instant,
   ): Promise<PassRow | null>;
   /**
    * Workflow revision bump without a lifecycle change: records a policy

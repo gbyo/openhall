@@ -99,6 +99,14 @@ export function fingerprintOverrideResolve(
  * Collisions only serialize unrelated commands; correctness never depends
  * on uniqueness.
  */
+/**
+ * Identity scope note: idempotency identity is namespaced per command. The
+ * same key used with a different command (approve vs deny, self vs staff
+ * surface) starts an independent execution; 409 idempotency_key_reused only
+ * fires when the fingerprint differs under the SAME command. Cross-command
+ * intents stay safe because every execution revalidates the pass revision
+ * and workflow state inside the locked transaction before mutating.
+ */
 export function advisoryLockKey(
   tenantId: string,
   actorAccountId: string,

@@ -100,7 +100,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS policy_evaluation_one_per_pass_revision
   ON policy_evaluation (tenant_id, pass_id, pass_revision);
 
 CREATE INDEX IF NOT EXISTS policy_evaluation_latest_per_pass
-  ON policy_evaluation (tenant_id, pass_id, evaluated_at DESC, id DESC);
+  ON policy_evaluation (tenant_id, pass_id, pass_revision DESC, evaluated_at DESC, id DESC);
 
 -- 4. Snapshot evaluated rules in results; persist the safety contribution.
 ALTER TABLE policy_evaluation_result

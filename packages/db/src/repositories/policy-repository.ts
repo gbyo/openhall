@@ -17,6 +17,12 @@ import type { PolicyContribution, PolicyDecision, PolicyRuleOutcome } from '@ope
 import type { PolicyOverrideMode } from '@openhall/application';
 import type { PolicyReasonCode } from '@openhall/application';
 import {
+  isOverrideCategory,
+  isPolicyOverrideMode,
+  isPolicyReasonCode,
+  type OverrideCategory,
+} from '@openhall/application';
+import {
   connectionFor,
   fromDatabaseInstant,
   toBigInt,
@@ -94,6 +100,21 @@ function toEvidenceDecision(
     return value;
   }
   throw new Error(`Unknown persisted workflow decision: ${value}`);
+}
+
+function toOverrideCategory(value: string): OverrideCategory {
+  if (isOverrideCategory(value)) return value;
+  throw new Error(`Unknown persisted override category: ${value}`);
+}
+
+function toOverrideMode(value: string): PolicyOverrideMode {
+  if (isPolicyOverrideMode(value)) return value;
+  throw new Error(`Unknown persisted override mode: ${value}`);
+}
+
+function toReasonCode(value: string): PolicyReasonCode {
+  if (isPolicyReasonCode(value)) return value;
+  throw new Error(`Unknown persisted reason code: ${value}`);
 }
 
 function toActorKind(value: string | null): 'person' | 'system' | null {
@@ -185,6 +206,7 @@ export class PostgresPolicyRepository implements PolicyRepository {
       .selectAll()
       .where('tenant_id', '=', context.tenantId)
       .where('pass_id', '=', passId)
+      .orderBy('pass_revision', 'desc')
       .orderBy('evaluated_at', 'desc')
       .orderBy('id', 'desc')
       .executeTakeFirst();
@@ -649,9 +671,9 @@ export class PostgresPolicyRepository implements PolicyRepository {
       destinationId: row.destination_id,
       destinationDisplayName: row.destination_display_name ?? '',
       destinationServiceType: row.destination_service_type,
-      category: row.category,
-      overrideMode: row.override_mode as PolicyOverrideMode,
-      reasonCode: row.reason_code,
+      category: toOverrideCategory(row.category),
+      overrideMode: toOverrideMode(row.override_mode),
+      reasonCode: toReasonCode(row.reason_code),
       requestedAt: fromDatabaseInstant(row.requested_at),
     }));
   }
