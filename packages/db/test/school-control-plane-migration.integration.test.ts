@@ -118,7 +118,7 @@ async function seedControlPlane(scratch: Pool, tag: string) {
 }
 
 describe('migration 008 school control plane', () => {
-  it('migrates a blank database 001 -> 008', async () => {
+  it('migrates a blank database 001 -> 009', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
@@ -135,6 +135,7 @@ describe('migration 008 school control plane', () => {
         '006_movement_policy_approvals_overrides',
         '007_destination_flow_and_movement',
         '008_school_control_plane',
+        '009_guided_setup_authentication',
       ]);
     } finally {
       await handle.destroy();

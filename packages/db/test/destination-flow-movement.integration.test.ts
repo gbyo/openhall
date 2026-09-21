@@ -127,7 +127,7 @@ async function seedEvaluation(scratch: Pool, school: { tenantId: string; pass: s
 }
 
 describe('migration 007 destination flow and movement', () => {
-  it('migrates a blank database 001 -> 008 with flow hardening', async () => {
+  it('migrates a blank database 001 -> 009 with flow hardening', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
@@ -141,6 +141,7 @@ describe('migration 007 destination flow and movement', () => {
         '006_movement_policy_approvals_overrides',
         '007_destination_flow_and_movement',
         '008_school_control_plane',
+        '009_guided_setup_authentication',
       ]);
       const constraints = await scratch.query<{ conname: string }>(
         `SELECT conname FROM pg_constraint WHERE conname LIKE '%phase7%' ORDER BY 1`,
