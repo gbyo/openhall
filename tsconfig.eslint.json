@@ -3,7 +3,10 @@
   "compilerOptions": {
     "noEmit": true,
     "composite": false,
+    "jsx": "react-jsx",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "types": ["node", "vitest/globals"]
   },
   "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "tests/**/*.ts", "*.ts"],

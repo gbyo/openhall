@@ -6,13 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:wayfinder": "playwright test --config playwright.wayfinder.config.ts"
   },
   "dependencies": {
+    "@fontsource-variable/public-sans": "5.3.0",
     "react": "19.3.0",
+    "react-aria-components": "1.21.1",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.63.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",

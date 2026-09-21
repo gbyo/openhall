@@ -18,6 +18,7 @@
     "lint": "eslint . --max-warnings 0 && prettier --check .",
     "format": "prettier --write .",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
+    "test:wayfinder": "pnpm --filter @openhall/web test:wayfinder",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test": "pnpm test:unit && pnpm test:integration",
     "db:migrate": "pnpm --filter @openhall/db migrate",
