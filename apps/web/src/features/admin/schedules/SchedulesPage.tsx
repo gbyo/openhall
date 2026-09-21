@@ -2,14 +2,66 @@ import { useState, type SubmitEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Temporal } from '@js-temporal/polyfill';
 import { api, confirmed, requireData } from '../../../api/client';
+import { productMessage } from '../../../api/problems';
 import { queryKeys } from '../../../api/query-keys';
 import { getCsrfToken } from '../../../api/session';
 import { formString } from '../../../api/forms';
-import { Button } from '../../../design-system/primitives/Button';
-import { Alert } from '../../../design-system/primitives/Alert';
 import { useSchool } from '../../../app/school/SchoolShell';
+import { PageHeader } from '../../../components/workspace/PageHeader';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type Tab = 'blocks' | 'templates' | 'calendar';
+
+const BLOCK_KINDS = [
+  ['instructional', 'Class'],
+  ['lunch', 'Lunch'],
+  ['advisory', 'Advisory'],
+  ['transition', 'Transition'],
+  ['other', 'Other'],
+] as const;
+
+type BlockKind = (typeof BLOCK_KINDS)[number][0];
+
+function blockKindLabel(kind: string): string {
+  return BLOCK_KINDS.find(([value]) => value === kind)?.[1] ?? kind;
+}
+
+function dayKindLabel(dayKind: string): string {
+  switch (dayKind) {
+    case 'instructional':
+      return 'Instructional';
+    case 'closed':
+      return 'Closed';
+    default:
+      return 'Non-instructional';
+  }
+}
+
 function command(etag: string) {
   const key = crypto.randomUUID();
   return {
@@ -21,6 +73,7 @@ function command(etag: string) {
 export function Component() {
   const { organizationId, context } = useSchool();
   const [tab, setTab] = useState<Tab>('blocks');
+  const [addingBlock, setAddingBlock] = useState(false);
   const today = Temporal.Now.zonedDateTimeISO(context.organization.timeZone).toPlainDate();
   const [from, setFrom] = useState(today.toString());
   const [through, setThrough] = useState(today.add({ days: 13 }).toString());
@@ -52,11 +105,7 @@ export function Component() {
       ),
   });
   const blockMutation = useMutation({
-    mutationFn: (body: {
-      code: string;
-      displayName: string;
-      kind: 'instructional' | 'lunch' | 'advisory' | 'transition' | 'other';
-    }) => {
+    mutationFn: (body: { code: string; displayName: string; kind: BlockKind }) => {
       const request = command(blocks.data?.etag ?? '');
       return confirmed(
         api.POST('/api/v1/organizations/{organizationId}/schedule/blocks', {
@@ -67,6 +116,7 @@ export function Component() {
       );
     },
     onSuccess: () => {
+      setAddingBlock(false);
       void blocks.refetch();
     },
   });
@@ -120,7 +170,7 @@ export function Component() {
     blockMutation.mutate({
       code: formString(data, 'code'),
       displayName: formString(data, 'displayName'),
-      kind: formString(data, 'kind') as 'instructional',
+      kind: formString(data, 'kind') as BlockKind,
     });
   }
   function addTemplate(event: SubmitEvent<HTMLFormElement>) {
@@ -136,6 +186,7 @@ export function Component() {
         },
       ],
     });
+    event.currentTarget.reset();
   }
   function applyCalendar(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -154,218 +205,357 @@ export function Component() {
       });
     calendarMutation.mutate({ days });
   }
+  const activeBlocks = (blocks.data?.blocks ?? []).filter((block) => block.status === 'active');
+  const activeTemplates = (templates.data?.templates ?? []).filter(
+    (template) => template.status === 'active',
+  );
   return (
-    <section className="workspace">
-      <header className="workspace__header">
-        <p className="auth-kicker">{context.organization.timeZone}</p>
-        <h1 className="wf-type-page-title">Schedules</h1>
-        <p>Blocks, day templates, and calendar assignments share one protected school schedule.</p>
-      </header>
-      <div className="segmented" role="tablist" aria-label="Schedule areas">
-        {(['blocks', 'templates', 'calendar'] as const).map((value) => (
-          <button
-            key={value}
-            role="tab"
-            aria-selected={tab === value}
-            onClick={() => {
-              setTab(value);
-            }}
-          >
-            {value[0]?.toUpperCase()}
-            {value.slice(1)}
-          </button>
-        ))}
-      </div>
+    <section className="grid gap-6">
+      <PageHeader
+        title="Schedules"
+        description={`Blocks, day templates, and calendar assignments share one protected school schedule. Times use ${context.organization.timeZone}.`}
+        actions={
+          tab === 'blocks' ? (
+            <Button
+              onClick={() => {
+                setAddingBlock(true);
+              }}
+            >
+              New block
+            </Button>
+          ) : undefined
+        }
+      />
       {mutationError && (
-        <Alert tone="danger" title="Schedule not changed">
-          <p>Review the latest schedule and try again. Your entries are still visible.</p>
+        <Alert variant="destructive">
+          <AlertTitle>Schedule not changed</AlertTitle>
+          <AlertDescription>
+            Review the latest schedule and try again. Your entries are still visible.{' '}
+            {productMessage(mutationError)}
+          </AlertDescription>
         </Alert>
       )}
-      {tab === 'blocks' && (
-        <div className="workspace__section">
-          <form className="inline-form" onSubmit={addBlock}>
-            <label>
-              Code
-              <input className="wf-input" name="code" required />
-            </label>
-            <label>
-              Name
-              <input className="wf-input" name="displayName" required />
-            </label>
-            <label>
-              Type
-              <select className="wf-input" name="kind">
-                <option value="instructional">Class</option>
-                <option value="lunch">Lunch</option>
-                <option value="advisory">Advisory</option>
-                <option value="transition">Transition</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
-            <Button type="submit" pending={blockMutation.isPending}>
-              Add block
-            </Button>
-          </form>
-          <ul className="plain-list">
-            {blocks.data?.blocks.map((block) => (
-              <li key={block.id}>
-                <strong>{block.displayName}</strong>
-                <span>
-                  {block.code} · {block.kind === 'instructional' ? 'Class' : block.kind}
-                </span>
-                <span>{block.status === 'active' ? 'Active' : 'Archived'}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {tab === 'templates' && (
-        <div className="workspace__section">
-          <form className="inline-form" onSubmit={addTemplate}>
-            <label>
-              Template name
-              <input className="wf-input" name="name" required />
-            </label>
-            <label>
-              Block
-              <select className="wf-input" name="blockId">
-                {blocks.data?.blocks
-                  .filter((block) => block.status === 'active')
-                  .map((block) => (
-                    <option key={block.id} value={block.id}>
-                      {block.displayName}
-                    </option>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          setTab(value as Tab);
+        }}
+      >
+        <TabsList aria-label="Schedule areas">
+          <TabsTrigger value="blocks">Blocks</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+        </TabsList>
+        <TabsContent value="blocks" className="grid gap-4">
+          {blocks.isPending ? (
+            <div className="grid gap-2" role="status" aria-label="Loading blocks">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (blocks.data?.blocks ?? []).length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>No blocks yet</EmptyTitle>
+                <EmptyDescription>
+                  Add the named parts of the school day before building templates.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <Table aria-label="Schedule blocks">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Code and type</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {blocks.data?.blocks.map((block) => (
+                    <TableRow key={block.id}>
+                      <TableCell className="font-medium">{block.displayName}</TableCell>
+                      <TableCell>
+                        {block.code} · {blockKindLabel(block.kind)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {block.status === 'active' ? 'Active' : 'Archived'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
                   ))}
-              </select>
-            </label>
-            <label>
-              Start
-              <input className="wf-input" name="startsAt" type="time" required />
-            </label>
-            <label>
-              End
-              <input className="wf-input" name="endsAt" type="time" required />
-            </label>
-            <Button type="submit" pending={templateMutation.isPending}>
-              Create template
-            </Button>
-          </form>
-          <p className="form-help">
-            Open a template to extend its timetable with additional block rows.
-          </p>
-          <ul className="plain-list">
-            {templates.data?.templates.map((template) => (
-              <li key={template.id}>
-                <strong>{template.name}</strong>
-                <span>
-                  {template.slots.length} {template.slots.length === 1 ? 'block' : 'blocks'}
-                </span>
-                <span>{template.status === 'active' ? 'Active' : 'Archived'}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {tab === 'calendar' && (
-        <div className="workspace__section">
-          <div className="range-controls">
-            <label>
-              View from
-              <input
-                className="wf-input"
-                type="date"
-                value={from}
-                onChange={(event) => {
-                  setFrom(event.target.value);
-                }}
-              />
-            </label>
-            <label>
-              Through
-              <input
-                className="wf-input"
-                type="date"
-                value={through}
-                onChange={(event) => {
-                  setThrough(event.target.value);
-                }}
-              />
-            </label>
-          </div>
-          <form className="editor editor--compact" onSubmit={applyCalendar}>
-            <fieldset>
-              <legend>Assign a date range</legend>
-              <label>
-                From
-                <input
-                  className="wf-input"
-                  name="rangeFrom"
-                  type="date"
-                  defaultValue={from}
-                  required
-                />
-              </label>
-              <label>
-                Through
-                <input
-                  className="wf-input"
-                  name="rangeThrough"
-                  type="date"
-                  defaultValue={through}
-                  required
-                />
-              </label>
-              <label>
-                Day type
-                <select className="wf-input" name="dayKind">
-                  <option value="instructional">Instructional</option>
-                  <option value="non_instructional">Non-instructional</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </label>
-              <label>
-                Template
-                <select className="wf-input" name="templateId">
-                  <option value="">None</option>
-                  {templates.data?.templates
-                    .filter((template) => template.status === 'active')
-                    .map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}
-                      </option>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="templates" className="grid gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>New template</CardTitle>
+              <CardDescription>
+                Start a day template with its first block. Open a template to extend its timetable
+                with additional block rows.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-4 sm:grid-cols-2" onSubmit={addTemplate}>
+                <Field className="sm:col-span-2">
+                  <FieldLabel htmlFor="template-name">Template name</FieldLabel>
+                  <Input id="template-name" name="name" required autoComplete="off" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="template-block">Block</FieldLabel>
+                  <NativeSelect id="template-block" name="blockId">
+                    {activeBlocks.map((block) => (
+                      <NativeSelectOption key={block.id} value={block.id}>
+                        {block.displayName}
+                      </NativeSelectOption>
                     ))}
-                </select>
-              </label>
-              <label>
-                Cycle code
-                <input className="wf-input" name="cycleCode" />
-              </label>
-              <label>
-                Operational note
-                <input className="wf-input" name="operationalNote" />
-              </label>
-            </fieldset>
-            <Button type="submit" pending={calendarMutation.isPending}>
-              Review and apply range
-            </Button>
+                  </NativeSelect>
+                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="template-start">Start</FieldLabel>
+                    <Input id="template-start" name="startsAt" type="time" required />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="template-end">End</FieldLabel>
+                    <Input id="template-end" name="endsAt" type="time" required />
+                  </Field>
+                </div>
+                <div className="sm:col-span-2">
+                  <Button type="submit" disabled={templateMutation.isPending}>
+                    {templateMutation.isPending ? 'Creating…' : 'Create template'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+          {templates.isPending ? (
+            <div className="grid gap-2" role="status" aria-label="Loading templates">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (templates.data?.templates ?? []).length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>No templates yet</EmptyTitle>
+                <EmptyDescription>
+                  Templates arrange blocks into reusable school days.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <Table aria-label="Day templates">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Template</TableHead>
+                    <TableHead>Blocks</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {templates.data?.templates.map((template) => (
+                    <TableRow key={template.id}>
+                      <TableCell className="font-medium">{template.name}</TableCell>
+                      <TableCell>
+                        {template.slots.length} {template.slots.length === 1 ? 'block' : 'blocks'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {template.status === 'active' ? 'Active' : 'Archived'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="calendar" className="grid gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Calendar range</CardTitle>
+              <CardDescription>
+                Choose the dates you want to review, then assign them in one protected change.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="calendar-from">View from</FieldLabel>
+                <Input
+                  id="calendar-from"
+                  type="date"
+                  value={from}
+                  onChange={(event) => {
+                    setFrom(event.target.value);
+                  }}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="calendar-through">Through</FieldLabel>
+                <Input
+                  id="calendar-through"
+                  type="date"
+                  value={through}
+                  onChange={(event) => {
+                    setThrough(event.target.value);
+                  }}
+                />
+              </Field>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Assign a date range</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-4 sm:grid-cols-2" onSubmit={applyCalendar}>
+                <Field>
+                  <FieldLabel htmlFor="calendar-range-from">From</FieldLabel>
+                  <Input
+                    id="calendar-range-from"
+                    name="rangeFrom"
+                    type="date"
+                    defaultValue={from}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="calendar-range-through">Through</FieldLabel>
+                  <Input
+                    id="calendar-range-through"
+                    name="rangeThrough"
+                    type="date"
+                    defaultValue={through}
+                    required
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="calendar-day-kind">Day type</FieldLabel>
+                  <NativeSelect id="calendar-day-kind" name="dayKind">
+                    <NativeSelectOption value="instructional">Instructional</NativeSelectOption>
+                    <NativeSelectOption value="non_instructional">
+                      Non-instructional
+                    </NativeSelectOption>
+                    <NativeSelectOption value="closed">Closed</NativeSelectOption>
+                  </NativeSelect>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="calendar-template">Template</FieldLabel>
+                  <NativeSelect id="calendar-template" name="templateId">
+                    <NativeSelectOption value="">None</NativeSelectOption>
+                    {activeTemplates.map((template) => (
+                      <NativeSelectOption key={template.id} value={template.id}>
+                        {template.name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="calendar-cycle">Cycle code</FieldLabel>
+                  <Input id="calendar-cycle" name="cycleCode" autoComplete="off" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="calendar-note">Operational note</FieldLabel>
+                  <Input id="calendar-note" name="operationalNote" autoComplete="off" />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Button type="submit" disabled={calendarMutation.isPending}>
+                    {calendarMutation.isPending ? 'Applying…' : 'Review and apply range'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+          {calendar.isPending ? (
+            <div className="grid gap-2" role="status" aria-label="Loading calendar">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (calendar.data?.days ?? []).length === 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>No days in this range</EmptyTitle>
+                <EmptyDescription>
+                  Assign a date range above to build the school calendar.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <Table aria-label="Assigned calendar days">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Day</TableHead>
+                    <TableHead>Detail</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {calendar.data?.days.map((day) => (
+                    <TableRow key={day.date}>
+                      <TableCell>
+                        <time>{day.date}</time>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {day.dayKind === 'instructional'
+                          ? (day.templateName ?? 'Instructional')
+                          : dayKindLabel(day.dayKind)}
+                      </TableCell>
+                      <TableCell>{day.cycleCode ?? day.operationalNote ?? ''}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+      <Dialog
+        open={addingBlock}
+        onOpenChange={(open) => {
+          if (!blockMutation.isPending) setAddingBlock(open);
+        }}
+      >
+        <DialogContent aria-label="New block">
+          <DialogHeader>
+            <DialogTitle>New block</DialogTitle>
+            <DialogDescription>
+              Name a part of the school day. Templates arrange blocks into school days.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4" onSubmit={addBlock}>
+            <Field>
+              <FieldLabel htmlFor="block-code">Code</FieldLabel>
+              <Input id="block-code" name="code" required autoComplete="off" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="block-name">Name</FieldLabel>
+              <Input id="block-name" name="displayName" required autoComplete="off" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="block-kind">Type</FieldLabel>
+              <NativeSelect id="block-kind" name="kind">
+                {BLOCK_KINDS.map(([value, label]) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            <DialogFooter>
+              <Button type="submit" disabled={blockMutation.isPending}>
+                {blockMutation.isPending ? 'Adding…' : 'Add block'}
+              </Button>
+            </DialogFooter>
           </form>
-          <ul className="calendar-list">
-            {calendar.data?.days.map((day) => (
-              <li key={day.date}>
-                <time>{day.date}</time>
-                <strong>
-                  {day.dayKind === 'instructional'
-                    ? (day.templateName ?? 'Instructional')
-                    : day.dayKind === 'closed'
-                      ? 'Closed'
-                      : 'Non-instructional'}
-                </strong>
-                <span>{day.cycleCode ?? day.operationalNote ?? ''}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
