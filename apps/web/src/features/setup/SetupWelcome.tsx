@@ -6,7 +6,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { ApiProblem } from '../../api/problems';
-import { SetupLayout } from './SetupLayout';
 import { useSetup } from './setup-state';
 import { validateSetupCode } from './setup-api';
 
@@ -57,75 +56,79 @@ export function SetupWelcome() {
   }
 
   return (
-    <SetupLayout kicker="WayPass">
-      <h1 className="setup-title" id="setup-welcome-title">
-        Let&apos;s set up WayPass
-      </h1>
-      <p className="setup-lede">This should only take a few minutes.</p>
-      {lockedOut ? (
-        <Alert className="mb-6">
-          <AlertTitle>Continue setup</AlertTitle>
-          <AlertDescription>
-            For security, enter your setup code again to continue.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {installed ? (
-        <Alert className="mb-6">
-          <AlertTitle>WayPass is already set up</AlertTitle>
-          <AlertDescription>
-            This server already has a school installation. <Link to="/login">Sign in</Link> instead.
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {error ? (
-        <Alert variant="destructive" className="mb-6">
-          <AlertTitle>Setup could not continue</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
-      <form
-        onSubmit={(event) => void submit(event)}
-        noValidate
-        aria-labelledby="setup-welcome-title"
-      >
-        <Field data-invalid={error !== null}>
-          <FieldLabel htmlFor="setup-code">Setup code</FieldLabel>
-          <Input
-            id="setup-code"
-            type="password"
-            autoComplete="off"
-            required
-            value={code}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => {
-              setCode(event.target.value);
-            }}
-            aria-invalid={error !== null}
-            aria-describedby={
-              error ? 'setup-code-description setup-code-error' : 'setup-code-description'
-            }
-          />
-          <FieldDescription id="setup-code-description">
-            Enter the one-time setup code shown by your WayPass server.
-          </FieldDescription>
-          {error ? <FieldError id="setup-code-error">{error}</FieldError> : null}
-        </Field>
-        <Collapsible className="mt-6">
-          <CollapsibleTrigger className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80">
-            Where do I find this?
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2 text-sm text-muted-foreground">
-            Your WayPass server prints a one-time setup code in its startup log when it first runs.
-            It works once, and for security you may be asked for it again if you reload this page
-            before setup finishes.
-          </CollapsibleContent>
-        </Collapsible>
-        <div className="mt-8">
-          <Button type="submit" disabled={pending}>
-            {pending ? 'Working…' : 'Continue'}
-          </Button>
-        </div>
-      </form>
-    </SetupLayout>
+    <main className="min-h-dvh bg-background px-5 py-10 text-foreground sm:px-6">
+      <div className="mx-auto w-full max-w-lg">
+        <h1 id="setup-welcome-title" className="text-2xl font-semibold tracking-tight">
+          Let&apos;s set up WayPass
+        </h1>
+        <p className="mt-2 text-muted-foreground">This should only take a few minutes.</p>
+        {lockedOut ? (
+          <Alert className="mt-6">
+            <AlertTitle>Continue setup</AlertTitle>
+            <AlertDescription>
+              For security, enter your setup code again to continue.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {installed ? (
+          <Alert className="mt-6">
+            <AlertTitle>WayPass is already set up</AlertTitle>
+            <AlertDescription>
+              This server already has a school installation. <Link to="/login">Sign in</Link>{' '}
+              instead.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {error ? (
+          <Alert variant="destructive" className="mt-6">
+            <AlertTitle>Setup could not continue</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+        <form
+          onSubmit={(event) => void submit(event)}
+          noValidate
+          aria-labelledby="setup-welcome-title"
+          className="mt-6"
+        >
+          <Field data-invalid={error !== null}>
+            <FieldLabel htmlFor="setup-code">Setup code</FieldLabel>
+            <Input
+              id="setup-code"
+              type="password"
+              autoComplete="off"
+              required
+              value={code}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                setCode(event.target.value);
+              }}
+              aria-invalid={error !== null}
+              aria-describedby={
+                error ? 'setup-code-description setup-code-error' : 'setup-code-description'
+              }
+            />
+            <FieldDescription id="setup-code-description">
+              Enter the one-time setup code shown by your WayPass server.
+            </FieldDescription>
+            {error ? <FieldError id="setup-code-error">{error}</FieldError> : null}
+          </Field>
+          <Collapsible className="mt-6">
+            <CollapsibleTrigger className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80">
+              Where do I find this?
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2 text-sm text-muted-foreground">
+              Your WayPass server prints a one-time setup code in its startup log when it first
+              runs. It works once, and for security you may be asked for it again if you reload this
+              page before setup finishes.
+            </CollapsibleContent>
+          </Collapsible>
+          <div className="mt-8">
+            <Button type="submit" disabled={pending}>
+              {pending ? 'Working…' : 'Continue'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </main>
   );
 }
