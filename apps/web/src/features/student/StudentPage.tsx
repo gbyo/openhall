@@ -316,7 +316,7 @@ export function StudentPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    request.mutate(request.variables);
+                    if (request.variables) request.mutate(request.variables);
                   }}
                 >
                   Check again
@@ -435,7 +435,7 @@ export function StudentPage() {
   const retry =
     action.error instanceof UncertainCommandError
       ? () => {
-          action.mutate(action.variables);
+          if (action.variables) action.mutate(action.variables);
         }
       : null;
   const primaryAction = presentation?.action;
@@ -521,7 +521,7 @@ export function StudentPage() {
                 >
                   Ask for staff review
                 </Button>
-              ) : primaryCopy && primaryAction && primaryAction !== 'request-review' ? (
+              ) : primaryCopy && primaryAction ? (
                 <Button
                   disabled={primaryPending}
                   aria-busy={primaryPending}

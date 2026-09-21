@@ -305,7 +305,12 @@ export function LiveMovementPage() {
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="movement-state-filter">State</Label>
-          <Select value={stateFilter} onValueChange={setStateFilter}>
+          <Select
+            value={stateFilter}
+            onValueChange={(value) => {
+              setStateFilter(value ?? 'all');
+            }}
+          >
             <SelectTrigger id="movement-state-filter" className="w-44">
               <SelectValue />
             </SelectTrigger>
@@ -321,7 +326,12 @@ export function LiveMovementPage() {
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="movement-destination-filter">Destination</Label>
-          <Select value={destinationFilter} onValueChange={setDestinationFilter}>
+          <Select
+            value={destinationFilter}
+            onValueChange={(value) => {
+              setDestinationFilter(value ?? 'all');
+            }}
+          >
             <SelectTrigger id="movement-destination-filter" className="w-44">
               <SelectValue />
             </SelectTrigger>
