@@ -1,6 +1,10 @@
-import { useEffect, useState, type SubmitEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type SubmitEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router';
-import { FieldError, Input, Label, Text, TextField } from 'react-aria-components';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { ApiProblem } from '../../api/problems';
 import { SetupLayout } from './SetupLayout';
 import { useSetup } from './setup-state';
@@ -54,65 +58,72 @@ export function SetupWelcome() {
 
   return (
     <SetupLayout kicker="WayPass">
-      <h1 className="maia-page-title" id="setup-welcome-title">
+      <h1 className="setup-title" id="setup-welcome-title">
         Let&apos;s set up WayPass
       </h1>
       <p className="setup-lede">This should only take a few minutes.</p>
       {lockedOut ? (
-        <div className="maia-alert maia-alert--info">
-          <p className="maia-alert__title">Continue setup</p>
-          <p>For security, enter your setup code again to continue.</p>
-        </div>
+        <Alert className="mb-6">
+          <AlertTitle>Continue setup</AlertTitle>
+          <AlertDescription>
+            For security, enter your setup code again to continue.
+          </AlertDescription>
+        </Alert>
       ) : null}
       {installed ? (
-        <div className="maia-alert maia-alert--info">
-          <p className="maia-alert__title">WayPass is already set up</p>
-          <p>
+        <Alert className="mb-6">
+          <AlertTitle>WayPass is already set up</AlertTitle>
+          <AlertDescription>
             This server already has a school installation. <Link to="/login">Sign in</Link> instead.
-          </p>
-        </div>
+          </AlertDescription>
+        </Alert>
       ) : null}
       {error ? (
-        <div className="maia-alert maia-alert--destructive" role="alert">
-          <p className="maia-alert__title">Setup could not continue</p>
-          <p>{error}</p>
-        </div>
+        <Alert variant="destructive" className="mb-6">
+          <AlertTitle>Setup could not continue</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
       <form
         onSubmit={(event) => void submit(event)}
         noValidate
         aria-labelledby="setup-welcome-title"
       >
-        <TextField
-          className="maia-field"
-          isInvalid={error !== null}
-          isRequired
-          value={code}
-          onChange={setCode}
-        >
-          <Label className="maia-label" htmlFor="setup-code">
-            Setup code
-          </Label>
-          <Input className="maia-input" id="setup-code" type="password" autoComplete="off" />
-          <Text slot="description" className="maia-field__description">
+        <Field data-invalid={error !== null}>
+          <FieldLabel htmlFor="setup-code">Setup code</FieldLabel>
+          <Input
+            id="setup-code"
+            type="password"
+            autoComplete="off"
+            required
+            value={code}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => {
+              setCode(event.target.value);
+            }}
+            aria-invalid={error !== null}
+            aria-describedby={
+              error ? 'setup-code-description setup-code-error' : 'setup-code-description'
+            }
+          />
+          <FieldDescription id="setup-code-description">
             Enter the one-time setup code shown by your WayPass server.
-          </Text>
-          <FieldError className="maia-field__error">{error ?? undefined}</FieldError>
-        </TextField>
-        <details className="setup-details">
-          <summary>Where do I find this?</summary>
-          <p className="setup-details__copy">
+          </FieldDescription>
+          {error ? <FieldError id="setup-code-error">{error}</FieldError> : null}
+        </Field>
+        <Collapsible className="mt-6">
+          <CollapsibleTrigger className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80">
+            Where do I find this?
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2 text-sm text-muted-foreground">
             Your WayPass server prints a one-time setup code in its startup log when it first runs.
             It works once, and for security you may be asked for it again if you reload this page
             before setup finishes.
-          </p>
-        </details>
-        <div className="setup-actions">
-          <div className="setup-actions__buttons">
-            <button type="submit" className="maia-button maia-button--primary" disabled={pending}>
-              {pending ? 'Working…' : 'Continue'}
-            </button>
-          </div>
+          </CollapsibleContent>
+        </Collapsible>
+        <div className="mt-8">
+          <Button type="submit" disabled={pending}>
+            {pending ? 'Working…' : 'Continue'}
+          </Button>
         </div>
       </form>
     </SetupLayout>

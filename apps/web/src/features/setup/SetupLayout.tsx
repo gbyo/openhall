@@ -16,14 +16,14 @@ export interface SetupLayoutProps {
  * focus transfer belong to Questionnaire; this shell never navigates. */
 export function SetupLayout({ kicker, children }: SetupLayoutProps) {
   return (
-    <main className="setup-maia setup-page">
+    <main className="setup-page">
       <div className="setup-column">
         <p className="setup-brand">
           <Link to="/setup" aria-label="WayPass setup">
             WayPass
           </Link>
         </p>
-        {kicker ? <p className="maia-kicker">{kicker}</p> : null}
+        {kicker ? <p className="setup-kicker">{kicker}</p> : null}
         {children}
       </div>
     </main>

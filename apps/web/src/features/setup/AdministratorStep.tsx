@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Questionnaire } from '@shadcn/react/questionnaire';
-import { FieldError, Input, Label, Text, TextField } from 'react-aria-components';
+import { useEffect, useState, type ChangeEvent } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { QuestionnaireTitle } from '@/components/ui/questionnaire';
 import { useFocusField } from './SetupLayout';
 import { useSetup } from './setup-state';
 import type { StepContentProps } from './SchoolStep';
@@ -60,67 +62,74 @@ export function AdministratorFields({ handleRef, onInvalidChange }: StepContentP
 
   return (
     <>
-      <Questionnaire.Title>
-        <h1 className="maia-page-title" id="setup-admin-title">
+      <QuestionnaireTitle>
+        <h1 className="setup-title" id="setup-admin-title">
           Who will manage WayPass?
         </h1>
-      </Questionnaire.Title>
-      <TextField
-        className="maia-field"
-        isInvalid={Boolean(errors.givenName)}
-        isRequired
-        value={givenName}
-        onChange={setGivenName}
-      >
-        <Label className="maia-label" htmlFor="setup-admin-given">
-          First name
-        </Label>
-        <Input className="maia-input" id="setup-admin-given" autoComplete="given-name" />
-        <FieldError className="maia-field__error">{errors.givenName}</FieldError>
-      </TextField>
-      <TextField
-        className="maia-field"
-        isInvalid={Boolean(errors.familyName)}
-        isRequired
-        value={familyName}
-        onChange={setFamilyName}
-      >
-        <Label className="maia-label" htmlFor="setup-admin-family">
-          Last name
-        </Label>
-        <Input className="maia-input" id="setup-admin-family" autoComplete="family-name" />
-        <FieldError className="maia-field__error">{errors.familyName}</FieldError>
-      </TextField>
-      <details
-        className="setup-details"
+      </QuestionnaireTitle>
+      <Field data-invalid={errors.givenName !== undefined}>
+        <FieldLabel htmlFor="setup-admin-given">First name</FieldLabel>
+        <Input
+          id="setup-admin-given"
+          autoComplete="given-name"
+          required
+          value={givenName}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            setGivenName(event.target.value);
+          }}
+          aria-invalid={errors.givenName !== undefined}
+          aria-describedby={errors.givenName ? 'setup-admin-given-error' : undefined}
+        />
+        {errors.givenName ? (
+          <FieldError id="setup-admin-given-error">{errors.givenName}</FieldError>
+        ) : null}
+      </Field>
+      <Field data-invalid={errors.familyName !== undefined}>
+        <FieldLabel htmlFor="setup-admin-family">Last name</FieldLabel>
+        <Input
+          id="setup-admin-family"
+          autoComplete="family-name"
+          required
+          value={familyName}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => {
+            setFamilyName(event.target.value);
+          }}
+          aria-invalid={errors.familyName !== undefined}
+          aria-describedby={errors.familyName ? 'setup-admin-family-error' : undefined}
+        />
+        {errors.familyName ? (
+          <FieldError id="setup-admin-family-error">{errors.familyName}</FieldError>
+        ) : null}
+      </Field>
+      <Collapsible
         open={customOpen}
-        onToggle={(event) => {
-          setCustomOpen((event.target as HTMLDetailsElement).open);
-        }}
+        onOpenChange={setCustomOpen}
+        className="rounded-2xl border border-border px-4 py-3"
       >
-        <summary>Customize display name</summary>
-        <TextField
-          className="maia-field"
-          value={displayName}
-          onChange={setDisplayName}
-          aria-label="Display name"
-        >
-          <Label className="maia-label" htmlFor="setup-admin-display">
-            Display name
-          </Label>
-          <Input
-            className="maia-input"
-            id="setup-admin-display"
-            autoComplete="off"
-            placeholder={preview || 'First Last'}
-          />
-          <Text slot="description" className="maia-field__description">
-            {preview
-              ? `Shown as \u201C${preview}\u201D unless you change it.`
-              : 'Shown across WayPass wherever your name appears.'}
-          </Text>
-        </TextField>
-      </details>
+        <CollapsibleTrigger className="text-[15px] font-semibold">
+          Customize display name
+        </CollapsibleTrigger>
+        <CollapsibleContent className="pt-3">
+          <Field>
+            <FieldLabel htmlFor="setup-admin-display">Display name</FieldLabel>
+            <Input
+              id="setup-admin-display"
+              autoComplete="off"
+              value={displayName}
+              placeholder={preview || 'First Last'}
+              aria-describedby="setup-admin-display-description"
+              onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                setDisplayName(event.target.value);
+              }}
+            />
+            <FieldDescription id="setup-admin-display-description">
+              {preview
+                ? `Shown as \u201C${preview}\u201D unless you change it.`
+                : 'Shown across WayPass wherever your name appears.'}
+            </FieldDescription>
+          </Field>
+        </CollapsibleContent>
+      </Collapsible>
     </>
   );
 }

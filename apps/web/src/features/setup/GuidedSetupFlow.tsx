@@ -1,5 +1,15 @@
-import { useRef, useState } from 'react';
-import { Questionnaire } from '@shadcn/react/questionnaire';
+import { useRef, useState, type MouseEvent } from 'react';
+import { buttonVariants } from '@/components/ui/button';
+import {
+  Questionnaire,
+  QuestionnaireActions,
+  QuestionnaireError,
+  QuestionnaireItem,
+  QuestionnaireNext,
+  QuestionnairePrevious,
+  QuestionnaireProgress,
+  QuestionnaireSubmit,
+} from '@/components/ui/questionnaire';
 import { SetupLayout } from './SetupLayout';
 import type { StepHandle } from './SetupLayout';
 import { SetupProgress } from './SetupProgress';
@@ -18,12 +28,10 @@ const ITEMS = ORDER.map((name) => ({ name, required: true }));
  * navigation. Answer state stays in setup memory; per-step field validation
  * runs before advancing and the server remains authoritative.
  *
- * Known gap (documented per UI 0.3 policy): Questionnaire's answer model is
- * one Choice/Input answer per item, so multi-field school/administrator/
- * review steps cannot satisfy its built-in required validation. Items run in
- * controlled mode with external validity shown through `invalid` + `Error`;
- * styled-registry Field/Combobox/RadioGroup/Collapsible/Item adoption is
- * pending the #15 foundation. */
+ * Known gap: Questionnaire's answer model is one Choice/Input answer per
+ * item, so multi-field school/administrator/review steps cannot satisfy its
+ * built-in required validation. Items run in controlled mode with external
+ * validity shown through `invalid` + `QuestionnaireError`. */
 export function GuidedSetupFlow() {
   const [item, setItem] = useState<SetupItemName>('school');
   const [invalid, setInvalid] = useState<Record<SetupItemName, boolean>>({
@@ -86,86 +94,76 @@ export function GuidedSetupFlow() {
 
   return (
     <SetupLayout kicker="WayPass setup">
-      <Questionnaire.Root
+      <Questionnaire
         items={ITEMS}
         item={item}
         onItemChange={(name) => {
           goTo(name as SetupItemName);
         }}
       >
-        <Questionnaire.Progress
-          render={(_props, state) => (
+        <QuestionnaireProgress
+          render={(_props: Record<string, unknown>, state: { current: number; total: number }) => (
             <SetupProgress current={state.current - 1} total={state.total} />
           )}
         />
-        <Questionnaire.Item name="school" required invalid={invalid.school}>
+        <QuestionnaireItem name="school" required invalid={invalid.school}>
           <SchoolFields handleRef={schoolHandle} onInvalidChange={markInvalid('school')} />
-          <Questionnaire.Error className="maia-questionnaire-error">
-            Fix the highlighted fields to continue.
-          </Questionnaire.Error>
-        </Questionnaire.Item>
-        <Questionnaire.Item name="administrator" required invalid={invalid.administrator}>
+          <QuestionnaireError>Fix the highlighted fields to continue.</QuestionnaireError>
+        </QuestionnaireItem>
+        <QuestionnaireItem name="administrator" required invalid={invalid.administrator}>
           <AdministratorFields
             handleRef={administratorHandle}
             onInvalidChange={markInvalid('administrator')}
           />
-          <Questionnaire.Error className="maia-questionnaire-error">
-            Fix the highlighted fields to continue.
-          </Questionnaire.Error>
-        </Questionnaire.Item>
-        <Questionnaire.Item name="sign-in" required invalid={invalid['sign-in']}>
+          <QuestionnaireError>Fix the highlighted fields to continue.</QuestionnaireError>
+        </QuestionnaireItem>
+        <QuestionnaireItem name="sign-in" required invalid={invalid['sign-in']}>
           <SignInFields handleRef={signInHandle} onInvalidChange={markInvalid('sign-in')} />
-          <Questionnaire.Error className="maia-questionnaire-error">
-            Fix the highlighted fields to continue.
-          </Questionnaire.Error>
-        </Questionnaire.Item>
-        <Questionnaire.Item name="review" required invalid={invalid.review}>
+          <QuestionnaireError>Fix the highlighted fields to continue.</QuestionnaireError>
+        </QuestionnaireItem>
+        <QuestionnaireItem name="review" required invalid={invalid.review}>
           <ReviewFields
             handleRef={reviewHandle}
             onInvalidChange={markInvalid('review')}
             onEdit={goTo}
           />
-        </Questionnaire.Item>
-        <div className="setup-actions">
-          <div className="setup-actions__buttons">
-            <Questionnaire.Previous
-              className="maia-button maia-button--secondary"
-              onClick={(event) => {
-                event.preventDefault();
-                const previous = ORDER[index - 1];
-                if (previous) goTo(previous);
-              }}
-            >
-              Back
-            </Questionnaire.Previous>
-            <Questionnaire.Next
-              className="maia-button maia-button--primary"
-              onClick={(event) => {
-                event.preventDefault();
-                advance();
-              }}
-            >
-              Continue
-            </Questionnaire.Next>
-            <Questionnaire.Submit
-              render={(props) => (
-                <button
-                  type="button"
-                  className="maia-button maia-button--primary"
-                  hidden={props.hidden as boolean | undefined}
-                  tabIndex={props.tabIndex as number | undefined}
-                  disabled={submitting}
-                  onClick={() => {
-                    void submit();
-                  }}
-                >
-                  {submitting ? 'Working…' : 'Create WayPass'}
-                </button>
-              )}
-            />
-          </div>
-        </div>
-      </Questionnaire.Root>
+        </QuestionnaireItem>
+        <QuestionnaireActions>
+          <QuestionnairePrevious
+            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+              event.preventDefault();
+              const previous = ORDER[index - 1];
+              if (previous) goTo(previous);
+            }}
+          >
+            Back
+          </QuestionnairePrevious>
+          <QuestionnaireNext
+            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+              event.preventDefault();
+              advance();
+            }}
+          >
+            Continue
+          </QuestionnaireNext>
+          <QuestionnaireSubmit
+            render={(props: Record<string, unknown>) => (
+              <button
+                type="button"
+                className={buttonVariants()}
+                hidden={props.hidden as boolean | undefined}
+                tabIndex={props.tabIndex as number | undefined}
+                disabled={submitting}
+                onClick={() => {
+                  void submit();
+                }}
+              >
+                {submitting ? 'Working…' : 'Create WayPass'}
+              </button>
+            )}
+          />
+        </QuestionnaireActions>
+      </Questionnaire>
     </SetupLayout>
   );
 }

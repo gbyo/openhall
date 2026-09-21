@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Questionnaire } from '@shadcn/react/questionnaire';
+import { QuestionnaireTitle } from '@/components/ui/questionnaire';
 import { useFocusField } from './SetupLayout';
 import { ProviderChoiceForm, type ProviderChoiceErrors } from './ProviderChoiceForm';
 import { useSetup } from './setup-state';
@@ -67,11 +67,11 @@ export function SignInFields({ handleRef, onInvalidChange }: StepContentProps) {
 
   return (
     <>
-      <Questionnaire.Title>
-        <h1 className="maia-page-title" id="setup-signin-title">
+      <QuestionnaireTitle>
+        <h1 className="setup-title" id="setup-signin-title">
           How should people sign in?
         </h1>
-      </Questionnaire.Title>
+      </QuestionnaireTitle>
       <div ref={groupRef} tabIndex={-1}>
         <ProviderChoiceForm
           idPrefix="setup-signin"

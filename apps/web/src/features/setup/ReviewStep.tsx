@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Questionnaire } from '@shadcn/react/questionnaire';
 import { useNavigate } from 'react-router';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from '@/components/ui/item';
+import { QuestionnaireTitle } from '@/components/ui/questionnaire';
 import { ApiProblem } from '../../api/problems';
 import { queryClient } from '../../app/query-client';
 import { useFocusField } from './SetupLayout';
@@ -125,70 +135,75 @@ export function ReviewFields({ handleRef, onInvalidChange, onEdit }: ReviewField
 
   return (
     <>
-      <Questionnaire.Title>
-        <h1 className="maia-page-title" id="setup-review-title">
+      <QuestionnaireTitle>
+        <h1 className="setup-title" id="setup-review-title">
           Ready to set up WayPass
         </h1>
-      </Questionnaire.Title>
+      </QuestionnaireTitle>
       {error ? (
-        <div className="maia-alert maia-alert--destructive" role="alert">
-          <p className="maia-alert__title">Setup could not finish</p>
-          <p>{error}</p>
-        </div>
+        <Alert variant="destructive" className="mb-6">
+          <AlertTitle>Setup could not finish</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
-      <ul className="setup-summary" aria-label="Setup answers">
-        <li className="setup-summary__row">
-          <span className="setup-summary__term">School</span>
-          <p className="setup-summary__value">
-            {state.school.name || '—'}
-            <br />
-            <span className="setup-summary__muted">{timeZoneLabel(state.school.timeZone)}</span>
-          </p>
-          <p className="setup-summary__edit">
-            <button
+      <ItemGroup aria-label="Setup answers" role="list">
+        <Item variant="outline" role="listitem">
+          <ItemContent>
+            <ItemTitle>School</ItemTitle>
+            <ItemDescription>
+              {state.school.name || '—'} · {timeZoneLabel(state.school.timeZone)}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button
+              variant="link"
               type="button"
-              className="maia-link"
               onClick={() => {
                 onEdit('school');
               }}
             >
               Edit
-            </button>
-          </p>
-        </li>
-        <li className="setup-summary__row">
-          <span className="setup-summary__term">Administrator</span>
-          <p className="setup-summary__value">{state.administrator.displayName || '—'}</p>
-          <p className="setup-summary__edit">
-            <button
+            </Button>
+          </ItemActions>
+        </Item>
+        <Item variant="outline" role="listitem">
+          <ItemContent>
+            <ItemTitle>Administrator</ItemTitle>
+            <ItemDescription>{state.administrator.displayName || '—'}</ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button
+              variant="link"
               type="button"
-              className="maia-link"
               onClick={() => {
                 onEdit('administrator');
               }}
             >
               Edit
-            </button>
-          </p>
-        </li>
-        <li className="setup-summary__row">
-          <span className="setup-summary__term">Sign-in</span>
-          <p className="setup-summary__value">
-            {signInLabel(state.choice, state.provider.providerName)}
-          </p>
-          <p className="setup-summary__edit">
-            <button
+            </Button>
+          </ItemActions>
+        </Item>
+        <Item variant="outline" role="listitem">
+          <ItemContent>
+            <ItemTitle>Sign-in</ItemTitle>
+
+            <ItemDescription>
+              {signInLabel(state.choice, state.provider.providerName)}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button
+              variant="link"
               type="button"
-              className="maia-link"
               onClick={() => {
                 onEdit('sign-in');
               }}
             >
               Edit
-            </button>
-          </p>
-        </li>
-      </ul>
+            </Button>
+          </ItemActions>
+        </Item>
+      </ItemGroup>
     </>
   );
 }
