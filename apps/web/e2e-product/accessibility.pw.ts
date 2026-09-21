@@ -29,7 +29,7 @@ function hasVisibleShadowColor(shadow: string): boolean {
     const alpha = slashAlpha?.[1] ?? commaAlpha?.[1];
     if (alpha !== undefined) {
       const value = Number.parseFloat(alpha);
-      return Number.isFinite(value) && (alpha.endsWith('%') ? value > 0 : value > 0);
+      return Number.isFinite(value) && value > 0;
     }
 
     if (/^#[\da-f]{4}$/i.test(normalized)) return normalized.slice(-1) !== '0';
@@ -147,6 +147,10 @@ test('student no-pass view stays usable at 200 percent text size', async ({ page
     element.style.fontSize = '200%';
   });
   await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Switch school, current school Roosevelt Middle School' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Account, signed in as Avery Johnson' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Nurse/ })).toBeVisible();
   const clipped = await page
     .locator('main')
