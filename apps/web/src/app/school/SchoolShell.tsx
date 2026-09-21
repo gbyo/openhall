@@ -1,8 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, useLoaderData, useOutletContext, useParams } from 'react-router';
 import type { OrganizationContext } from '../../api/types';
-import { meQuery } from '../queries';
+import { meQuery, sessionQuery } from '../queries';
 import { RealtimeProvider } from '../realtime/RealtimeProvider';
+import {
+  SetupAccessBanner,
+  formatSetupDeadline,
+} from '../../design-system/patterns/SetupAccessBanner';
 
 export interface SchoolOutletContext {
   context: OrganizationContext;
@@ -29,6 +33,9 @@ export function SchoolShell() {
   const { context } = useLoaderData<{ context: OrganizationContext }>();
   const organizationId = useParams().organizationId ?? context.organization.id;
   const { data: me } = useQuery(meQuery);
+  const { data: session } = useQuery(sessionQuery);
+  const setupSession =
+    session?.authenticated === true && session.authenticationMethod === 'setup' ? session : null;
   const student = context.affiliations.includes('student') && has(context, 'pass.request.self');
   const links: { to: string; label: string }[] = [];
   if (student) links.push({ to: 'pass', label: 'My WayPass' });
@@ -72,6 +79,14 @@ export function SchoolShell() {
             </ul>
           </nav>
         )}
+        {setupSession ? (
+          <div className="product-notice">
+            <SetupAccessBanner
+              compact
+              deadlineLabel={formatSetupDeadline(setupSession.absoluteExpiresAt)}
+            />
+          </div>
+        ) : null}
         <main className="product-main">
           <Outlet context={{ context, organizationId } satisfies SchoolOutletContext} />
         </main>

@@ -16,6 +16,7 @@ const STATUS_BY_CODE: Record<AuthErrorCode, number> = {
   invalid_bootstrap_draft: 400,
   recovery_token_invalid: 401,
   provider_configuration_unsupported: 400,
+  provider_setup_conflict: 409,
 };
 
 const TITLE_BY_CODE: Record<AuthErrorCode, string> = {
@@ -32,6 +33,7 @@ const TITLE_BY_CODE: Record<AuthErrorCode, string> = {
   invalid_bootstrap_draft: 'Invalid setup details',
   recovery_token_invalid: 'Invalid recovery token',
   provider_configuration_unsupported: 'Unsupported provider configuration',
+  provider_setup_conflict: 'School sign-in is already connected',
 };
 
 export function statusFor(code: AuthErrorCode): number {

@@ -790,6 +790,63 @@
   padding: var(--wf-space-4) clamp(var(--wf-space-5), 4vw, var(--wf-space-8));
 }
 
+.wf-setup-access-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--wf-space-4);
+  border: var(--wf-border-width) solid var(--wf-status-info);
+  border-radius: var(--wf-radius-container);
+  background: var(--wf-status-info-subtle);
+  padding: var(--wf-space-5);
+}
+
+.wf-setup-access-banner p {
+  margin: 0;
+}
+
+.wf-setup-access-banner__marker {
+  display: flex;
+  width: 1.5rem;
+  align-items: center;
+  padding-top: var(--wf-space-1);
+}
+
+.wf-setup-access-banner__marker::before,
+.wf-setup-access-banner__marker::after {
+  height: 0.1875rem;
+  flex: 1;
+  background: var(--wf-status-info);
+  content: '';
+}
+
+.wf-setup-access-banner__marker i {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex: 0 0 auto;
+  border: 0.1875rem solid var(--wf-status-info);
+  border-radius: 50%;
+  background: var(--wf-surface-default);
+}
+
+.wf-setup-access-banner__marker i + i {
+  margin-left: var(--wf-space-2);
+}
+
+.wf-setup-access-banner__marker i:last-child {
+  border-style: dashed;
+}
+
+.wf-setup-access-banner__action {
+  margin-top: var(--wf-space-4);
+}
+
+.wf-setup-access-banner--compact {
+  border-radius: 0;
+  border-inline: 0;
+  border-top: 0;
+  padding: var(--wf-space-4) clamp(var(--wf-space-5), 4vw, var(--wf-space-8));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wf-skeleton,
   .wf-connection-status__pulse {
@@ -808,7 +865,8 @@
   .wf-pass-card,
   .wf-conflict-notice,
   .wf-connection-status,
-  .wf-recovery-banner {
+  .wf-recovery-banner,
+  .wf-setup-access-banner {
     border-color: CanvasText;
   }
 

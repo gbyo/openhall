@@ -19,6 +19,7 @@ import { startDestinationFlowWorker } from './destination-flow/reconciler-runner
 import { carriedStatus, safeRequestPath, scrubForLog } from './http-privacy.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerBootstrapRoutes } from './routes/bootstrap.js';
+import { registerSetupRoutes } from './routes/setup.js';
 import { registerControlPlaneRoutes } from './routes/control-plane.js';
 import { registerMeRoutes } from './routes/me.js';
 import { registerMovementRoutes } from './routes/movement.js';
@@ -282,6 +283,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   registerSystemRoutes(typedApp);
   registerAuthRoutes(typedApp, dependencies);
   registerBootstrapRoutes(typedApp, dependencies);
+  registerSetupRoutes(typedApp, dependencies);
   registerMeRoutes(typedApp, authorizationDependencies);
   const passDependencies = createPassDependencies(options.database);
   registerPassesRoutes(typedApp, {

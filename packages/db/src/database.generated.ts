@@ -319,6 +319,7 @@ export interface OidcLoginTransaction {
   identity_provider_id: string | null;
   processing_started_at: string | null;
   provider_revision: number | null;
+  provider_setup_account_id: string | null;
   purpose: string;
   return_path: Generated<string>;
   state_hash: Buffer;

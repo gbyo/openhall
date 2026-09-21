@@ -142,6 +142,51 @@ export const GOOGLE_WORKSPACE_PRESET = {
   scopes: ['openid', 'email', 'profile'],
 } as const;
 
+/**
+ * Server-owned canonical Google Workspace provider values. The browser
+ * submits only genuine user input (client ID + secret); everything here is
+ * derived/enforced server-side so the frontend can never smuggle alternate
+ * issuers, scopes, keys, or auth methods through the Google choice.
+ */
+export const CANONICAL_GOOGLE_PROVIDER = {
+  key: 'workspace',
+  displayName: 'Google Workspace',
+  issuer: 'https://accounts.google.com',
+  scopes: ['openid', 'email', 'profile'],
+  tokenEndpointAuthMethod: 'client_secret_post',
+} as const;
+
+/**
+ * Authoritative IANA time-zone check shared by server-side bootstrap and
+ * provider-setup validation. Never trust browser validation alone.
+ */
+export function assertValidTimeZone(value: string, field = 'school time zone'): string {
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 100) {
+    throw new AuthenticationError('invalid_bootstrap_draft', `Invalid ${field}`);
+  }
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: trimmed });
+  } catch {
+    throw new AuthenticationError('invalid_bootstrap_draft', `Invalid ${field}`);
+  }
+  return trimmed;
+}
+
+/** Deterministic slug derivation shared by client defaults and server enforcement. */
+export function deriveSlug(name: string): string | undefined {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 63);
+  if (slug.length === 0 || !SLUG_PATTERN.test(slug)) return undefined;
+  return slug;
+}
+
 const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 /**

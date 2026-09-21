@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState, type ChangeEvent, type SubmitEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { api, confirmed } from '../../api/client';
 import { getCsrfToken, clearSessionMemory } from '../../api/session';
@@ -7,29 +7,8 @@ import { queryClient } from '../query-client';
 import { meQuery } from '../queries';
 import { Alert } from '../../design-system/primitives/Alert';
 import { Button } from '../../design-system/primitives/Button';
-import { TextField } from '../../design-system/primitives/TextField';
 import { RecoveryBanner } from '../../design-system/patterns/RecoveryBanner';
 import { AppFrame } from '../AppFrame';
-
-const EMPTY_SETUP = {
-  operatorToken: '',
-  tenantName: '',
-  tenantSlug: '',
-  schoolName: '',
-  schoolSlug: '',
-  schoolTimeZone: '',
-  adminGivenName: '',
-  adminFamilyName: '',
-  adminDisplayName: '',
-  providerKey: 'workspace',
-  providerDisplayName: 'Google Workspace',
-  providerPreset: 'google',
-  providerIssuer: 'https://accounts.google.com',
-  providerClientId: '',
-  providerClientSecret: '',
-  providerAuthMethod: 'client_secret_post',
-  providerScopes: 'openid email profile',
-};
 
 export function LoginPage() {
   const [search] = useSearchParams();
@@ -85,7 +64,7 @@ export function LoginPage() {
               <p>Try again in a moment.</p>
             </Alert>
           )}
-          {tenant && (
+          {tenant && providers.length > 0 && (
             <div className="auth-provider-list">
               <div>
                 <p className="wf-type-heading">{tenant.name}</p>
@@ -106,6 +85,14 @@ export function LoginPage() {
               </ul>
             </div>
           )}
+          {tenant && providers.length === 0 && (
+            <Alert title="School sign-in hasn't been connected yet">
+              <p>An administrator needs to finish WayPass setup for {tenant.name}.</p>
+              <p>
+                <Link to="/recovery/access">Continue with recovery access</Link>
+              </p>
+            </Alert>
+          )}
           {discovery.data?.tenantSelectionRequired && (
             <Alert title="Choose your school">
               <p>Use your school's WayPass address to sign in.</p>
@@ -113,164 +100,6 @@ export function LoginPage() {
           )}
         </section>
       </div>
-    </AppFrame>
-  );
-}
-
-export function SetupPage() {
-  const [form, setForm] = useState(EMPTY_SETUP);
-  const [error, setError] = useState<string | null>(null);
-  const set =
-    (name: keyof typeof form) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const value = event.target.value;
-      setForm((previous) => {
-        if (name === 'providerPreset' && value === 'google')
-          return {
-            ...previous,
-            providerPreset: value,
-            providerIssuer: 'https://accounts.google.com',
-            providerScopes: 'openid email profile',
-          };
-        if (name === 'providerPreset' && value === 'generic')
-          return {
-            ...previous,
-            providerPreset: value,
-            providerIssuer: '',
-            providerScopes: 'openid',
-          };
-        return { ...previous, [name]: value };
-      });
-    };
-  const field = (name: keyof typeof form, label: string, secret = false) => (
-    <TextField
-      id={`setup-${name}`}
-      label={label}
-      type={secret ? 'password' : 'text'}
-      value={form[name]}
-      onChange={set(name)}
-      required
-      autoComplete="off"
-    />
-  );
-  async function submit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    try {
-      const response = await fetch('/api/v1/bootstrap/prepare', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bootstrap ${form.operatorToken.trim()}`,
-        },
-        body: JSON.stringify({
-          tenantName: form.tenantName,
-          tenantSlug: form.tenantSlug,
-          schoolName: form.schoolName,
-          schoolSlug: form.schoolSlug,
-          schoolTimeZone: form.schoolTimeZone,
-          adminGivenName: form.adminGivenName,
-          adminFamilyName: form.adminFamilyName,
-          adminDisplayName: form.adminDisplayName,
-          providerKey: form.providerKey,
-          providerDisplayName: form.providerDisplayName,
-          providerIssuer: form.providerIssuer,
-          providerClientId: form.providerClientId,
-          providerClientSecret: form.providerClientSecret,
-          providerAuthMethod: form.providerAuthMethod,
-          providerScopes: form.providerScopes.split(/[\s,]+/).filter(Boolean),
-        }),
-      });
-      const payload = (await response.json()) as { authorizationUrl?: string };
-      if (!response.ok || !payload.authorizationUrl)
-        throw new Error('Check the setup details and try again.');
-      window.location.assign(payload.authorizationUrl);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Setup failed.');
-    }
-  }
-  return (
-    <AppFrame>
-      <section className="setup-view" aria-labelledby="setup-title">
-        <header className="setup-view__header">
-          <p className="auth-kicker">First-time setup</p>
-          <h1 className="wf-type-page-title" id="setup-title">
-            Set up WayPass
-          </h1>
-          <p>
-            Connect the school and its sign-in provider. The one-time operator token is never
-            stored.
-          </p>
-        </header>
-        {error && (
-          <Alert tone="danger" role="alert" title="Setup could not continue">
-            <p>{error}</p>
-          </Alert>
-        )}
-        <form className="setup-form" onSubmit={(event) => void submit(event)}>
-          <fieldset className="setup-form__section setup-form__section--token">
-            <legend>Server access</legend>
-            {field('operatorToken', 'Operator token', true)}
-          </fieldset>
-          <fieldset className="setup-form__section">
-            <legend>School</legend>
-            <div className="setup-form__grid">
-              {field('tenantName', 'Organization name')}
-              {field('tenantSlug', 'Organization slug (lowercase)')}
-              {field('schoolName', 'School name')}
-              {field('schoolSlug', 'School slug (lowercase)')}
-              <div className="setup-form__wide">
-                {field('schoolTimeZone', 'School time zone (e.g. America/Chicago)')}
-              </div>
-            </div>
-          </fieldset>
-          <fieldset className="setup-form__section">
-            <legend>Administrator</legend>
-            <div className="setup-form__grid">
-              {field('adminGivenName', 'Administrator given name')}
-              {field('adminFamilyName', 'Administrator family name')}
-              <div className="setup-form__wide">
-                {field('adminDisplayName', 'Administrator display name')}
-              </div>
-            </div>
-          </fieldset>
-          <fieldset className="setup-form__section">
-            <legend>Sign-in provider</legend>
-            <div className="setup-form__grid">
-              <label className="wf-field">
-                <span className="wf-field__label">Provider</span>
-                <select
-                  className="wf-input"
-                  value={form.providerPreset}
-                  onChange={set('providerPreset')}
-                >
-                  <option value="google">Google Workspace</option>
-                  <option value="generic">Generic OpenID Connect</option>
-                </select>
-              </label>
-              {field('providerKey', 'Provider key (lowercase)')}
-              {field('providerDisplayName', 'Provider display name')}
-              {field('providerIssuer', 'Provider issuer URL')}
-              {field('providerClientId', 'Client ID')}
-              {field('providerClientSecret', 'Client secret', true)}
-              <label className="wf-field">
-                <span className="wf-field__label">Client authentication</span>
-                <select
-                  className="wf-input"
-                  value={form.providerAuthMethod}
-                  onChange={set('providerAuthMethod')}
-                >
-                  <option value="client_secret_post">client_secret_post</option>
-                  <option value="client_secret_basic">client_secret_basic</option>
-                </select>
-              </label>
-              {field('providerScopes', 'Scopes (space separated)')}
-            </div>
-          </fieldset>
-          <div className="setup-form__actions">
-            <Button type="submit">Validate and continue with the provider</Button>
-          </div>
-        </form>
-      </section>
     </AppFrame>
   );
 }

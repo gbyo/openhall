@@ -11,6 +11,8 @@ import './design-system/typography.css';
 import './design-system/motion.css';
 import './design-system/utilities.css';
 import './design-system/components.css';
+import './features/setup/maia-theme.css';
+import './features/setup/setup.css';
 import './styles.css';
 import { queryClient } from './app/query-client';
 import { router } from './app/router';

@@ -1,14 +1,30 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Outlet } from 'react-router';
 import { ErrorPage } from './ErrorPage';
 import {
+  connectSignInLoader,
   indexLoader,
   loginLoader,
   protectedLoader,
+  recoveryAccessLoader,
   recoveryLoader,
   schoolLoader,
   setupLoader,
 } from './loaders';
-import { LoginPage, SetupPage, RecoveryPage, EnrollPage } from './auth/AuthPages';
+import { LoginPage, RecoveryPage, EnrollPage } from './auth/AuthPages';
+import { ConnectSignInPage } from '../features/auth/ConnectSignInPage';
+import { RecoveryAccessPage } from '../features/auth/RecoveryAccessPage';
+import { RequireSetupToken } from '../features/setup/RequireSetupToken';
+import { SetupProvider } from '../features/setup/setup-state';
+import { SetupWelcome } from '../features/setup/SetupWelcome';
+import { GuidedSetupFlow } from '../features/setup/GuidedSetupFlow';
+
+function SetupShell() {
+  return (
+    <SetupProvider>
+      <Outlet />
+    </SetupProvider>
+  );
+}
 import { SchoolChooser } from './school/SchoolChooser';
 import { SchoolIndex } from './school/SchoolIndex';
 import { SchoolShell } from './school/SchoolShell';
@@ -33,7 +49,35 @@ export const router = createBrowserRouter([
     element: <p role="status">Opening WayPass…</p>,
     errorElement: <ErrorPage />,
   },
-  { path: '/setup', loader: setupLoader, element: <SetupPage />, errorElement: <ErrorPage /> },
+  {
+    path: '/setup',
+    loader: setupLoader,
+    element: <SetupShell />,
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <SetupWelcome /> },
+      {
+        path: 'flow',
+        element: (
+          <RequireSetupToken>
+            <GuidedSetupFlow />
+          </RequireSetupToken>
+        ),
+      },
+    ],
+  },
+  {
+    path: '/connect-sign-in',
+    loader: connectSignInLoader,
+    element: <ConnectSignInPage />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/recovery/access',
+    loader: recoveryAccessLoader,
+    element: <RecoveryAccessPage />,
+    errorElement: <ErrorPage />,
+  },
   { path: '/login', loader: loginLoader, element: <LoginPage />, errorElement: <ErrorPage /> },
   { path: '/enroll', element: <EnrollPage />, errorElement: <ErrorPage /> },
   {

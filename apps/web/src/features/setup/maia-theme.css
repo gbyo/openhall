@@ -1,0 +1,49 @@
+/* shadcn Maia semantic theme, scoped to the guided-setup flow.
+ * The setup canvas is white; the primary accent is shadcn blue applied only
+ * through semantic roles. This scope leaves the rest of the Wayfinder product
+ * untouched until the UI 0.3 foundation (#15) lands. Styled-registry adoption
+ * (Button, Field, Combobox, RadioGroup, Collapsible, Item) is pending that
+ * foundation; until then setup composes the React Aria base directly. */
+.setup-maia {
+  --background: #ffffff;
+  --foreground: #1b2430;
+  --card: #ffffff;
+  --card-foreground: #1b2430;
+  --popover: #ffffff;
+  --popover-foreground: #1b2430;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2f7;
+  --secondary-foreground: #1b2430;
+  --muted: #f4f6f8;
+  --muted-foreground: #5b6672;
+  --accent: #e8effc;
+  --accent-foreground: #1e40af;
+  --destructive: #b4232a;
+  --destructive-foreground: #ffffff;
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+  --ring: #2563eb;
+  --radius: 0.625rem;
+
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.setup-maia :focus-visible {
+  outline: 0.125rem solid var(--ring);
+  outline-offset: 0.125rem;
+}
+
+/* Questionnaire renders a native form; each Item is a fieldset. */
+.setup-maia fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.setup-maia legend {
+  padding: 0;
+  margin-bottom: var(--space-4, 1rem);
+}
