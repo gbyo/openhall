@@ -284,6 +284,7 @@ export async function resolvePassApproval(
 }
 
 export interface PendingApprovalItem {
+  readonly organizationId: string;
   readonly approvalId: string;
   readonly passId: string;
   readonly passRevision: string;
@@ -304,6 +305,7 @@ export interface PendingApprovalItem {
 
 function toPendingItem(view: PendingApprovalView): PendingApprovalItem {
   return {
+    organizationId: view.organizationId,
     approvalId: view.approvalId,
     passId: view.passId,
     passRevision: view.passRevision.toString(10),

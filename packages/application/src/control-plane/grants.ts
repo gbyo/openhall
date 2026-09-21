@@ -41,11 +41,13 @@ export interface GrantDependencies {
 export interface GrantView {
   readonly id: string;
   readonly personId: string;
+  readonly person: { readonly id: string; readonly displayName: string };
   readonly accountId: string;
   readonly role: string;
   readonly scopeKind: string;
   readonly organizationId: string | null;
   readonly destinationId: string | null;
+  readonly destination: { readonly id: string; readonly displayName: string } | null;
   readonly status: string;
   readonly validFrom: string | null;
   readonly validUntil: string | null;
@@ -64,11 +66,19 @@ export function toGrantView(row: GrantRecord): GrantView {
   return {
     id: row.id,
     personId: row.personId,
+    person: { id: row.personId, displayName: row.personDisplayName },
     accountId: row.accountId,
     role: row.role,
     scopeKind: row.scopeKind,
     organizationId: row.organizationId,
     destinationId: row.destinationId,
+    destination:
+      row.destinationId === null
+        ? null
+        : {
+            id: row.destinationId,
+            displayName: row.destinationDisplayName ?? 'Destination',
+          },
     status: row.status,
     validFrom: row.validFrom === null ? null : row.validFrom.toString(),
     validUntil: row.validUntil === null ? null : row.validUntil.toString(),
@@ -282,6 +292,35 @@ export async function listAuthorizationGrants(
     );
     const rows = await dependencies.grants.listByOrganization(context, organizationId);
     return { grants: rows.map(toGrantView) };
+  });
+}
+
+/** GET /authorization-grants/:id — authoritative detail and strong ETag. */
+export async function getAuthorizationGrant(
+  principal: Principal,
+  grantId: string,
+  dependencies: GrantDependencies,
+): Promise<{ readonly grant: GrantView; readonly etag: string }> {
+  const now = dependencies.clock.now();
+  return dependencies.runner.run(principal.tenantId, async (context) => {
+    const row = await dependencies.grants.loadById(context, grantId);
+    if (row?.tenantId !== principal.tenantId) {
+      throw new ControlPlaneError('authorization_grant_not_found', 'Grant not found.');
+    }
+    const organizationId = await canonicalGrantOrganization(context, dependencies, row);
+    if (organizationId === null) {
+      throw new ControlPlaneError('authorization_grant_not_found', 'Grant not found.');
+    }
+    await requireOrganizationCapability(
+      context,
+      dependencies.authorization,
+      principal,
+      'authorization.manage',
+      organizationId,
+      now,
+      'authorization_grant_not_found',
+    );
+    return { grant: toGrantView(row), etag: etagForGrant(row.id, row.revision) };
   });
 }
 

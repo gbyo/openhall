@@ -1,0 +1,230 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test, type Page } from '@playwright/test';
+import { DESTINATION, mockPass, ORG, PASS, PERSON, SECTION, shell, studentApis } from './fixtures';
+
+const STUDENT = {
+  affiliations: ['student'],
+  capabilities: ['pass.request.self', 'pass.depart.self'],
+};
+
+function listenForErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  return errors;
+}
+
+async function openStudentNoPass(page: Page): Promise<string[]> {
+  const errors = listenForErrors(page);
+  await shell(page, STUDENT);
+  await studentApis(page, { current: null });
+  await page.goto(`/schools/${ORG}/pass`);
+  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
+  return errors;
+}
+
+async function openTeacherRequests(page: Page): Promise<string[]> {
+  const errors = listenForErrors(page);
+  await shell(page, { affiliations: ['staff'], capabilities: [] });
+  await page.route('**/api/v1/me/pass-approvals/pending', (route) =>
+    route.fulfill({
+      json: {
+        approvals: [
+          {
+            approvalId: '00000000-0000-4000-8000-000000000020',
+            organizationId: ORG,
+            passEtag: '"pass:test:1"',
+            student: { id: PERSON, displayName: 'Alex Rivera' },
+            destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+            requiredSection: { id: SECTION, title: 'Science 7' },
+            requestedAt: '2026-09-21T14:00:00Z',
+          },
+        ],
+      },
+    }),
+  );
+  await page.route('**/api/v1/me/pass-overrides/pending', (route) =>
+    route.fulfill({ json: { overrides: [] } }),
+  );
+  await page.goto(`/schools/${ORG}/requests`);
+  await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible();
+  return errors;
+}
+
+test('teacher requests render coherently at a Chromebook-sized viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  const errors = await openTeacherRequests(page);
+  await expect(page.getByText('Alex Rivera')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve' })).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
+
+test('teacher can approve from the keyboard with a visible focus indicator', async ({ page }) => {
+  const errors = await openTeacherRequests(page);
+  // Registered after the helper so it wins on refetch: resolving the
+  // approval clears the row instead of re-rendering the seeded feed.
+  let approvals: unknown[] = [
+    {
+      approvalId: '00000000-0000-4000-8000-000000000020',
+      organizationId: ORG,
+      passEtag: '"pass:test:1"',
+      student: { id: PERSON, displayName: 'Alex Rivera' },
+      destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+      requiredSection: { id: SECTION, title: 'Science 7' },
+      requestedAt: '2026-09-21T14:00:00Z',
+    },
+  ];
+  await page.route('**/api/v1/me/pass-approvals/pending', (route) =>
+    route.fulfill({ json: { approvals } }),
+  );
+  let approved = false;
+  await page.route('**/api/v1/pass-approvals/*/approve', async (route) => {
+    approved = true;
+    approvals = [];
+    await route.fulfill({ json: { pass: mockPass('ready') } });
+  });
+  const approve = page.getByRole('button', { name: 'Approve' });
+  await approve.focus();
+  await expect(approve).toBeFocused();
+  const outline = await approve.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor };
+  });
+  expect(outline.style).not.toBe('none');
+  expect(Number.parseFloat(outline.width)).toBeGreaterThan(0);
+  expect(outline.color).not.toBe('rgba(0, 0, 0, 0)');
+  const box = await approve.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, height: window.innerHeight };
+  });
+  expect(box.top).toBeGreaterThanOrEqual(0);
+  expect(box.bottom).toBeLessThanOrEqual(box.height);
+  await page.keyboard.press('Enter');
+  expect(approved).toBe(true);
+  await expect(page.getByText('Alex Rivera')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('student no-pass view stays usable at 200 percent text size', async ({ page }) => {
+  const errors = await openStudentNoPass(page);
+  await page.locator('html').evaluate((element) => {
+    element.style.fontSize = '200%';
+  });
+  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Nurse/ })).toBeVisible();
+  const clipped = await page
+    .locator('.product-main')
+    .evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(clipped).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
+
+test('product honors reduced motion on the live-connection banner', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const errors = listenForErrors(page);
+  await shell(page, {
+    affiliations: ['staff'],
+    capabilities: [],
+    staffedDestinations: [
+      {
+        id: DESTINATION,
+        displayName: 'Nurse',
+        serviceType: 'nurse',
+        capabilities: ['destination.station.manage'],
+      },
+    ],
+  });
+  await page.route(`**/api/v1/organizations/${ORG}/events`, (route) => route.abort());
+  await page.route(`**/api/v1/destinations/${DESTINATION}/station`, (route) =>
+    route.fulfill({
+      json: {
+        destination: {
+          id: DESTINATION,
+          displayName: 'Nurse',
+          serviceType: 'nurse',
+          checkInMode: 'required',
+          capacity: 3,
+        },
+        occupancy: { consumingReservations: 0, availableCapacity: 3 },
+        queueCount: 0,
+        outbound: [],
+        atDestination: [],
+        ready: [],
+        queued: [],
+      },
+    }),
+  );
+  await page.goto(`/schools/${ORG}/stations/${DESTINATION}`);
+  await expect(page.getByRole('heading', { name: 'Nurse' })).toBeVisible();
+  await expect(page.getByRole('status').getByText(/reconnecting/i)).toBeVisible();
+  await expect(page.locator('.wf-connection-status__pulse')).toHaveCSS('animation-name', 'none');
+  expect(
+    await page
+      .locator('html')
+      .evaluate((element) =>
+        getComputedStyle(element).getPropertyValue('--wf-motion-standard').trim(),
+      ),
+  ).toBe('1ms');
+  expect(errors).toEqual([]);
+});
+
+test('station actions stay available in forced colors', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  const errors = listenForErrors(page);
+  await shell(page, {
+    affiliations: ['staff'],
+    capabilities: [],
+    staffedDestinations: [
+      {
+        id: DESTINATION,
+        displayName: 'Nurse',
+        serviceType: 'nurse',
+        capabilities: ['destination.station.manage'],
+      },
+    ],
+  });
+  await page.route(`**/api/v1/destinations/${DESTINATION}/station`, (route) =>
+    route.fulfill({
+      json: {
+        destination: {
+          id: DESTINATION,
+          displayName: 'Nurse',
+          serviceType: 'nurse',
+          checkInMode: 'required',
+          capacity: 3,
+        },
+        occupancy: { consumingReservations: 1, availableCapacity: 2 },
+        queueCount: 0,
+        outbound: [
+          {
+            passId: PASS,
+            passRevision: '4',
+            passEtag: '"pass:test:4"',
+            student: { id: PERSON, displayName: 'Alex Rivera' },
+            departedAt: '2026-09-21T14:00:00Z',
+            expectedReturnAt: '2026-09-21T14:20:00Z',
+          },
+        ],
+        atDestination: [],
+        ready: [],
+        queued: [],
+      },
+    }),
+  );
+  await page.goto(`/schools/${ORG}/stations/${DESTINATION}`);
+  await expect(page.getByRole('heading', { name: 'Nurse' })).toBeVisible();
+  await expect(page.getByText('Alex Rivera')).toBeVisible();
+  const checkIn = page.getByRole('button', { name: 'Check in' });
+  await expect(checkIn).toBeVisible();
+  await expect(checkIn).toBeEnabled();
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(
+    results.violations.filter((violation) =>
+      ['serious', 'critical'].includes(violation.impact ?? ''),
+    ),
+  ).toEqual([]);
+  expect(errors).toEqual([]);
+});

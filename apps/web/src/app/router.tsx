@@ -1,0 +1,97 @@
+import { createBrowserRouter } from 'react-router';
+import { ErrorPage } from './ErrorPage';
+import {
+  indexLoader,
+  loginLoader,
+  protectedLoader,
+  recoveryLoader,
+  schoolLoader,
+  setupLoader,
+} from './loaders';
+import { LoginPage, SetupPage, RecoveryPage, EnrollPage } from './auth/AuthPages';
+import { SchoolChooser } from './school/SchoolChooser';
+import { SchoolIndex } from './school/SchoolIndex';
+import { SchoolShell } from './school/SchoolShell';
+import { StudentPage } from '../features/student/StudentPage';
+import { RequestsPage } from '../features/requests/RequestsPage';
+import { ClassPage } from '../features/teacher/ClassPage';
+import { LiveMovementPage } from '../features/movement/LiveMovementPage';
+import { StationPage } from '../features/station/StationPage';
+import { AdminIndex, AdminLayout } from '../features/admin/AdminLayout';
+import { DestinationsPage } from '../features/admin/destinations/DestinationsPage';
+import { DestinationDetailPage } from '../features/admin/destinations/DestinationDetailPage';
+
+async function protectedSchoolLoader(args: Parameters<typeof schoolLoader>[0]) {
+  await protectedLoader(args);
+  return schoolLoader(args);
+}
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    loader: indexLoader,
+    element: <p role="status">Opening WayPass…</p>,
+    errorElement: <ErrorPage />,
+  },
+  { path: '/setup', loader: setupLoader, element: <SetupPage />, errorElement: <ErrorPage /> },
+  { path: '/login', loader: loginLoader, element: <LoginPage />, errorElement: <ErrorPage /> },
+  { path: '/enroll', element: <EnrollPage />, errorElement: <ErrorPage /> },
+  {
+    path: '/recovery',
+    loader: recoveryLoader,
+    element: <RecoveryPage />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/schools',
+    loader: protectedLoader,
+    element: <SchoolChooser />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/schools/:organizationId',
+    loader: protectedSchoolLoader,
+    element: <SchoolShell />,
+    errorElement: <ErrorPage />,
+    children: [
+      { index: true, element: <SchoolIndex /> },
+      { path: 'pass', element: <StudentPage /> },
+      { path: 'requests', element: <RequestsPage /> },
+      { path: 'classes/:sectionId', element: <ClassPage /> },
+      { path: 'movement', element: <LiveMovementPage /> },
+      {
+        path: 'scheduled-passes',
+        lazy: () => import('../features/admin/scheduled-passes/ScheduledPassesPage'),
+      },
+      { path: 'stations/:destinationId', element: <StationPage /> },
+      {
+        path: 'admin',
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <AdminIndex /> },
+          { path: 'live', element: <LiveMovementPage /> },
+          { path: 'destinations', element: <DestinationsPage /> },
+          { path: 'destinations/:destinationId', element: <DestinationDetailPage /> },
+          { path: 'locations', lazy: () => import('../features/admin/locations/LocationsPage') },
+          { path: 'schedules', lazy: () => import('../features/admin/schedules/SchedulesPage') },
+          { path: 'policies', lazy: () => import('../features/admin/policies/PoliciesPage') },
+          {
+            path: 'policies/:policyRuleId',
+            lazy: () => import('../features/admin/policies/PolicyDetailPage'),
+          },
+          {
+            path: 'staff-access',
+            lazy: () => import('../features/admin/staff-access/StaffAccessPage'),
+          },
+          {
+            path: 'scheduled-passes',
+            lazy: () => import('../features/admin/scheduled-passes/ScheduledPassesPage'),
+          },
+          { path: 'people', lazy: () => import('../features/admin/people/PeoplePage') },
+          { path: 'audit', lazy: () => import('../features/admin/audit/AuditPage') },
+        ],
+      },
+    ],
+  },
+  { path: '*', element: <ErrorPage /> },
+]);

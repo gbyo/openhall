@@ -128,6 +128,8 @@
 
 .wf-reference-controls fieldset {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   margin: 0;
   border: 0;
   gap: var(--wf-space-3);
@@ -410,6 +412,10 @@
   padding-block: var(--wf-space-4);
   color: var(--wf-color-text-muted);
   font-size: 0.875rem;
+}
+
+.wf-student-frame-control-note > * {
+  min-width: 0;
 }
 
 .wf-student-state-list {

@@ -10,6 +10,9 @@ import {
   getActiveSelfPass,
   getOwnQueueStatus,
   getStationView,
+  listSchoolLivePasses,
+  listSectionLivePasses,
+  listSectionStudents,
   arriveSelfPass,
   listPendingApprovals,
   listPendingOverrides,
@@ -28,6 +31,7 @@ import {
   type DepartPassDependencies,
   type FlowReadDependencies,
   type OverrideCommandDependencies,
+  type OperationalReadDependencies,
   type ProgressPassDependencies,
   type RequestPassDependencies,
 } from '@openhall/application';
@@ -38,6 +42,7 @@ import {
   PostgresExpectedPlacementRepository,
   PostgresIdempotencyRepository,
   PostgresOutboxWriter,
+  PostgresOperationalReadRepository,
   PostgresPassRepository,
   PostgresPolicyRepository,
   PostgresTenantTransactionRunner,
@@ -54,6 +59,7 @@ export interface PassDependencies {
   readonly depart: DepartPassDependencies;
   readonly progress: ProgressPassDependencies;
   readonly reads: FlowReadDependencies;
+  readonly operations: OperationalReadDependencies;
   readonly reconciler: DestinationFlowReconciler;
 }
 
@@ -75,6 +81,7 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
   const idempotency = new PostgresIdempotencyRepository();
   const audit = new PostgresAuditWriter();
   const outbox = new PostgresOutboxWriter();
+  const operations = new PostgresOperationalReadRepository();
   const request: RequestPassDependencies = {
     clock,
     runner,
@@ -142,6 +149,7 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
       outbox,
     },
     reads: { clock, runner, passes, flow, authorization },
+    operations: { clock, runner, authorization, operations },
     reconciler: new DestinationFlowReconciler({
       clock,
       runner,
@@ -163,6 +171,9 @@ export {
   getActiveSelfPass,
   getOwnQueueStatus,
   getStationView,
+  listSchoolLivePasses,
+  listSectionLivePasses,
+  listSectionStudents,
   listPendingApprovals,
   listPendingOverrides,
   requestPassOverride,

@@ -1,4 +1,5 @@
 import {
+  getIdentityEnrollmentStatus,
   issueIdentityEnrollment,
   revokeIdentityEnrollment,
   type Principal,
@@ -7,6 +8,7 @@ import {
   IdentityEnrollmentIssueBodySchema,
   IdentityEnrollmentIssueResponseSchema,
   IdentityEnrollmentResponseSchema,
+  IdentityEnrollmentStatusResponseSchema,
   UuidSchema,
 } from '@openhall/contracts';
 import { Type } from 'typebox';
@@ -17,6 +19,7 @@ import { requireCsrf, requirePrincipal } from '../auth/session-context.js';
 import type { ControlPlaneDependencies } from '../control-plane/dependencies.js';
 import {
   CONTROL_PLANE_ERRORS,
+  COOKIE_SECURITY,
   COOKIE_CSRF_SECURITY,
   CreateHeadersSchema,
   MutationHeadersSchema,
@@ -51,6 +54,44 @@ export function registerEnrollmentRoutes(
   handle: ControlPlaneHandler,
 ): void {
   const typedApp = app.withTypeProvider<TypeBoxTypeProvider>();
+
+  typedApp.get(
+    '/api/v1/organizations/:organizationId/people/:personId/enrollment',
+    {
+      schema: {
+        operationId: 'getIdentityEnrollmentStatus',
+        tags: ['control-plane'],
+        description:
+          'Read the live sign-in invitation for one person, if present. Returns no token, digest, identity, or provider internals. Requires identity.enroll. Cache-Control: no-store.',
+        security: COOKIE_SECURITY,
+        params: EnrollmentPersonParamsSchema,
+        response: {
+          200: IdentityEnrollmentStatusResponseSchema,
+          401: CONTROL_PLANE_ERRORS[401],
+          403: CONTROL_PLANE_ERRORS[403],
+          404: CONTROL_PLANE_ERRORS[404],
+        },
+      },
+      preHandler: async (request, reply) => requirePrincipal(request, reply),
+    },
+    async (request, reply) => {
+      const principal: Principal | undefined = request.principal;
+      if (principal === undefined) return unauthenticated(reply, request);
+      await handle(request, reply, async () => {
+        const result = await getIdentityEnrollmentStatus(
+          principal,
+          request.params.organizationId,
+          request.params.personId,
+          controlPlane.enrollment,
+        );
+        return {
+          body: { enrollment: result.enrollment },
+          ...(result.etag === undefined ? {} : { etag: result.etag }),
+          status: 200,
+        };
+      });
+    },
+  );
 
   typedApp.post(
     '/api/v1/organizations/:organizationId/people/:personId/enrollments',

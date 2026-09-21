@@ -350,6 +350,45 @@ afterAll(async () => {
 });
 
 describe('identity enrollment issuance', () => {
+  it('reads only the active invitation status with its authoritative ETag', async () => {
+    const member = await makeMember(tenantA, schoolA, 'student', 'Status');
+    const empty = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/people/${member.personId}/enrollment`,
+      headers: authHeaders(requireAdmin()),
+    });
+    expect(empty.statusCode).toBe(200);
+    expect(empty.json()).toEqual({ enrollment: null });
+    expect(empty.headers.etag).toBeUndefined();
+
+    const issued = await issueEnrollment(requireAdmin(), schoolA, member.personId);
+    const body = issued.json<IssuedBody>();
+    const active = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/people/${member.personId}/enrollment`,
+      headers: authHeaders(requireAdmin()),
+    });
+    expect(active.statusCode).toBe(200);
+    expect(active.json()).toMatchObject({
+      enrollment: {
+        id: body.enrollmentId,
+        organizationId: schoolA,
+        personId: member.personId,
+        status: 'active',
+        revision: '1',
+      },
+    });
+    expect(requiredEtag(active)).toBe(`"identity-enrollment:${body.enrollmentId}:1"`);
+
+    if (adminB === null) throw new Error('admin fixture missing');
+    const concealed = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/people/${member.personId}/enrollment`,
+      headers: authHeaders(adminB),
+    });
+    expect(concealed.statusCode).toBe(404);
+  });
+
   it('issues a one-time invitation and stores only the digest', async () => {
     const member = await makeMember(tenantA, schoolA, 'student', 'Invited');
     const response = await issueEnrollment(requireAdmin(), schoolA, member.personId);

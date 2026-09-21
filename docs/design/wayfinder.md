@@ -84,4 +84,13 @@ The dedicated Playwright configuration starts only Vite. Tests cover reference s
 
 Add global semantic decisions only to the small foundation stylesheets (`tokens`, `reset`, `typography`, `motion`, and `utilities`). Add a native or React Aria primitive under `primitives` when it solves reusable interaction behavior. Add a pattern under `patterns` only when it expresses a WayPass product concept. Reference-only controls, mock data, and canonical compositions remain under `reference` and must not import backend contracts.
 
-Dark mode, school color themes, real application shells, routing, production data fetching, pass commands, realtime transport, and product API integration remain Phase 9 decisions.
+Phase 9 applies these foundations to the real product shell. Ready makes the deadline and Start pass
+action dominant without a giant status surface; tracked movement gives `Route` visual priority;
+completion is intentionally quiet. Student, teacher, station, operations, and administrator layouts
+reuse these primitives rather than defining feature-local design systems. Connection treatment is
+wired to one school-level EventSource and reports only transport health; authoritative successful
+GETs, not heartbeats, update the last-confirmed time. Heavy administration routes are lazy-loaded,
+while the focused student route remains free of an administrator sidebar.
+
+Dark mode, school color themes, native applications, push notifications, and offline mutation
+queues remain intentionally deferred.

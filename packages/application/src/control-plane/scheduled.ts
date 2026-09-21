@@ -33,13 +33,24 @@ export interface ScheduledAuthView {
   readonly id: string;
   readonly organizationId: string;
   readonly studentId: string;
+  readonly student: {
+    readonly id: string;
+    readonly displayName: string;
+    readonly gradeLevel: string | null;
+  };
   readonly destinationId: string;
+  readonly destination: {
+    readonly id: string;
+    readonly displayName: string;
+    readonly serviceType: string;
+  };
   readonly validFrom: string;
   readonly validUntil: string;
   readonly status: string;
   readonly approvalMode: string;
   readonly originStrategy: string;
   readonly originLocationId: string | null;
+  readonly originLocation: { readonly id: string; readonly name: string } | null;
   readonly revision: string;
   readonly createdByAccountId: string | null;
   readonly createdAt: string;
@@ -53,12 +64,14 @@ export interface ScheduledAuthView {
 
 export interface ScheduledAuthStudentView {
   readonly id: string;
+  readonly organizationId: string;
   readonly validFrom: string;
   readonly validUntil: string;
   readonly status: 'active' | 'used' | 'cancelled' | 'expired';
   readonly approvalMode: 'preapproved' | 'approval_required';
   readonly originStrategy: 'expected' | 'specific';
   readonly revision: string;
+  readonly authorizationEtag: string;
   readonly destination: {
     readonly id: string;
     readonly displayName: string;
@@ -79,13 +92,27 @@ export function toScheduledAuthView(row: ScheduledAuthRecord): ScheduledAuthView
     id: row.id,
     organizationId: row.organizationId,
     studentId: row.studentId,
+    student: {
+      id: row.studentId,
+      displayName: row.studentDisplayName,
+      gradeLevel: row.studentGradeLevel,
+    },
     destinationId: row.destinationId,
+    destination: {
+      id: row.destinationId,
+      displayName: row.destinationDisplayName,
+      serviceType: row.destinationServiceType,
+    },
     validFrom: row.validFrom.toString(),
     validUntil: row.validUntil.toString(),
     status: row.status,
     approvalMode: row.approvalMode,
     originStrategy: row.originStrategy,
     originLocationId: row.originLocationId,
+    originLocation:
+      row.originLocationId === null
+        ? null
+        : { id: row.originLocationId, name: row.originLocationName ?? 'Location' },
     revision: row.revision.toString(10),
     createdByAccountId: row.createdByAccountId,
     createdAt: row.createdAt.toString(),
@@ -272,6 +299,7 @@ async function appendScheduledAudit(
       studentId: row.studentId,
       status: row.status,
       revision: row.revision.toString(10),
+      authorizationEtag: etagForScheduledAuth(row.id, row.revision),
       requestId,
     },
   });
@@ -756,6 +784,7 @@ async function toStudentViews(
     }
     views.push({
       id: row.id,
+      organizationId: row.organizationId,
       validFrom: row.validFrom.toString(),
       validUntil: row.validUntil.toString(),
       // The migration CHECK constrains these columns to the view unions.
@@ -763,6 +792,7 @@ async function toStudentViews(
       approvalMode: row.approvalMode as ScheduledAuthStudentView['approvalMode'],
       originStrategy: row.originStrategy as ScheduledAuthStudentView['originStrategy'],
       revision: row.revision.toString(10),
+      authorizationEtag: etagForScheduledAuth(row.id, row.revision),
       destination: {
         id: destination.id,
         displayName: destination.displayName,

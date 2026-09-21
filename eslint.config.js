@@ -11,6 +11,7 @@ export default tseslint.config(
       'eslint.config.js',
       'openapi/openapi.json',
       'packages/db/src/database.generated.ts',
+      'apps/web/src/api/generated/**',
     ],
   },
   eslint.configs.recommended,
