@@ -1,8 +1,9 @@
-import { Navigate, useLoaderData } from 'react-router';
+import { Navigate } from 'react-router';
 import type { OrganizationContext } from '../../api/types';
+import { useSchool } from './SchoolShell';
 
 export function SchoolIndex() {
-  const { context } = useLoaderData<{ context: OrganizationContext }>();
+  const { context } = useSchool();
   const adminCapabilities = [
     'destination.manage',
     'schedule.manage',
