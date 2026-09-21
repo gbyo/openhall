@@ -168,7 +168,10 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     },
     refResolver: {
       buildLocalReference(json, _baseUri, _fragment, index) {
-        return typeof json.$id === 'string' && json.$id.length > 0 ? json.$id : `def-${String(index)}`;
+        if (typeof json.$id === 'string' && json.$id.length > 0) {
+          return json.$id;
+        }
+        return `def-${String(index)}`;
       },
     },
   });
