@@ -13,6 +13,7 @@ import {
   SECTION,
   shell,
   studentApis,
+  studentHomeApis,
 } from './fixtures';
 
 const STUDENT = {
@@ -28,7 +29,7 @@ test('waiting student sees passive approval state without repeat actions', async
   await studentApis(page, { current: mockPass('requested', null, APPROVAL_PENDING) });
   await page.goto(`/schools/${ORG}/pass`);
   await expect(page.getByRole('heading', { name: 'Waiting for approval' })).toBeVisible();
-  await expect(page.getByText('No action needed.')).toBeVisible();
+  await expect(page.getByText('No action needed right now.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Start pass' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Ask for staff review' })).toHaveCount(0);
 });
@@ -82,10 +83,166 @@ test('student starts a scheduled appointment from Upcoming', async ({ page }) =>
   );
   await page.goto(`/schools/${ORG}/pass`);
   await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Upcoming' })).toBeVisible();
-  await expect(page.getByText(/Available/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ready now' })).toBeVisible();
+  await expect(page.getByText(/Available until/)).toBeVisible();
   await page.getByRole('button', { name: 'Start WayPass' }).click();
   await expect(page.getByRole('heading', { name: "You're ready." })).toBeVisible();
+});
+
+test('student sees future appointments without a premature Start action', async ({ page }) => {
+  await shell(page, STUDENT);
+  const active: { current: ReturnType<typeof mockPass> | null } = { current: null };
+  const future = {
+    id: '00000000-0000-4000-8000-000000000031',
+    organizationId: ORG,
+    status: 'active',
+    validFrom: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    validUntil: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+    destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+    authorizationEtag: '"auth:test:2"',
+  };
+  await studentApis(page, active, [future]);
+  await page.goto(`/schools/${ORG}/pass`);
+  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Upcoming' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ready now' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Start WayPass' })).toHaveCount(0);
+});
+
+test('student home groups destinations into intent tiles without admin metadata', async ({
+  page,
+}) => {
+  await shell(page, STUDENT);
+  await studentHomeApis(page, { current: null });
+  await page.goto(`/schools/${ORG}/pass`);
+  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
+  for (const name of ['Restroom', 'Nurse', 'Counselor', 'Library', 'More']) {
+    await expect(page.getByRole('button', { name })).toBeVisible();
+  }
+  await expect(page.getByRole('button', { name: 'Nurse' })).toHaveText('Nurse');
+  await expect(page.getByText('Check-in')).toHaveCount(0);
+  await expect(page.getByText('Planetarium')).toHaveCount(0);
+  await page.getByRole('button', { name: 'More' }).click();
+  await expect(page.getByRole('heading', { name: 'Request a WayPass' })).toBeVisible();
+  await expect(page.getByText('Planetarium')).toBeVisible();
+});
+
+test('ready appointments sit above the launcher in a four-column desktop grid', async ({
+  page,
+}) => {
+  await shell(page, STUDENT);
+  const active: { current: ReturnType<typeof mockPass> | null } = { current: null };
+  await studentHomeApis(page, active, {
+    scheduled: [
+      {
+        id: '00000000-0000-4000-8000-000000000030',
+        organizationId: ORG,
+        status: 'active',
+        validFrom: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        validUntil: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+        destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+        authorizationEtag: '"auth:test:1"',
+      },
+    ],
+  });
+  await page.goto(`/schools/${ORG}/pass`);
+  const readyBox = await page.getByRole('heading', { name: 'Ready now' }).boundingBox();
+  const launcherBox = await page
+    .getByRole('heading', { name: 'Where do you need to go?' })
+    .boundingBox();
+  expect(readyBox).not.toBeNull();
+  expect(launcherBox).not.toBeNull();
+  if (readyBox && launcherBox) {
+    expect(readyBox.y).toBeLessThan(launcherBox.y);
+  }
+  const columns = await page
+    .getByRole('list', { name: 'Where do you need to go?' })
+    .evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+  expect(columns).toBe(4);
+});
+
+test('clicking an intent tile never posts a pass before confirmation', async ({ page }) => {
+  await shell(page, STUDENT);
+  const active: { current: ReturnType<typeof mockPass> | null } = { current: null };
+  await studentHomeApis(page, active);
+  let posted = 0;
+  await page.route('**/api/v1/me/passes', async (route) => {
+    posted += 1;
+    active.current = mockPass('requested', null);
+    await route.fulfill({
+      status: 201,
+      json: { pass: active.current },
+      headers: { ETag: '"pass:test:1"' },
+    });
+  });
+  await page.goto(`/schools/${ORG}/pass`);
+  // Single-destination intent skips the picker and lands on confirmation.
+  await page.getByRole('button', { name: 'Nurse' }).click();
+  await expect(page.getByRole('heading', { name: 'Request a WayPass' })).toBeVisible();
+  expect(posted).toBe(0);
+  // Multi-destination intent opens an item-based picker, still without posting.
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Restroom' }).click();
+  await expect(page.getByRole('button', { name: 'First floor restroom' })).toBeVisible();
+  expect(posted).toBe(0);
+  await page.getByRole('button', { name: 'First floor restroom' }).click();
+  await page.getByRole('button', { name: 'Request WayPass' }).click();
+  expect(posted).toBe(1);
+});
+
+test('desktop request flow uses a dialog and pending shows Requesting', async ({ page }) => {
+  await shell(page, STUDENT);
+  const active: { current: ReturnType<typeof mockPass> | null } = { current: null };
+  await studentHomeApis(page, active);
+  let release!: (value: unknown) => void;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/v1/me/passes', async (route) => {
+    active.current = mockPass('requested', null);
+    await gate;
+    await route.fulfill({
+      status: 201,
+      json: { pass: active.current },
+      headers: { ETag: '"pass:test:1"' },
+    });
+  });
+  await page.goto(`/schools/${ORG}/pass`);
+  await page.getByRole('button', { name: 'Nurse' }).click();
+  await expect(page.locator('[data-slot="dialog-content"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Request WayPass' }).click();
+  await expect(page.getByRole('button', { name: /Requesting/ })).toBeVisible();
+  release(null);
+  await expect(page.getByRole('heading', { name: 'Request received' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toHaveCount(0);
+});
+
+test('active traveling pass shows a live timer without mutating the pass', async ({ page }) => {
+  await shell(page, STUDENT);
+  const active: { current: ReturnType<typeof mockPass> | null } = {
+    current: {
+      ...mockPass('outbound', 'none'),
+      movement: {
+        readyUntil: null,
+        queueEnteredAt: null,
+        queueExpiresAt: null,
+        expectedReturnAt: new Date(Date.now() + 8 * 60 * 1000 + 42 * 1000).toISOString(),
+        effectiveCheckInMode: 'none',
+        reasonCode: null,
+      },
+    },
+  };
+  await studentHomeApis(page, active);
+  let completed = false;
+  await page.route(`**/api/v1/me/passes/${PASS}/complete`, async (route) => {
+    completed = true;
+    await route.fulfill({ json: { pass: active.current } });
+  });
+  await page.goto(`/schools/${ORG}/pass`);
+  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toHaveCount(0);
+  await expect(page.getByText('remaining')).toBeVisible();
+  await expect(page.getByText('08:4')).toBeVisible();
+  expect(completed).toBe(false);
 });
 
 test('teacher can deny a request and the row resolves', async ({ page }) => {
@@ -960,11 +1117,15 @@ test('student no-pass view works at 320px from the keyboard without axe violatio
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto(`/schools/${ORG}/pass`);
   await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
+  const overflow = await page
+    .locator('main')
+    .evaluate((element) => element.scrollWidth - element.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await page.getByRole('button', { name: /Nurse/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-slot="drawer-popup"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Request a WayPass' })).toBeVisible();
+  await page.getByRole('button', { name: 'Request WayPass' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: "You're ready." })).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
