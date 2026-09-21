@@ -265,21 +265,29 @@ beforeAll(async () => {
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Grant Room') RETURNING id`,
     [tenantA, schoolA],
   );
+  const categoryA = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Grant Nurse Cat') RETURNING id`,
+    [tenantA, schoolA],
+  );
   destinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Grant Nurse') RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'Grant Nurse') RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
   archivedDestinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name, status) VALUES ($1, $2, $3, 'office', 'Grant Archive', 'archived') RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name, status) VALUES ($1, $2, $3, $4, 'office', 'Grant Archive', 'archived') RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
   const locationB = await insertReturningId(
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Grant B Room') RETURNING id`,
     [tenantB, schoolB],
   );
+  const categoryB = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Grant B Cat') RETURNING id`,
+    [tenantB, schoolB],
+  );
   destinationB = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Grant B Nurse') RETURNING id`,
-    [tenantB, schoolB, locationB],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'Grant B Nurse') RETURNING id`,
+    [tenantB, schoolB, locationB, categoryB],
   );
 }, 120000);
 

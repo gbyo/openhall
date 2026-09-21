@@ -1,32 +1,34 @@
 import { Skeleton } from '@/components/ui/skeleton';
 import { StudentDestinationGrid } from './StudentDestinationGrid.js';
 import type { ScheduledAuthorization } from './scheduled-presentation.js';
-import type { DestinationCatalogEntry, StudentIntent } from './student-intents.js';
-import { groupDestinationsIntoIntents } from './student-intents.js';
+import type { StudentCatalogCategory, StudentCategory } from './student-intents.js';
+import { splitStudentCatalog } from './student-intents.js';
 import { ReadyNowPasses, UpcomingPasses } from './UpcomingPasses.js';
 
 interface StudentHomeProps {
-  destinations: DestinationCatalogEntry[];
+  categories: StudentCatalogCategory[];
   authorizations: ScheduledAuthorization[];
   timeZone: string;
   startingId: string | null;
   startPending: boolean;
   actionsDisabled: boolean;
-  onSelectIntent: (intent: StudentIntent) => void;
+  onSelectCategory: (category: StudentCategory) => void;
+  onSelectMore: (secondary: StudentCategory[]) => void;
   onStartScheduled: (authorization: ScheduledAuthorization) => void;
 }
 
 export function StudentHome({
-  destinations,
+  categories,
   authorizations,
   timeZone,
   startingId,
   startPending,
   actionsDisabled,
-  onSelectIntent,
+  onSelectCategory,
+  onSelectMore,
   onStartScheduled,
 }: StudentHomeProps) {
-  const intents = groupDestinationsIntoIntents(destinations);
+  const { primary, secondary } = splitStudentCatalog(categories);
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <ReadyNowPasses
@@ -41,9 +43,13 @@ export function StudentHome({
           Where do you need to go?
         </h1>
         <StudentDestinationGrid
-          intents={intents}
+          primary={primary}
+          hasSecondary={secondary.length > 0}
           disabled={actionsDisabled}
-          onSelect={onSelectIntent}
+          onSelectCategory={onSelectCategory}
+          onSelectMore={() => {
+            onSelectMore(secondary);
+          }}
         />
       </div>
       <UpcomingPasses authorizations={authorizations} timeZone={timeZone} />

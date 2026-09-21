@@ -102,10 +102,30 @@ async function seedSchool(scratch: Pool, tag: string) {
       [tenantId, school],
     ),
   );
+  // destination_category exists only from migration 010 on; pinned-version
+  // fixtures must not reference it while latest-level fixtures must.
+  const hasCategories =
+    (
+      await scratch.query<{ reg: string | null }>(
+        `SELECT to_regclass('destination_category') AS reg`,
+      )
+    ).rows[0]?.reg !== null;
+  const category = hasCategories
+    ? idOf(
+        await scratch.query(
+          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse') RETURNING id`,
+          [tenantId, school],
+        ),
+      )
+    : null;
   const destination = idOf(
     await scratch.query(
-      `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'N') RETURNING id`,
-      [tenantId, school, location],
+      hasCategories
+        ? `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'N') RETURNING id`
+        : `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'N') RETURNING id`,
+      hasCategories && category !== null
+        ? [tenantId, school, location, category]
+        : [tenantId, school, location],
     ),
   );
   const pass = idOf(
@@ -127,7 +147,7 @@ async function seedEvaluation(scratch: Pool, school: { tenantId: string; pass: s
 }
 
 describe('migration 007 destination flow and movement', () => {
-  it('migrates a blank database 001 -> 009 with flow hardening', async () => {
+  it('migrates a blank database 001 -> 010 with flow hardening', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
@@ -142,6 +162,7 @@ describe('migration 007 destination flow and movement', () => {
         '007_destination_flow_and_movement',
         '008_school_control_plane',
         '009_guided_setup_authentication',
+        '010_destination_categories',
       ]);
       const constraints = await scratch.query<{ conname: string }>(
         `SELECT conname FROM pg_constraint WHERE conname LIKE '%phase7%' ORDER BY 1`,
@@ -262,10 +283,16 @@ describe('migration 007 destination flow and movement', () => {
           [school.tenantId, school.otherSchool],
         ),
       );
+      const foreignCategory = idOf(
+        await scratch.query(
+          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Foreign Nurse') RETURNING id`,
+          [school.tenantId, school.otherSchool],
+        ),
+      );
       const foreignDestination = idOf(
         await scratch.query(
-          `INSERT INTO destination (tenant_id, organization_id, location_id, service_type) VALUES ($1, $2, $3, 'nurse') RETURNING id`,
-          [school.tenantId, school.otherSchool, foreignLocation],
+          `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type) VALUES ($1, $2, $3, $4, 'nurse') RETURNING id`,
+          [school.tenantId, school.otherSchool, foreignLocation, foreignCategory],
         ),
       );
       await expect(

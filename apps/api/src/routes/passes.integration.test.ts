@@ -248,25 +248,37 @@ beforeAll(async () => {
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic B') RETURNING id`,
     [tenantA, schoolB],
   );
+  const categoryA = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Restrooms', 'primary') RETURNING id`,
+    [tenantA, schoolA],
+  );
+  const categoryB = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
+    [tenantA, schoolB],
+  );
+  const categoryTB = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
+    [tenantB, tenantBSchool],
+  );
   destinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'restroom', 'Restroom B') RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'restroom', 'Restroom B') RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
   closedDestinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name, status) VALUES ($1, $2, $3, 'restroom', 'Closed Restroom', 'closed') RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, status) VALUES ($1, $2, $3, $4, true, 'restroom', 'Closed Restroom', 'closed') RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
   destinationB = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Nurse B') RETURNING id`,
-    [tenantA, schoolB, locationB],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse B') RETURNING id`,
+    [tenantA, schoolB, locationB, categoryB],
   );
   const tenantBLocation = await insertReturningId(
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'TB Clinic') RETURNING id`,
     [tenantB, tenantBSchool],
   );
   crossTenantDestination = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'TB Nurse') RETURNING id`,
-    [tenantB, tenantBSchool, tenantBLocation],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'nurse', 'TB Nurse') RETURNING id`,
+    [tenantB, tenantBSchool, tenantBLocation, categoryTB],
   );
 
   // Schedule fixtures so Expected Placement resolves for section members.

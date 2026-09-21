@@ -382,9 +382,13 @@ beforeAll(async () => {
     `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, location_id) VALUES ($1, $2, $3, $4, $5)`,
     [tenantA, schoolA, sectionA1, block, locationA],
   );
+  const categoryA = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
+    [tenantA, schoolA],
+  );
   destinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Nurse') RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse') RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
 }, 120000);
 
@@ -482,9 +486,13 @@ describe('scheduled authorization administration', () => {
     const missing = await createAuth(requireAdmin(), schoolA, authPayload(randomUUID()));
     expect(missing.statusCode).toBe(404);
 
+    const archivedCategory = await insertReturningId(
+      `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Archived Cat') RETURNING id`,
+      [tenantA, schoolA],
+    );
     const archived = await insertReturningId(
-      `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name, status) VALUES ($1, $2, $3, 'office', 'Archived', 'archived') RETURNING id`,
-      [tenantA, schoolA, locationA],
+      `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name, status) VALUES ($1, $2, $3, $4, 'office', 'Archived', 'archived') RETURNING id`,
+      [tenantA, schoolA, locationA, archivedCategory],
     );
     const archivedDest = await createAuth(
       requireAdmin(),

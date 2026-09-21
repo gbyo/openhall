@@ -8,6 +8,9 @@ export const queryKeys = {
   activeSelfPass: ['active-self-pass'] as const,
   selfScheduled: ['self-scheduled'] as const,
   destinations: (organizationId: string) => ['destinations', organizationId] as const,
+  studentCatalog: (organizationId: string) => ['student-catalog', organizationId] as const,
+  destinationCategories: (organizationId: string) =>
+    ['destination-categories', organizationId] as const,
   destination: (destinationId: string) => ['destination', destinationId] as const,
   queueStatus: (passId: string) => ['queue-status', passId] as const,
   pendingApprovals: ['pending-approvals'] as const,

@@ -20,6 +20,7 @@ function authorization(overrides: Partial<ScheduledAuthorization> = {}): Schedul
       id: '00000000-0000-4000-8000-000000000012',
       displayName: 'Nurse',
       serviceType: 'nurse',
+      category: { id: 'cat-nurse', name: 'Nurse', iconKey: 'medical', toneKey: 'rose' },
     },
     originLocation: null,
     ...overrides,

@@ -203,6 +203,19 @@ export async function createPassInTransaction(
   if (destination.status !== 'active') {
     throw new PassApplicationError('destination_unavailable', 'Destination is not requestable.');
   }
+  if (requestSource === 'student_web') {
+    // Student self-service is server-enforced, never merely a UI filter:
+    // the destination must be explicitly requestable and grouped under an
+    // active primary/secondary category. Staff and scheduled creation are
+    // unaffected so hidden appointments remain startable.
+    if (
+      !destination.studentSelfRequestable ||
+      destination.categoryStatus !== 'active' ||
+      (destination.categorySurface !== 'primary' && destination.categorySurface !== 'secondary')
+    ) {
+      throw new PassApplicationError('destination_unavailable', 'Destination is not requestable.');
+    }
+  }
   const school = await dependencies.facts.loadOrganization(context, schoolId);
   if (school?.kind !== 'school' || school.status !== 'active') {
     throw new PassApplicationError('destination_not_found', 'Destination not found.');

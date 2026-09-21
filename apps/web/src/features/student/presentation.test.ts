@@ -13,6 +13,7 @@ function pass(state: string, mode: Pass['movement']['effectiveCheckInMode'] = nu
       displayName: 'Nurse',
       serviceType: 'nurse',
       checkInMode: 'required',
+      category: { id: 'cat-nurse', name: 'Nurse', iconKey: 'medical', toneKey: 'rose' },
     },
     origin: { placementKind: 'resolved', block: null, section: null, location: null },
     requestSource: 'student_web',

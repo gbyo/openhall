@@ -1,45 +1,68 @@
 import { describe, expect, it } from 'vitest';
-import { groupDestinationsIntoIntents, intentKeyForServiceType } from './student-intents.js';
-import type { DestinationCatalogEntry } from './student-intents.js';
+import { splitStudentCatalog, toStudentCategory } from './student-intents.js';
+import type { StudentCatalogCategory } from './student-intents.js';
 
-function entry(
+function category(
   id: string,
-  serviceType: string,
-  displayName = serviceType,
-): DestinationCatalogEntry {
-  return { id, displayName, serviceType, checkInMode: 'none' };
+  overrides: Partial<StudentCatalogCategory> = {},
+): StudentCatalogCategory {
+  return {
+    id,
+    name: id,
+    iconKey: 'generic',
+    toneKey: 'neutral',
+    studentSurface: 'primary',
+    sortOrder: 0,
+    destinations: [],
+    ...overrides,
+  };
 }
 
-describe('student intent registry', () => {
-  it('maps canonical service types to intents', () => {
-    expect(intentKeyForServiceType('restroom')).toBe('restroom');
-    expect(intentKeyForServiceType('nurse')).toBe('nurse');
-    expect(intentKeyForServiceType('health')).toBe('nurse');
-    expect(intentKeyForServiceType('counseling')).toBe('counselor');
-    expect(intentKeyForServiceType('library')).toBe('library');
-    expect(intentKeyForServiceType('office')).toBe('office');
-  });
-
-  it('groups known destinations and keeps unknown ones under More', () => {
-    const intents = groupDestinationsIntoIntents([
-      entry('a', 'restroom', 'First floor restroom'),
-      entry('b', 'restroom', 'Second floor restroom'),
-      entry('c', 'health', 'Health Office'),
-      entry('d', 'planetarium', 'Planetarium'),
+describe('server-defined student catalog', () => {
+  it('splits primary and secondary surfaces without a persisted More', () => {
+    const { primary, secondary } = splitStudentCatalog([
+      category('restroom', { name: 'Restroom', iconKey: 'restroom', toneKey: 'aqua' }),
+      category('principal', {
+        name: 'Principal',
+        studentSurface: 'secondary',
+        iconKey: 'building',
+        toneKey: 'blue',
+      }),
     ]);
-    expect(intents.map((intent) => intent.key)).toEqual(['restroom', 'nurse', 'more']);
-    expect(intents[0]?.destinations).toHaveLength(2);
-    expect(intents[2]?.destinations.map((entry) => entry.id)).toEqual(['d']);
+    expect(primary.map((entry) => entry.name)).toEqual(['Restroom']);
+    expect(secondary.map((entry) => entry.name)).toEqual(['Principal']);
+    expect(primary[0]?.icon).toBeDefined();
+    expect(primary[0]?.tone).toBe('aqua');
   });
 
-  it('omits More when every destination is known', () => {
-    const intents = groupDestinationsIntoIntents([entry('a', 'library', 'Library')]);
-    expect(intents.map((intent) => intent.key)).toEqual(['library']);
+  it('renders whatever the server returns without service-type branching', () => {
+    const custom = category('services', {
+      name: 'Student Services',
+      studentSurface: 'secondary',
+      destinations: [
+        {
+          id: 'd1',
+          displayName: 'Guidance',
+          location: { id: 'l1', name: 'Room 101' },
+          checkInMode: 'none',
+        },
+      ],
+    });
+    const converted = toStudentCategory(custom);
+    expect(converted.name).toBe('Student Services');
+    expect(converted.surface).toBe('secondary');
+    expect(converted.destinations).toHaveLength(1);
   });
 
-  it('never matches on display names', () => {
-    expect(intentKeyForServiceType('planetarium')).toBe('more');
-    const intents = groupDestinationsIntoIntents([entry('a', 'planetarium', 'Restroom Annex')]);
-    expect(intents.map((intent) => intent.key)).toEqual(['more']);
+  it('falls back to generic presentation for unknown keys', () => {
+    const converted = toStudentCategory(
+      category('x', { iconKey: 'not-a-key', toneKey: 'not-a-tone' }),
+    );
+    expect(converted.icon).toBeDefined();
+    expect(converted.tone).toBe('neutral');
+  });
+
+  it('returns empty lists for an empty catalog', () => {
+    expect(splitStudentCatalog([])).toEqual({ primary: [], secondary: [] });
   });
 });

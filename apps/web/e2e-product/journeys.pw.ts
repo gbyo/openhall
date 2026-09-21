@@ -6,6 +6,7 @@ import {
   mockPass,
   ORG,
   ORG_B,
+  orgCategories,
   orgDestinations,
   orgLocations,
   PASS,
@@ -164,7 +165,7 @@ test('uncertain requests keep one idempotency key across Check again', async ({ 
   expect(keys[1]).toBe(keys[0]);
 });
 
-test('student home groups destinations into intent tiles without admin metadata', async ({
+test('student home renders server-defined categories with a generated More tile', async ({
   page,
 }) => {
   await shell(page, STUDENT);
@@ -178,6 +179,9 @@ test('student home groups destinations into intent tiles without admin metadata'
   await expect(page.getByText('Check-in')).toHaveCount(0);
   await expect(page.getByText('Planetarium')).toHaveCount(0);
   await page.getByRole('button', { name: 'More' }).click();
+  await expect(page.getByRole('heading', { name: 'More places' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Planetarium' })).toBeVisible();
+  await page.getByRole('button', { name: 'Planetarium' }).click();
   await expect(page.getByRole('heading', { name: 'Request a WayPass' })).toBeVisible();
   await expect(page.getByText('Planetarium')).toBeVisible();
 });
@@ -216,7 +220,7 @@ test('ready appointments sit above the launcher in a four-column desktop grid', 
   expect(columns).toBe(4);
 });
 
-test('clicking an intent tile never posts a pass before confirmation', async ({ page }) => {
+test('clicking a category tile never posts a pass before confirmation', async ({ page }) => {
   await shell(page, STUDENT);
   const active: { current: ReturnType<typeof mockPass> | null } = { current: null };
   await studentHomeApis(page, active);
@@ -231,11 +235,11 @@ test('clicking an intent tile never posts a pass before confirmation', async ({ 
     });
   });
   await page.goto(`/schools/${ORG}/pass`);
-  // Single-destination intent skips the picker and lands on confirmation.
+  // Single-destination category skips the picker and lands on confirmation.
   await page.getByRole('button', { name: 'Nurse' }).click();
   await expect(page.getByRole('heading', { name: 'Request a WayPass' })).toBeVisible();
   expect(posted).toBe(0);
-  // Multi-destination intent opens an item-based picker, still without posting.
+  // Multi-destination category opens an item-based picker, still without posting.
   await page.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('button', { name: 'Restroom' }).click();
   await expect(page.getByRole('button', { name: 'First floor restroom' })).toBeVisible();
@@ -772,6 +776,9 @@ test('admin destinations create in a dialog over the list', async ({ page }) => 
   await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
     route.fulfill({ json: orgDestinations() }),
   );
+  await page.route(`**/api/v1/organizations/${ORG}/destination-categories`, (route) =>
+    route.fulfill({ json: orgCategories() }),
+  );
   await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
     route.fulfill({ json: orgLocations() }),
   );
@@ -782,8 +789,41 @@ test('admin destinations create in a dialog over the list', async ({ page }) => 
   const dialog = page.getByRole('dialog', { name: 'New destination' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel('Display name')).toBeVisible();
-  await expect(dialog.getByLabel('Type')).toBeVisible();
+  await expect(dialog.getByLabel('Category')).toBeVisible();
   await expect(dialog.getByLabel('Location')).toBeVisible();
+  await expect(dialog.getByText('Students can request this destination')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Advanced' }).click();
+  await expect(dialog.getByLabel('Internal type')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
+test('admin categories create from the Categories tab', async ({ page }) => {
+  await shell(page, ADMIN);
+  await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
+    route.fulfill({ json: orgDestinations() }),
+  );
+  const categories = orgCategories().categories;
+  await page.route(`**/api/v1/organizations/${ORG}/destination-categories`, (route) =>
+    route.fulfill({ json: { categories } }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
+    route.fulfill({ json: orgLocations() }),
+  );
+  await page.goto(`/schools/${ORG}/admin/destinations`);
+  await page.getByRole('tab', { name: 'Categories' }).click();
+  await expect(page.getByRole('heading', { name: 'Categories' })).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Destination categories' }).getByText('Nurse'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'New category' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New category' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Name')).toBeVisible();
+  await expect(dialog.getByLabel('Icon')).toBeVisible();
+  await expect(dialog.getByLabel('Color')).toBeVisible();
+  await expect(dialog.getByLabel('Student launcher')).toBeVisible();
+  await expect(dialog.getByLabel('Display order')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });

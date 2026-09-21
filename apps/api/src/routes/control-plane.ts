@@ -26,6 +26,7 @@ import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { requireCsrf, requirePrincipal } from '../auth/session-context.js';
 import { registerAuditRoutes } from './control-plane-audit.js';
+import { registerDestinationCategoryRoutes } from './control-plane-destination-categories.js';
 import { registerEnrollmentRoutes } from './control-plane-enrollment.js';
 import { registerGrantRoutes } from './control-plane-grants.js';
 import { registerPeopleRoutes } from './control-plane-people.js';
@@ -331,6 +332,8 @@ export function registerControlPlaneRoutes(
             requestId: request.id,
             config: {
               locationId: request.body.locationId,
+              categoryId: request.body.categoryId,
+              studentSelfRequestable: request.body.studentSelfRequestable,
               serviceType: request.body.serviceType,
               displayName: request.body.displayName,
               capacity: request.body.capacity,
@@ -418,6 +421,8 @@ export function registerControlPlaneRoutes(
             requestId: request.id,
             config: {
               locationId: request.body.locationId,
+              categoryId: request.body.categoryId,
+              studentSelfRequestable: request.body.studentSelfRequestable,
               serviceType: request.body.serviceType,
               displayName: request.body.displayName,
               capacity: request.body.capacity,
@@ -526,6 +531,7 @@ export function registerControlPlaneRoutes(
     },
   );
 
+  registerDestinationCategoryRoutes(typedApp, controlPlane, auth, handle);
   registerAuditRoutes(typedApp, controlPlane, auth, handle);
   registerScheduleRoutes(typedApp, controlPlane, auth, handle);
   registerPolicyRoutes(typedApp, controlPlane, auth, handle);

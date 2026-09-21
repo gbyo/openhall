@@ -58,6 +58,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
+import { DestinationAssignedStaff } from './DestinationAssignedStaff.js';
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -102,6 +103,18 @@ export function DestinationDetailPage() {
         }),
       ),
   });
+  const categories = useQuery({
+    queryKey: queryKeys.destinationCategories(organizationId),
+    queryFn: () =>
+      confirmed(
+        api.GET('/api/v1/organizations/{organizationId}/destination-categories', {
+          params: { path: { organizationId } },
+        }),
+      ),
+  });
+  const activeCategories = (categories.data?.categories ?? []).filter(
+    (item) => item.status === 'active',
+  );
   const [draft, setDraft] = useState<NonNullable<typeof detail.data>['destination'] | null>(null);
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   useEffect(() => {
@@ -131,6 +144,8 @@ export function DestinationDetailPage() {
             headers,
             body: {
               locationId: draft.locationId,
+              categoryId: draft.categoryId,
+              studentSelfRequestable: draft.studentSelfRequestable,
               serviceType: draft.serviceType,
               displayName: draft.displayName,
               capacity: draft.capacity,
@@ -272,7 +287,48 @@ export function DestinationDetailPage() {
               </Combobox>
             </Field>
             <Field>
-              <FieldLabel htmlFor="destination-type">Type</FieldLabel>
+              <FieldLabel htmlFor="destination-category">Category</FieldLabel>
+              <Select
+                value={draft.categoryId}
+                onValueChange={(value: string | null) => {
+                  if (value) setDraft({ ...draft, categoryId: value });
+                }}
+              >
+                <SelectTrigger id="destination-category">
+                  <SelectValue placeholder="Choose a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeCategories.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field orientation="horizontal">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="destination-student-access">
+                  Students can request this destination
+                </Label>
+                <FieldDescription>
+                  When off, staff and scheduled passes can still use this destination.
+                </FieldDescription>
+              </div>
+              <Switch
+                id="destination-student-access"
+                checked={draft.studentSelfRequestable}
+                onCheckedChange={(checked) => {
+                  setDraft({ ...draft, studentSelfRequestable: checked });
+                }}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="destination-type">Internal type</FieldLabel>
+              <FieldDescription>
+                Machine-readable classification used for compatibility and integrations. It does not
+                control how this destination is grouped for students.
+              </FieldDescription>
               <Input
                 id="destination-type"
                 value={draft.serviceType}
@@ -283,6 +339,7 @@ export function DestinationDetailPage() {
             </Field>
           </FieldGroup>
         </FieldSet>
+        <DestinationAssignedStaff destinationId={destinationId} />
         <FieldSet>
           <FieldLegend>Movement</FieldLegend>
           <FieldGroup>

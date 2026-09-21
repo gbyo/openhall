@@ -9,7 +9,7 @@ import type { Pass } from '../../api/types';
 import { QueuePosition } from '../../design-system/patterns/QueuePosition';
 import { Route, RouteStop } from '../../design-system/patterns/Route';
 import type { StudentPassPresentation } from './presentation';
-import { groupDestinationsIntoIntents } from './student-intents.js';
+import { iconForCategoryKey } from '../../lib/destination-category-presentation.js';
 import { formatSchoolTime } from './student-time.js';
 
 export interface PassAction {
@@ -156,25 +156,15 @@ export function ActiveStudentPass({
   primary,
   secondary,
 }: ActiveStudentPassProps) {
-  const intents = groupDestinationsIntoIntents([
-    {
-      id: pass.destination.id,
-      displayName: pass.destination.displayName,
-      serviceType: pass.destination.serviceType,
-      checkInMode: 'none',
-    },
-  ]);
-  const icon = intents[0]?.icon;
-  const intentLabel =
-    intents[0] && intents[0].key !== 'more' ? intents[0].label : pass.destination.displayName;
+  const category = pass.destination.category;
+  const icon = iconForCategoryKey(category?.iconKey ?? 'generic');
+  const intentLabel = category?.name ?? pass.destination.displayName;
   return (
     <div className="mx-auto w-full max-w-xl">
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
-            {icon ? (
-              <HugeiconsIcon icon={icon} strokeWidth={2} aria-hidden="true" className="size-6" />
-            ) : null}
+            <HugeiconsIcon icon={icon} strokeWidth={2} aria-hidden="true" className="size-6" />
             <p className="text-sm font-medium text-muted-foreground">{intentLabel}</p>
             <Badge variant="secondary">{stateBadge(presentation)}</Badge>
           </div>

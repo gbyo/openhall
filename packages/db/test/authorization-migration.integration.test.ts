@@ -63,7 +63,7 @@ afterAll(async () => {
 
 describe('migration 004 authorization relationships', () => {
   it('advances the expected migration marker', () => {
-    expect(EXPECTED_MIGRATION).toBe('009_guided_setup_authentication');
+    expect(EXPECTED_MIGRATION).toBe('010_destination_categories');
   });
 
   it('migrates a blank database 001 -> 004', async () => {

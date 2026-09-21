@@ -335,7 +335,7 @@ test('student home has no overflow at 390px and no serious axe findings', async 
   expect(errors).toEqual([]);
 });
 
-test('student intent tiles stay labeled in forced colors', async ({ page }) => {
+test('student category tiles stay labeled in forced colors', async ({ page }) => {
   await page.emulateMedia({ forcedColors: 'active' });
   const errors = listenForErrors(page);
   await shell(page, STUDENT);

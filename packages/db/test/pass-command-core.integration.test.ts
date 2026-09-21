@@ -123,16 +123,43 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
       [tenantId, schoolB],
     ),
   );
+  // destination_category exists only from migration 010 on; pinned-version
+  // fixtures must not reference it while latest-level fixtures must.
+  const hasCategories =
+    (
+      await target.query<{ reg: string | null }>(
+        `SELECT to_regclass('destination_category') AS reg`,
+      )
+    ).rows[0]?.reg !== null;
+  async function categoryFor(school: string, name: string): Promise<string | null> {
+    if (!hasCategories) return null;
+    return idOf(
+      await target.query<{ id: string }>(
+        `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, $3) RETURNING id`,
+        [tenantId, school, name],
+      ),
+    );
+  }
+  const categoryB = await categoryFor(schoolB, 'Nurse');
+  const categoryA = await categoryFor(schoolA, 'Restroom');
   const destinationB = idOf(
     await target.query<{ id: string }>(
-      `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Nurse B') RETURNING id`,
-      [tenantId, schoolB, locationB],
+      hasCategories
+        ? `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'Nurse B') RETURNING id`
+        : `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Nurse B') RETURNING id`,
+      hasCategories && categoryB !== null
+        ? [tenantId, schoolB, locationB, categoryB]
+        : [tenantId, schoolB, locationB],
     ),
   );
   const destinationA = idOf(
     await target.query<{ id: string }>(
-      `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'restroom', 'Restroom A') RETURNING id`,
-      [tenantId, schoolA, locationA],
+      hasCategories
+        ? `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'restroom', 'Restroom A') RETURNING id`
+        : `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'restroom', 'Restroom A') RETURNING id`,
+      hasCategories && categoryA !== null
+        ? [tenantId, schoolA, locationA, categoryA]
+        : [tenantId, schoolA, locationA],
     ),
   );
   return {
@@ -148,8 +175,8 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
 }
 
 describe('migration 005 pass command core', () => {
-  it('advances the expected migration marker to 009', () => {
-    expect(EXPECTED_MIGRATION).toBe('009_guided_setup_authentication');
+  it('advances the expected migration marker to 010', () => {
+    expect(EXPECTED_MIGRATION).toBe('010_destination_categories');
   });
 
   it('migrates a blank database 001 -> 005 with same-school hardening', async () => {

@@ -173,9 +173,13 @@ beforeAll(async () => {
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic') RETURNING id`,
     [tenantA, schoolA],
   );
+  const categoryA1 = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
+    [tenantA, schoolA],
+  );
   destinationA1 = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Nurse') RETURNING id`,
-    [tenantA, schoolA, location],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse') RETURNING id`,
+    [tenantA, schoolA, location, categoryA1],
   );
 
   // Student at school A.

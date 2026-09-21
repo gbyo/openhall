@@ -17,6 +17,9 @@ export const TITLE_BY_CODE: Record<ControlPlaneErrorCode, string> = {
   invalid_location_state: 'Invalid location state',
   destination_not_found: 'Destination not found',
   destination_in_use: 'Destination in use',
+  destination_category_not_found: 'Destination category not found',
+  destination_category_in_use: 'Destination category in use',
+  destination_category_exists: 'Destination category exists',
   destination_already_open: 'Destination already open',
   destination_already_closed: 'Destination already closed',
   invalid_destination_state: 'Invalid destination state',
@@ -97,6 +100,11 @@ export const LocationIdParamsSchema = Type.Object(
 );
 export const DestinationIdParamsSchema = Type.Object(
   { destinationId: UuidSchema },
+  { additionalProperties: false },
+);
+
+export const DestinationCategoryIdParamsSchema = Type.Object(
+  { categoryId: UuidSchema },
   { additionalProperties: false },
 );
 

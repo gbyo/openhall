@@ -923,6 +923,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{organizationId}/destination-categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List school destination categories with full admin DTO. Requires destination.manage on the exact school. Cache-Control: no-store. */
+        get: operations["listDestinationCategories"];
+        put?: never;
+        /** @description Create a school destination category (status active, revision 1). Requires Idempotency-Key. Cache-Control: no-store. */
+        post: operations["createDestinationCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/destination-categories/{categoryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one destination category with its strong ETag. Authorized against the canonical school. Cache-Control: no-store. */
+        get: operations["getDestinationCategory"];
+        /** @description Replace category presentation metadata (never status; revision + 1). Renames never mutate destination service types. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
+        put: operations["updateDestinationCategory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/destination-categories/{categoryId}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Archive a destination category (terminal). Rejects with destination_category_in_use while non-archived destinations still reference it. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
+        post: operations["archiveDestinationCategory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/organizations/{organizationId}/student-destination-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Purpose-built student launcher catalog: active primary/secondary categories with eligible destinations only. Authorized with pass.request.self semantics. Cache-Control: no-store. */
+        get: operations["listMyStudentDestinationCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organizationId}/audit-events": {
         parameters: {
             query?: never;
@@ -2662,6 +2732,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -2843,6 +2920,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -3012,6 +3096,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -3132,6 +3223,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -3428,6 +3526,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -3638,6 +3743,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -3854,6 +3966,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -4070,6 +4189,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -4363,6 +4489,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -4573,6 +4706,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -4783,6 +4923,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -4993,6 +5140,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -5203,6 +5357,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -5413,6 +5574,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -5623,6 +5791,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -5834,6 +6009,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -6045,6 +6227,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -6256,6 +6445,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;
@@ -7762,6 +7958,9 @@ export interface operations {
                             organizationId: string;
                             /** Format: uuid */
                             locationId: string;
+                            /** Format: uuid */
+                            categoryId: string;
+                            studentSelfRequestable: boolean;
                             serviceType: string;
                             displayName: string | null;
                             capacity: number | null;
@@ -7851,6 +8050,9 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     locationId: string;
+                    /** Format: uuid */
+                    categoryId: string;
+                    studentSelfRequestable: boolean;
                     serviceType: string;
                     displayName: string | null;
                     capacity: number | null;
@@ -7878,6 +8080,9 @@ export interface operations {
                             organizationId: string;
                             /** Format: uuid */
                             locationId: string;
+                            /** Format: uuid */
+                            categoryId: string;
+                            studentSelfRequestable: boolean;
                             serviceType: string;
                             displayName: string | null;
                             capacity: number | null;
@@ -8048,6 +8253,9 @@ export interface operations {
                             organizationId: string;
                             /** Format: uuid */
                             locationId: string;
+                            /** Format: uuid */
+                            categoryId: string;
+                            studentSelfRequestable: boolean;
                             serviceType: string;
                             displayName: string | null;
                             capacity: number | null;
@@ -8138,6 +8346,9 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     locationId: string;
+                    /** Format: uuid */
+                    categoryId: string;
+                    studentSelfRequestable: boolean;
                     serviceType: string;
                     displayName: string | null;
                     capacity: number | null;
@@ -8165,6 +8376,9 @@ export interface operations {
                             organizationId: string;
                             /** Format: uuid */
                             locationId: string;
+                            /** Format: uuid */
+                            categoryId: string;
+                            studentSelfRequestable: boolean;
                             serviceType: string;
                             displayName: string | null;
                             capacity: number | null;
@@ -8338,6 +8552,9 @@ export interface operations {
                             organizationId: string;
                             /** Format: uuid */
                             locationId: string;
+                            /** Format: uuid */
+                            categoryId: string;
+                            studentSelfRequestable: boolean;
                             serviceType: string;
                             displayName: string | null;
                             capacity: number | null;
@@ -8511,6 +8728,9 @@ export interface operations {
                             organizationId: string;
                             /** Format: uuid */
                             locationId: string;
+                            /** Format: uuid */
+                            categoryId: string;
+                            studentSelfRequestable: boolean;
                             serviceType: string;
                             displayName: string | null;
                             capacity: number | null;
@@ -8684,6 +8904,9 @@ export interface operations {
                             organizationId: string;
                             /** Format: uuid */
                             locationId: string;
+                            /** Format: uuid */
+                            categoryId: string;
+                            studentSelfRequestable: boolean;
                             serviceType: string;
                             displayName: string | null;
                             capacity: number | null;
@@ -8852,7 +9075,810 @@ export interface operations {
                             id: string;
                             displayName: string;
                             serviceType: string;
+                            /** Format: uuid */
+                            categoryId: string;
                             checkInMode: "none" | "optional" | "required";
+                        }[];
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    listDestinationCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        categories: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            name: string;
+                            iconKey: string;
+                            toneKey: string;
+                            studentSurface: "primary" | "secondary" | "hidden";
+                            sortOrder: number;
+                            status: "active" | "archived";
+                            revision: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    createDestinationCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    iconKey: string;
+                    toneKey: string;
+                    studentSurface: "primary" | "secondary" | "hidden";
+                    sortOrder: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        category: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            name: string;
+                            iconKey: string;
+                            toneKey: string;
+                            studentSurface: "primary" | "secondary" | "hidden";
+                            sortOrder: number;
+                            status: "active" | "archived";
+                            revision: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
+                    };
+                };
+            };
+            /** @description Malformed input, invalid precondition, or invalid idempotency key */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Resource in use, duplicate, or invalid state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Stale resource revision */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description If-Match required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    getDestinationCategory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                categoryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        category: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            name: string;
+                            iconKey: string;
+                            toneKey: string;
+                            studentSurface: "primary" | "secondary" | "hidden";
+                            sortOrder: number;
+                            status: "active" | "archived";
+                            revision: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    updateDestinationCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "if-match"?: string;
+            };
+            path: {
+                categoryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    iconKey: string;
+                    toneKey: string;
+                    studentSurface: "primary" | "secondary" | "hidden";
+                    sortOrder: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        category: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            name: string;
+                            iconKey: string;
+                            toneKey: string;
+                            studentSurface: "primary" | "secondary" | "hidden";
+                            sortOrder: number;
+                            status: "active" | "archived";
+                            revision: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
+                    };
+                };
+            };
+            /** @description Malformed input, invalid precondition, or invalid idempotency key */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Resource in use, duplicate, or invalid state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Stale resource revision */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description If-Match required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    archiveDestinationCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                "if-match"?: string;
+            };
+            path: {
+                categoryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        category: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            name: string;
+                            iconKey: string;
+                            toneKey: string;
+                            studentSurface: "primary" | "secondary" | "hidden";
+                            sortOrder: number;
+                            status: "active" | "archived";
+                            revision: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
+                    };
+                };
+            };
+            /** @description Malformed input, invalid precondition, or invalid idempotency key */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Resource in use, duplicate, or invalid state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Stale resource revision */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description If-Match required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    listMyStudentDestinationCatalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        categories: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            iconKey: string;
+                            toneKey: string;
+                            studentSurface: "primary" | "secondary";
+                            sortOrder: number;
+                            destinations: {
+                                /** Format: uuid */
+                                id: string;
+                                displayName: string;
+                                location: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                };
+                                checkInMode: "none" | "optional" | "required";
+                            }[];
                         }[];
                     };
                 };
@@ -13678,6 +14704,13 @@ export interface operations {
                                 id: string;
                                 displayName: string;
                                 serviceType: string;
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             originLocation: {
                                 /** Format: uuid */
@@ -13769,6 +14802,13 @@ export interface operations {
                                 displayName: string;
                                 serviceType: string;
                                 checkInMode: "none" | "optional" | "required";
+                                category: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    iconKey: string;
+                                    toneKey: string;
+                                } | null;
                             };
                             origin: {
                                 placementKind: string;

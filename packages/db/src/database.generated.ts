@@ -157,6 +157,7 @@ export interface Course {
 
 export interface Destination {
   capacity: number | null;
+  category_id: string;
   check_in_mode: Generated<string>;
   default_duration_seconds: number | null;
   display_name: string | null;
@@ -170,7 +171,23 @@ export interface Destination {
   revision: Generated<Int8>;
   service_type: string;
   status: Generated<string>;
+  student_self_requestable: Generated<boolean>;
   tenant_id: string;
+  updated_at: Generated<string>;
+}
+
+export interface DestinationCategory {
+  created_at: Generated<string>;
+  icon_key: Generated<string>;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  revision: Generated<Int8>;
+  sort_order: Generated<number>;
+  status: Generated<string>;
+  student_surface: Generated<string>;
+  tenant_id: string;
+  tone_key: Generated<string>;
   updated_at: Generated<string>;
 }
 
@@ -656,6 +673,7 @@ export interface DB {
   calendar_day: CalendarDay;
   course: Course;
   destination: Destination;
+  destination_category: DestinationCategory;
   destination_reservation: DestinationReservation;
   external_reference: ExternalReference;
   idempotency_record: IdempotencyRecord;

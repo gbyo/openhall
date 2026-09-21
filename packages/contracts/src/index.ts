@@ -492,6 +492,17 @@ export const PassMovementProjectionSchema = Type.Object(
  * Small safe pass representation. Revision is a decimal string because the
  * underlying value is PostgreSQL bigint, never a JSON number.
  */
+/** Current category presentation joined onto pass/scheduled projections (never snapshotted). */
+export const PassDestinationCategorySchema = Type.Object(
+  {
+    id: UuidSchema,
+    name: Type.String(),
+    iconKey: Type.String(),
+    toneKey: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
 export const PassSchema = Type.Object(
   {
     id: UuidSchema,
@@ -508,6 +519,7 @@ export const PassSchema = Type.Object(
           Type.Literal('optional'),
           Type.Literal('required'),
         ]),
+        category: Type.Union([PassDestinationCategorySchema, Type.Null()]),
       },
       { additionalProperties: false },
     ),
@@ -781,6 +793,8 @@ export const DestinationSchema = Type.Object(
     id: UuidSchema,
     organizationId: UuidSchema,
     locationId: UuidSchema,
+    categoryId: UuidSchema,
+    studentSelfRequestable: Type.Boolean(),
     serviceType: Type.String({ minLength: 1, maxLength: 100 }),
     displayName: Type.Union([Type.String({ minLength: 1, maxLength: 200 }), Type.Null()]),
     capacity: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
@@ -810,6 +824,8 @@ export const DestinationResponseSchema = Type.Object(
 export const DestinationWriteBodySchema = Type.Object(
   {
     locationId: UuidSchema,
+    categoryId: UuidSchema,
+    studentSelfRequestable: Type.Boolean(),
     serviceType: Type.String({ minLength: 1, maxLength: 100 }),
     displayName: Type.Union([Type.String({ minLength: 1, maxLength: 200 }), Type.Null()]),
     capacity: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
@@ -1407,6 +1423,7 @@ export const ScheduledAuthStudentViewSchema = Type.Object(
         id: UuidSchema,
         displayName: Type.String(),
         serviceType: Type.String(),
+        category: Type.Union([PassDestinationCategorySchema, Type.Null()]),
       },
       { additionalProperties: false },
     ),
@@ -1465,9 +1482,93 @@ export const DestinationCatalogEntrySchema = Type.Object(
     id: UuidSchema,
     displayName: Type.String(),
     serviceType: Type.String(),
+    categoryId: UuidSchema,
     checkInMode: CheckInModeSchema,
   },
   { additionalProperties: false },
+);
+
+/**
+ * School-defined destination category: the student-facing grouping for
+ * destinations. Presentation travels as safe product keys; the frontend
+ * owns the single centralized key -> icon/class mapping.
+ */
+export const DestinationCategorySchema = Type.Object(
+  {
+    id: UuidSchema,
+    organizationId: UuidSchema,
+    name: Type.String({ minLength: 1, maxLength: 100 }),
+    iconKey: Type.String({ minLength: 1, maxLength: 40 }),
+    toneKey: Type.String({ minLength: 1, maxLength: 40 }),
+    studentSurface: Type.Union([
+      Type.Literal('primary'),
+      Type.Literal('secondary'),
+      Type.Literal('hidden'),
+    ]),
+    sortOrder: Type.Integer({ minimum: 0 }),
+    status: Type.Union([Type.Literal('active'), Type.Literal('archived')]),
+    revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+    updatedAt: InstantSchema,
+  },
+  { $id: 'DestinationCategory', additionalProperties: false },
+);
+
+export const DestinationCategoryListSchema = Type.Object(
+  { categories: Type.Array(DestinationCategorySchema) },
+  { $id: 'DestinationCategoryList', additionalProperties: false },
+);
+
+export const DestinationCategoryResponseSchema = Type.Object(
+  { category: DestinationCategorySchema },
+  { $id: 'DestinationCategoryResponse', additionalProperties: false },
+);
+
+export const DestinationCategoryWriteBodySchema = Type.Object(
+  {
+    name: Type.String({ minLength: 1, maxLength: 100 }),
+    iconKey: Type.String({ minLength: 1, maxLength: 40 }),
+    toneKey: Type.String({ minLength: 1, maxLength: 40 }),
+    studentSurface: Type.Union([
+      Type.Literal('primary'),
+      Type.Literal('secondary'),
+      Type.Literal('hidden'),
+    ]),
+    sortOrder: Type.Integer({ minimum: 0, maximum: 100000 }),
+  },
+  { $id: 'DestinationCategoryWriteBody', additionalProperties: false },
+);
+
+/**
+ * Purpose-built student launcher catalog: active primary/secondary
+ * categories with their eligible destinations. Hidden/archived categories,
+ * non-requestable destinations, and empty categories never appear.
+ */
+export const StudentDestinationCatalogDestinationSchema = Type.Object(
+  {
+    id: UuidSchema,
+    displayName: Type.String(),
+    location: Type.Object({ id: UuidSchema, name: Type.String() }, { additionalProperties: false }),
+    checkInMode: CheckInModeSchema,
+  },
+  { additionalProperties: false },
+);
+
+export const StudentDestinationCatalogCategorySchema = Type.Object(
+  {
+    id: UuidSchema,
+    name: Type.String(),
+    iconKey: Type.String(),
+    toneKey: Type.String(),
+    studentSurface: Type.Union([Type.Literal('primary'), Type.Literal('secondary')]),
+    sortOrder: Type.Integer({ minimum: 0 }),
+    destinations: Type.Array(StudentDestinationCatalogDestinationSchema),
+  },
+  { additionalProperties: false },
+);
+
+export const StudentDestinationCatalogSchema = Type.Object(
+  { categories: Type.Array(StudentDestinationCatalogCategorySchema) },
+  { $id: 'StudentDestinationCatalog', additionalProperties: false },
 );
 
 export const DestinationCatalogSchema = Type.Object(

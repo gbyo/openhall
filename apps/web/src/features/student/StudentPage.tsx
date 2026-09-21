@@ -11,10 +11,13 @@ import { StatusAnnouncer } from '../../components/StatusAnnouncer';
 import { useSchool } from '../../app/school/SchoolShell';
 import { ActiveStudentPass, type PassAction } from './ActiveStudentPass';
 import { presentStudentPass } from './presentation';
-import type { DestinationCatalogEntry, StudentIntent } from './student-intents.js';
+import type { StudentCatalogDestination, StudentCategory } from './student-intents.js';
 import type { ScheduledAuthorization } from './scheduled-presentation.js';
 import { StudentHome, StudentHomeSkeleton } from './StudentHome';
-import { StudentPassRequestSurface } from './StudentPassRequestSurface';
+import {
+  StudentPassRequestSurface,
+  type StudentPassRequestState,
+} from './StudentPassRequestSurface';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -63,8 +66,27 @@ const ACTION_COPY: Record<Action, { label: string; pendingLabel: string }> = {
 };
 
 interface PendingSelection {
-  intent: StudentIntent;
+  category: StudentCategory | null;
+  secondary: StudentCategory[] | null;
   destinationId: string | null;
+}
+
+function toRequestState(
+  selection: PendingSelection | null,
+  status: { pending: boolean; error: string | null; uncertain: boolean },
+): StudentPassRequestState | null {
+  if (!selection) return null;
+  if (!selection.category) {
+    if (!selection.secondary) return null;
+    return { kind: 'more', secondary: selection.secondary, ...status };
+  }
+  return {
+    kind: 'category',
+    category: selection.category,
+    destination:
+      selection.category.destinations.find((entry) => entry.id === selection.destinationId) ?? null,
+    ...status,
+  };
 }
 
 export function StudentPage() {
@@ -84,11 +106,11 @@ export function StudentPage() {
     queryFn: async () => passResource(await api.GET('/api/v1/me/passes/active')),
     staleTime: 5_000,
   });
-  const destinations = useQuery({
-    queryKey: queryKeys.destinations(organizationId),
+  const catalog = useQuery({
+    queryKey: queryKeys.studentCatalog(organizationId),
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/me/organizations/{organizationId}/destinations', {
+        api.GET('/api/v1/me/organizations/{organizationId}/student-destination-catalog', {
           params: { path: { organizationId } },
         }),
       ),
@@ -262,21 +284,30 @@ export function StudentPage() {
   if (!pass) {
     const authorizations =
       scheduled.data?.authorizations.filter((item) => item.organizationId === organizationId) ?? [];
-    const catalog = destinations.data?.destinations ?? [];
-    const loaded = !destinations.isPending && !scheduled.isPending;
+    const categories = catalog.data?.categories ?? [];
+    const loaded = !catalog.isPending && !scheduled.isPending;
     const startScheduledError = startScheduled.error;
-    const selectIntent = (intent: StudentIntent) => {
+    const selectCategory = (category: StudentCategory) => {
       request.reset();
-      setSelection({ intent, destinationId: null });
+      setSelection({ category, secondary: null, destinationId: null });
     };
-    const pickDestination = (destination: DestinationCatalogEntry) => {
+    const selectMore = (secondary: StudentCategory[]) => {
+      request.reset();
+      setSelection({ category: null, secondary, destinationId: null });
+    };
+    const pickCategory = (category: StudentCategory) => {
+      request.reset();
+      setSelection({ category, secondary: null, destinationId: null });
+    };
+    const pickDestination = (destination: StudentCatalogDestination) => {
       setSelection((current) =>
         current ? { ...current, destinationId: destination.id } : current,
       );
     };
     const confirmRequest = () => {
-      if (!selection) return;
-      const destinationId = selection.destinationId ?? selection.intent.destinations[0]?.id ?? null;
+      if (!selection?.category) return;
+      const destinationId =
+        selection.destinationId ?? selection.category.destinations[0]?.id ?? null;
       if (!destinationId) return;
       request.mutate(requestCommands.begin({ destinationId }, null));
     };
@@ -311,7 +342,7 @@ export function StudentPage() {
         )}
         {!loaded ? (
           <StudentHomeSkeleton />
-        ) : catalog.length === 0 && authorizations.length === 0 ? (
+        ) : categories.length === 0 && authorizations.length === 0 ? (
           <Empty>
             <EmptyHeader>
               <EmptyTitle>No destinations available.</EmptyTitle>
@@ -322,7 +353,7 @@ export function StudentPage() {
           </Empty>
         ) : (
           <StudentHome
-            destinations={catalog}
+            categories={categories}
             authorizations={authorizations}
             timeZone={timeZone}
             startingId={
@@ -332,7 +363,8 @@ export function StudentPage() {
             }
             startPending={startScheduled.isPending}
             actionsDisabled={request.isPending}
-            onSelectIntent={selectIntent}
+            onSelectCategory={selectCategory}
+            onSelectMore={selectMore}
             onStartScheduled={(authorization: ScheduledAuthorization) => {
               startScheduled.mutate(
                 scheduledCommands.begin(
@@ -344,20 +376,12 @@ export function StudentPage() {
           />
         )}
         <StudentPassRequestSurface
-          request={
-            selection
-              ? {
-                  intent: selection.intent,
-                  destination:
-                    selection.intent.destinations.find(
-                      (entry) => entry.id === selection.destinationId,
-                    ) ?? null,
-                  pending: request.isPending,
-                  error: request.error ? productMessage(request.error) : null,
-                  uncertain: request.error instanceof UncertainCommandError,
-                }
-              : null
-          }
+          request={toRequestState(selection, {
+            pending: request.isPending,
+            error: request.error ? productMessage(request.error) : null,
+            uncertain: request.error instanceof UncertainCommandError,
+          })}
+          onPickCategory={pickCategory}
           onPickDestination={pickDestination}
           onConfirm={confirmRequest}
           onRetry={retryRequest}

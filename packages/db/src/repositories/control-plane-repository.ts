@@ -59,6 +59,8 @@ interface DestinationRow {
   tenant_id: string;
   organization_id: string;
   location_id: string;
+  category_id: string;
+  student_self_requestable: boolean;
   service_type: string;
   display_name: string | null;
   capacity: number | null;
@@ -96,6 +98,8 @@ function toDestinationRecord(row: DestinationRow): DestinationRecord {
     tenantId: row.tenant_id,
     organizationId: row.organization_id,
     locationId: row.location_id,
+    categoryId: row.category_id,
+    studentSelfRequestable: row.student_self_requestable,
     serviceType: row.service_type,
     displayName: row.display_name,
     capacity: row.capacity,
@@ -382,6 +386,8 @@ export class PostgresDestinationRepository implements DestinationRepository {
         tenant_id: context.tenantId,
         organization_id: input.organizationId,
         location_id: input.locationId,
+        category_id: input.categoryId,
+        student_self_requestable: input.studentSelfRequestable,
         service_type: input.serviceType,
         display_name: input.displayName,
         capacity: input.capacity,
@@ -410,6 +416,8 @@ export class PostgresDestinationRepository implements DestinationRepository {
       .updateTable('destination')
       .set({
         location_id: update.locationId,
+        category_id: update.categoryId,
+        student_self_requestable: update.studentSelfRequestable,
         service_type: update.serviceType,
         display_name: update.displayName,
         capacity: update.capacity,

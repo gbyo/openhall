@@ -10,6 +10,7 @@ export * from './repositories/scheduled-auth-repository.js';
 export * from './repositories/grant-admin-repository.js';
 export * from './repositories/people-repository.js';
 export * from './repositories/control-plane-repository.js';
+export * from './repositories/destination-category-repository.js';
 export * from './repositories/policy-admin-repository.js';
 export * from './repositories/schedule-admin-repository.js';
 export * from './repositories/authorization-repository.js';
