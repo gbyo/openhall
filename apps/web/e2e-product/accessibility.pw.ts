@@ -34,16 +34,16 @@ function hasVisibleShadowColor(shadow: string): boolean {
     const normalized = color.toLowerCase();
     if (normalized === 'transparent') return false;
 
-    const slashAlpha = normalized.match(/\/\s*([\d.]+%?)\s*\)$/);
-    const commaAlpha = normalized.match(/(?:rgba|hsla)\([^)]*,\s*([\d.]+%?)\s*\)$/);
+    const slashAlpha = /\/\s*([\d.]+%?)\s*\)$/.exec(normalized);
+    const commaAlpha = /(?:rgba|hsla)\([^)]*,\s*([\d.]+%?)\s*\)$/.exec(normalized);
     const alpha = slashAlpha?.[1] ?? commaAlpha?.[1];
     if (alpha !== undefined) {
       const value = Number.parseFloat(alpha);
       return Number.isFinite(value) && value > 0;
     }
 
-    if (/^#[\da-f]{4}$/i.test(normalized)) return normalized.slice(-1) !== '0';
-    if (/^#[\da-f]{8}$/i.test(normalized)) return normalized.slice(-2) !== '00';
+    if (/^#[\da-f]{4}$/i.test(normalized)) return !normalized.endsWith('0');
+    if (/^#[\da-f]{8}$/i.test(normalized)) return !normalized.endsWith('00');
     return true;
   });
 }
