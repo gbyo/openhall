@@ -1,5 +1,4 @@
-import { useRef, useState, type MouseEvent } from 'react';
-import { buttonVariants } from '@/components/ui/button';
+import { useRef, useState } from 'react';
 import {
   Questionnaire,
   QuestionnaireActions,
@@ -12,7 +11,6 @@ import {
 } from '@/components/ui/questionnaire';
 import { SetupLayout } from './SetupLayout';
 import type { StepHandle } from './SetupLayout';
-import { SetupProgress } from './SetupProgress';
 import { SchoolFields } from './SchoolStep';
 import { AdministratorFields } from './AdministratorStep';
 import { SignInFields } from './SignInStep';
@@ -31,7 +29,14 @@ const ITEMS = ORDER.map((name) => ({ name, required: true }));
  * Known gap: Questionnaire's answer model is one Choice/Input answer per
  * item, so multi-field school/administrator/review steps cannot satisfy its
  * built-in required validation. Items run in controlled mode with external
- * validity shown through `invalid` + `QuestionnaireError`. */
+ * validity shown through `invalid` + `QuestionnaireError`.
+ *
+ * Navigation notes: Previous uses Questionnaire's native step-back. Next
+ * preventDefaults the native advance because the native path runs built-in
+ * item validation, which answer-less multi-field items cannot satisfy;
+ * step-handle validation owns advancement instead. Submit renders as a plain
+ * button for the same reason: a form submit would run the same built-in
+ * validation before reaching the review submit. */
 export function GuidedSetupFlow() {
   const [item, setItem] = useState<SetupItemName>('school');
   const [invalid, setInvalid] = useState<Record<SetupItemName, boolean>>({
@@ -101,11 +106,7 @@ export function GuidedSetupFlow() {
           goTo(name as SetupItemName);
         }}
       >
-        <QuestionnaireProgress
-          render={(_props: Record<string, unknown>, state: { current: number; total: number }) => (
-            <SetupProgress current={state.current - 1} total={state.total} />
-          )}
-        />
+        <QuestionnaireProgress />
         <QuestionnaireItem name="school" required invalid={invalid.school}>
           <SchoolFields handleRef={schoolHandle} onInvalidChange={markInvalid('school')} />
           <QuestionnaireError>Fix the highlighted fields to continue.</QuestionnaireError>
@@ -119,7 +120,6 @@ export function GuidedSetupFlow() {
         </QuestionnaireItem>
         <QuestionnaireItem name="sign-in" required invalid={invalid['sign-in']}>
           <SignInFields handleRef={signInHandle} onInvalidChange={markInvalid('sign-in')} />
-          <QuestionnaireError>Fix the highlighted fields to continue.</QuestionnaireError>
         </QuestionnaireItem>
         <QuestionnaireItem name="review" required invalid={invalid.review}>
           <ReviewFields
@@ -129,17 +129,9 @@ export function GuidedSetupFlow() {
           />
         </QuestionnaireItem>
         <QuestionnaireActions>
-          <QuestionnairePrevious
-            onClick={(event: MouseEvent<HTMLButtonElement>) => {
-              event.preventDefault();
-              const previous = ORDER[index - 1];
-              if (previous) goTo(previous);
-            }}
-          >
-            Back
-          </QuestionnairePrevious>
+          <QuestionnairePrevious>Back</QuestionnairePrevious>
           <QuestionnaireNext
-            onClick={(event: MouseEvent<HTMLButtonElement>) => {
+            onClick={(event) => {
               event.preventDefault();
               advance();
             }}
@@ -147,21 +139,14 @@ export function GuidedSetupFlow() {
             Continue
           </QuestionnaireNext>
           <QuestionnaireSubmit
-            render={(props: Record<string, unknown>) => (
-              <button
-                type="button"
-                className={buttonVariants()}
-                hidden={props.hidden as boolean | undefined}
-                tabIndex={props.tabIndex as number | undefined}
-                disabled={submitting}
-                onClick={() => {
-                  void submit();
-                }}
-              >
-                {submitting ? 'Working…' : 'Create WayPass'}
-              </button>
-            )}
-          />
+            type="button"
+            disabled={submitting}
+            onClick={() => {
+              void submit();
+            }}
+          >
+            {submitting ? 'Creating…' : 'Create WayPass'}
+          </QuestionnaireSubmit>
         </QuestionnaireActions>
       </Questionnaire>
     </SetupLayout>

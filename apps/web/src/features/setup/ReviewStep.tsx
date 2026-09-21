@@ -10,7 +10,7 @@ import {
   ItemGroup,
   ItemTitle,
 } from '@/components/ui/item';
-import { QuestionnaireTitle } from '@/components/ui/questionnaire';
+import { QuestionnaireDescription, QuestionnaireTitle } from '@/components/ui/questionnaire';
 import { ApiProblem } from '../../api/problems';
 import { queryClient } from '../../app/query-client';
 import { useFocusField } from './SetupLayout';
@@ -136,10 +136,11 @@ export function ReviewFields({ handleRef, onInvalidChange, onEdit }: ReviewField
   return (
     <>
       <QuestionnaireTitle>
-        <h1 className="setup-title" id="setup-review-title">
-          Ready to set up WayPass
-        </h1>
+        <h1 id="setup-review-title">Ready to set up WayPass</h1>
       </QuestionnaireTitle>
+      <QuestionnaireDescription>
+        Make sure everything looks right before creating WayPass.
+      </QuestionnaireDescription>
       {error ? (
         <Alert variant="destructive" className="mb-6">
           <AlertTitle>Setup could not finish</AlertTitle>

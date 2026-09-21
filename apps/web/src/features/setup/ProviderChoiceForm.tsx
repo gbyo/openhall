@@ -6,6 +6,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import {
+  QuestionnaireChoice,
+  QuestionnaireChoiceDescription,
+  QuestionnaireChoices,
+} from '@/components/ui/questionnaire';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { ProviderDraft, SignInChoice } from './setup-state';
 
@@ -19,14 +24,32 @@ export interface ProviderChoiceErrors {
   scopes?: string;
 }
 
-export interface ProviderChoiceFormProps {
-  idPrefix: string;
-  choice: SignInChoice | null;
-  provider: ProviderDraft;
-  errors: ProviderChoiceErrors;
-  allowLater: boolean;
-  onChoice: (choice: SignInChoice) => void;
-  onProvider: (provider: Partial<ProviderDraft>) => void;
+const CHOICE_OPTIONS: readonly {
+  value: SignInChoice;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: 'google',
+    title: 'Google Workspace',
+    description:
+      "Use your school's Google accounts. Recommended for schools using Google Workspace.",
+  },
+  {
+    value: 'generic',
+    title: 'Another OpenID Connect provider',
+    description: 'Connect any standards-based sign-in service your school already uses.',
+  },
+  {
+    value: 'later',
+    title: 'Set up sign-in later',
+    description:
+      'Start configuring WayPass now and connect your school’s sign-in afterward. This browser will receive temporary setup access.',
+  },
+];
+
+function choiceOptions(allowLater: boolean): readonly (typeof CHOICE_OPTIONS)[number][] {
+  return allowLater ? CHOICE_OPTIONS : CHOICE_OPTIONS.slice(0, 2);
 }
 
 const cardClassName =
@@ -54,49 +77,102 @@ function ChoiceCard({
   );
 }
 
-/** Sign-in options as Base UI radio cards. Google exposes only client ID +
- * secret; the server owns issuer, scopes, keys, and auth method. Advanced
- * generic settings start collapsed. */
-export function ProviderChoiceForm({
+export interface ProviderChoiceGroupProps {
+  idPrefix?: string | undefined;
+  choice: SignInChoice | null;
+  allowLater: boolean;
+  errorId?: string | undefined;
+  onChoice: (choice: SignInChoice) => void;
+}
+
+/** Sign-in options as Base UI radio cards. Used outside Questionnaire (for
+ * example the connect-sign-in page), where Questionnaire choice primitives
+ * have no Item context. */
+export function ProviderChoiceCards({
+  idPrefix,
+  choice,
+  allowLater,
+  errorId,
+  onChoice,
+}: ProviderChoiceGroupProps) {
+  return (
+    <RadioGroup
+      aria-label="Sign-in options"
+      {...(errorId ? { 'aria-describedby': errorId } : {})}
+      value={choice}
+      onValueChange={(value) => {
+        onChoice(value as SignInChoice);
+      }}
+    >
+      {choiceOptions(allowLater).map((option) => (
+        <ChoiceCard
+          key={option.value}
+          idPrefix={idPrefix ?? 'provider-choice'}
+          value={option.value}
+          title={option.title}
+          description={option.description}
+        />
+      ))}
+    </RadioGroup>
+  );
+}
+
+/** Sign-in options as canonical Questionnaire choices. The checked state is
+ * fully controlled by the single setup-state choice; Questionnaire mirrors
+ * it as its item answer without becoming a second source of truth. */
+export function ProviderQuestionnaireChoices({
+  choice,
+  allowLater,
+  onChoice,
+}: ProviderChoiceGroupProps) {
+  return (
+    <QuestionnaireChoices aria-label="Sign-in options">
+      {choiceOptions(allowLater).map((option) => (
+        <QuestionnaireChoice
+          key={option.value}
+          value={option.value}
+          checked={choice === option.value}
+          // The canonical hover wash (input/40) drops the muted description
+          // text to ~4.46:1. muted/50 keeps hover feedback while holding
+          // ≥4.5:1. This overrides via className merge, not a parallel style.
+          className="hover:bg-muted/50"
+          onChange={() => {
+            onChoice(option.value);
+          }}
+        >
+          {option.title}
+          <QuestionnaireChoiceDescription className="group-data-checked/questionnaire-choice:text-foreground">
+            {option.description}
+          </QuestionnaireChoiceDescription>
+        </QuestionnaireChoice>
+      ))}
+    </QuestionnaireChoices>
+  );
+}
+
+export interface ProviderChoiceFormProps {
+  idPrefix: string;
+  choice: SignInChoice | null;
+  provider: ProviderDraft;
+  errors: ProviderChoiceErrors;
+  allowLater: boolean;
+  onChoice: (choice: SignInChoice) => void;
+  onProvider: (provider: Partial<ProviderDraft>) => void;
+}
+
+/** Provider-specific follow-up fields shared by every sign-in surface. Google
+ * exposes only client ID + secret; the server owns issuer, scopes, keys, and
+ * auth method. Advanced generic settings start collapsed. */
+export function ProviderDetailsForm({
   idPrefix,
   choice,
   provider,
   errors,
   allowLater,
-  onChoice,
   onProvider,
-}: ProviderChoiceFormProps) {
+}: Omit<ProviderChoiceFormProps, 'onChoice'>) {
   return (
-    <div>
-      <RadioGroup
-        aria-label="Sign-in options"
-        {...(errors.choice ? { 'aria-describedby': `${idPrefix}-choice-error` } : {})}
-        value={choice}
-        onValueChange={(value) => {
-          onChoice(value as SignInChoice);
-        }}
-      >
-        <ChoiceCard
-          idPrefix={idPrefix}
-          value="google"
-          title="Google Workspace"
-          description="Use your school's Google accounts. Recommended for schools using Google Workspace."
-        />
-        <ChoiceCard
-          idPrefix={idPrefix}
-          value="generic"
-          title="Another OpenID Connect provider"
-          description="Connect any standards-based sign-in service your school already uses."
-        />
-        {allowLater ? (
-          <ChoiceCard
-            idPrefix={idPrefix}
-            value="later"
-            title="Set up sign-in later"
-            description="Start configuring WayPass now and connect your school's sign-in afterward. This browser will receive temporary setup access."
-          />
-        ) : null}
-      </RadioGroup>
+    <>
       {choice === 'google' ? (
         <div className="mt-2 ml-2 border-l-2 border-border pl-4">
           <Field data-invalid={errors.clientId !== undefined}>
@@ -235,9 +311,8 @@ export function ProviderChoiceForm({
             onOpenChange={(open: boolean) => {
               onProvider({ advancedOpen: open });
             }}
-            className="rounded-2xl border border-border px-4 py-3"
           >
-            <CollapsibleTrigger className="text-[15px] font-semibold">
+            <CollapsibleTrigger className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80">
               Advanced provider settings
             </CollapsibleTrigger>
             <CollapsibleContent className="pt-3">
@@ -309,6 +384,39 @@ export function ProviderChoiceForm({
           </AlertDescription>
         </Alert>
       ) : null}
+    </>
+  );
+}
+
+/** Sign-in options plus provider fields for surfaces outside Questionnaire. */
+export function ProviderChoiceForm({
+  idPrefix,
+  choice,
+  provider,
+  errors,
+  allowLater,
+  onChoice,
+  onProvider,
+}: ProviderChoiceFormProps) {
+  return (
+    <div>
+      <ProviderChoiceCards
+        idPrefix={idPrefix}
+        choice={choice}
+        allowLater={allowLater}
+        errorId={errors.choice ? `${idPrefix}-choice-error` : undefined}
+        onChoice={(value) => {
+          onChoice(value);
+        }}
+      />
+      <ProviderDetailsForm
+        idPrefix={idPrefix}
+        choice={choice}
+        provider={provider}
+        errors={errors}
+        allowLater={allowLater}
+        onProvider={onProvider}
+      />
       {errors.choice ? (
         <p
           className="mt-2 text-sm font-medium text-destructive"

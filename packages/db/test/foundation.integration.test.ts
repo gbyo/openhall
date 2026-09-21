@@ -497,7 +497,7 @@ describe('foundation migration on PostgreSQL 18', () => {
     const handle = createDatabase(databaseUrl, { max: 1 });
     const probe = new PostgresReadinessProbe(handle.database);
     await expect(probe.check()).resolves.toEqual({
-      migration: '008_school_control_plane',
+      migration: '009_guided_setup_authentication',
     });
     await handle.destroy();
     await expect(probe.check()).rejects.toBeDefined();

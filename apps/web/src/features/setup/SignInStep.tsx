@@ -1,12 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { QuestionnaireTitle } from '@/components/ui/questionnaire';
+import {
+  QuestionnaireDescription,
+  QuestionnaireError,
+  QuestionnaireTitle,
+} from '@/components/ui/questionnaire';
 import { useFocusField } from './SetupLayout';
-import { ProviderChoiceForm, type ProviderChoiceErrors } from './ProviderChoiceForm';
+import {
+  ProviderDetailsForm,
+  ProviderQuestionnaireChoices,
+  type ProviderChoiceErrors,
+} from './ProviderChoiceForm';
 import { useSetup } from './setup-state';
 import type { StepContentProps } from './SchoolStep';
 
-/** Sign-in choice with conditional provider fields. Provider secrets stay in
- * memory; the server owns issuer, scopes, keys, and auth method for Google. */
+/** Sign-in choice with conditional provider fields. The choice itself is a
+ * canonical Questionnaire single-choice question, controlled by the single
+ * setup-state selection; provider secrets stay in memory and the server owns
+ * issuer, scopes, keys, and auth method for Google. */
 export function SignInFields({ handleRef, onInvalidChange }: StepContentProps) {
   const { state, dispatch } = useSetup();
   const [attempted, setAttempted] = useState(false);
@@ -68,26 +78,35 @@ export function SignInFields({ handleRef, onInvalidChange }: StepContentProps) {
   return (
     <>
       <QuestionnaireTitle>
-        <h1 className="setup-title" id="setup-signin-title">
-          How should people sign in?
-        </h1>
+        <h1 id="setup-signin-title">How should people sign in?</h1>
       </QuestionnaireTitle>
+      <QuestionnaireDescription>
+        Choose the sign-in your school will use every day. You can connect it now or finish setup
+        first.
+      </QuestionnaireDescription>
       <div ref={groupRef} tabIndex={-1}>
-        <ProviderChoiceForm
-          idPrefix="setup-signin"
+        <ProviderQuestionnaireChoices
           choice={state.choice}
-          provider={state.provider}
-          errors={errors}
           allowLater
           onChoice={(choice) => {
             dispatch({ type: 'setChoice', choice });
             setErrors({});
           }}
+        />
+        <ProviderDetailsForm
+          idPrefix="setup-signin"
+          choice={state.choice}
+          provider={state.provider}
+          errors={errors}
+          allowLater
           onProvider={(patch) => {
             dispatch({ type: 'setProvider', provider: patch });
           }}
         />
       </div>
+      <QuestionnaireError>
+        {errors.choice ?? 'Fix the highlighted fields to continue.'}
+      </QuestionnaireError>
     </>
   );
 }
