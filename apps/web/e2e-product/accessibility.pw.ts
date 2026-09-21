@@ -150,7 +150,9 @@ test('student no-pass view stays usable at 200 percent text size', async ({ page
   await expect(
     page.getByRole('button', { name: 'Switch school, current school Roosevelt Middle School' }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Account, signed in as Avery Johnson' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Account, signed in as Avery Johnson' }),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: /Nurse/ })).toBeVisible();
   const clipped = await page
     .locator('main')
