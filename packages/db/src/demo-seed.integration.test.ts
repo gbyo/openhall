@@ -35,6 +35,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
+  const administration = new URL(process.env.DATABASE_URL);
+  administration.pathname = '/postgres';
   try {
     try {
       await pool.end();
@@ -42,9 +45,6 @@ afterAll(async () => {
       await destroyHandle();
     }
   } finally {
-    if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
-    const administration = new URL(process.env.DATABASE_URL);
-    administration.pathname = '/postgres';
     const admin = new Client({ connectionString: administration.toString() });
     await admin.connect();
     try {
