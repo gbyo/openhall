@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -123,21 +124,24 @@ export function SchoolSwitcher({
           <HugeiconsIcon icon={UnfoldMoreIcon} strokeWidth={2} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" className="w-56">
-          <DropdownMenuLabel>Schools</DropdownMenuLabel>
-          {schools.map((school) => (
-            <DropdownMenuItem
-              key={school.id}
-              disabled={school.id === organizationId}
-              onClick={() => void switchSchool(school.id)}
-            >
-              <span className="truncate">{school.name}</span>
-              {school.id === organizationId ? (
-                <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="ml-auto" />
-              ) : null}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem render={<Link to="/schools" />}>View all schools</DropdownMenuItem>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Schools</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {schools.map((school) => (
+              <DropdownMenuItem
+                key={school.id}
+                disabled={school.id === organizationId}
+                onClick={() => void switchSchool(school.id)}
+              >
+                <span className="truncate">{school.name}</span>
+                {school.id === organizationId ? (
+                  <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="ml-auto" />
+                ) : null}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem render={<Link to="/schools" />}>View all schools</DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -175,21 +179,24 @@ export function SchoolSwitcher({
             <HugeiconsIcon icon={UnfoldMoreIcon} strokeWidth={2} className="ml-auto" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="bottom" className="w-56">
-            <DropdownMenuLabel>Schools</DropdownMenuLabel>
-            {schools.map((school) => (
-              <DropdownMenuItem
-                key={school.id}
-                disabled={school.id === organizationId}
-                onClick={() => void switchSchool(school.id)}
-              >
-                <span className="truncate">{school.name}</span>
-                {school.id === organizationId ? (
-                  <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="ml-auto" />
-                ) : null}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link to="/schools" />}>View all schools</DropdownMenuItem>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Schools</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {schools.map((school) => (
+                <DropdownMenuItem
+                  key={school.id}
+                  disabled={school.id === organizationId}
+                  onClick={() => void switchSchool(school.id)}
+                >
+                  <span className="truncate">{school.name}</span>
+                  {school.id === organizationId ? (
+                    <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="ml-auto" />
+                  ) : null}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem render={<Link to="/schools" />}>View all schools</DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

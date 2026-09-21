@@ -85,26 +85,37 @@ export function RealtimeProvider({
       queryClient.getQueryData<OrganizationContext>(queryKeys.organizationContext(organizationId)),
     ),
   );
+  // Query-cache notifications can fire while another component is rendering
+  // (e.g. a route loader populating the cache during mount). Defer the state
+  // updates past the current render so this provider never sets state during
+  // another component's render pass.
   useEffect(
     () =>
       queryClient.getQueryCache().subscribe((event) => {
-        if (event.query.state.status === 'success' && event.query.state.dataUpdatedAt > 0)
-          setLastConfirmedAt(new Date(event.query.state.dataUpdatedAt));
+        if (event.query.state.status === 'success' && event.query.state.dataUpdatedAt > 0) {
+          const at = new Date(event.query.state.dataUpdatedAt);
+          queueMicrotask(() => {
+            setLastConfirmedAt((prev) => (prev?.getTime() === at.getTime() ? prev : at));
+          });
+        }
       }),
     [queryClient],
   );
   useEffect(() => {
-    const syncRevision = () => {
-      setContextRevision(
-        contextRevisionOf(
-          queryClient.getQueryData<OrganizationContext>(
-            queryKeys.organizationContext(organizationId),
-          ),
+    const readRevision = () =>
+      contextRevisionOf(
+        queryClient.getQueryData<OrganizationContext>(
+          queryKeys.organizationContext(organizationId),
         ),
       );
+    const scheduleSyncRevision = () => {
+      const next = readRevision();
+      queueMicrotask(() => {
+        setContextRevision((prev) => (prev === next ? prev : next));
+      });
     };
-    syncRevision();
-    return queryClient.getQueryCache().subscribe(syncRevision);
+    scheduleSyncRevision();
+    return queryClient.getQueryCache().subscribe(scheduleSyncRevision);
   }, [organizationId, queryClient]);
   useEffect(() => {
     const source = new EventSource(`/api/v1/organizations/${organizationId}/events`);
