@@ -56,7 +56,12 @@ import {
   FieldSet,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from '@/components/ui/input-group';
 import {
   Item,
   ItemActions,
@@ -260,7 +265,7 @@ export function Component() {
       students.data?.students.map((student) => ({
         value: student.id,
         label: student.gradeLevel
-          ? `${student.displayName} · Grade ${String(student.gradeLevel)}`
+          ? `${student.displayName} · Grade ${student.gradeLevel}`
           : student.displayName,
       })) ?? [],
     [students.data],
@@ -321,24 +326,23 @@ export function Component() {
 
   function submitCreate() {
     if (!createValid) return;
+    if (origin === 'specific' && locationId === null) return;
     create.mutate({
       key: crypto.randomUUID(),
       body: {
-        studentId: studentId as string,
-        destinationId: destinationId as string,
+        studentId,
+        destinationId,
         validFrom: instant(validFrom, timeZone),
         validUntil: instant(validUntil, timeZone),
         approvalMode,
         origin:
-          origin === 'expected'
-            ? { strategy: 'expected' }
-            : { strategy: 'specific', locationId: locationId as string },
+          origin === 'expected' ? { strategy: 'expected' } : { strategy: 'specific', locationId },
       },
     });
   }
 
   const cancellingRow = cancelling
-    ? rows.find(({ item }) => item.id === cancelling.id)?.item ?? null
+    ? (rows.find(({ item }) => item.id === cancelling.id)?.item ?? null)
     : null;
   const cancelPending = cancel.isPending;
 
@@ -472,7 +476,7 @@ export function Component() {
                         <DropdownMenuItem
                           variant="destructive"
                           disabled={cancellingThis}
-                          onSelect={() => {
+                          onClick={() => {
                             setCancelling({ id: item.id, studentName: item.student.displayName });
                           }}
                         >
@@ -493,198 +497,200 @@ export function Component() {
           if (!open) closeCreate();
         }}
       >
-        <DialogContent>
+        <DialogContent className="grid max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>New scheduled pass</DialogTitle>
             <DialogDescription>
               Set an appointment window. Times use {zoneName(timeZone)}.
             </DialogDescription>
           </DialogHeader>
-          {students.isPending || destinations.isPending ? (
-            <div role="status" aria-label="Loading pass options" className="flex flex-col gap-2">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-              <span className="sr-only">Loading students and destinations…</span>
-            </div>
-          ) : (
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="scheduled-student">Student</FieldLabel>
-                <Combobox
-                  items={studentOptions}
-                  value={selectedStudent}
-                  onValueChange={(option: Option | null) => {
-                    setStudentId(option?.value ?? null);
-                  }}
-                  filter={(item: Option, query: string) =>
-                    item.label.toLowerCase().includes(query.toLowerCase())
-                  }
-                >
-                  <ComboboxInput id="scheduled-student" placeholder="Search students" />
-                  <ComboboxContent>
-                    <ComboboxList>
-                      {(item: Option) => (
-                        <ComboboxItem key={item.value} value={item}>
-                          {item.label}
-                        </ComboboxItem>
-                      )}
-                    </ComboboxList>
-                    <ComboboxEmpty>No matching student.</ComboboxEmpty>
-                  </ComboboxContent>
-                </Combobox>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="scheduled-destination">Destination</FieldLabel>
-                <Combobox
-                  items={destinationOptions}
-                  value={selectedDestination}
-                  onValueChange={(option: Option | null) => {
-                    setDestinationId(option?.value ?? null);
-                  }}
-                  filter={(item: Option, query: string) =>
-                    item.label.toLowerCase().includes(query.toLowerCase())
-                  }
-                >
-                  <ComboboxInput id="scheduled-destination" placeholder="Search destinations" />
-                  <ComboboxContent>
-                    <ComboboxList>
-                      {(item: Option) => (
-                        <ComboboxItem key={item.value} value={item}>
-                          {item.label}
-                        </ComboboxItem>
-                      )}
-                    </ComboboxList>
-                    <ComboboxEmpty>No matching destination.</ComboboxEmpty>
-                  </ComboboxContent>
-                </Combobox>
-              </Field>
-              <FieldSet>
-                <FieldLegend>Available</FieldLegend>
-                <FieldDescription>Times shown in {zoneName(timeZone)}.</FieldDescription>
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="scheduled-from">From</FieldLabel>
-                    <Input
-                      id="scheduled-from"
-                      type="datetime-local"
-                      required
-                      value={validFrom}
-                      onChange={(event) => {
-                        setValidFrom(event.target.value);
-                      }}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="scheduled-until">Until</FieldLabel>
-                    <Input
-                      id="scheduled-until"
-                      type="datetime-local"
-                      required
-                      value={validUntil}
-                      onChange={(event) => {
-                        setValidUntil(event.target.value);
-                      }}
-                    />
-                  </Field>
-                </FieldGroup>
-              </FieldSet>
-              <FieldSet>
-                <FieldLegend>Origin</FieldLegend>
-                <RadioGroup
-                  aria-label="Origin"
-                  value={origin}
-                  onValueChange={(value) => {
-                    setOrigin(value as 'expected' | 'specific');
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="expected" id="origin-expected" />
-                    <Label htmlFor="origin-expected">Use student&apos;s expected location</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="specific" id="origin-specific" />
-                    <Label htmlFor="origin-specific">Specific location</Label>
-                  </div>
-                </RadioGroup>
-                {origin === 'specific' && (
-                  <Field>
-                    <FieldLabel htmlFor="scheduled-location">Location</FieldLabel>
-                    {locations.isPending ? (
-                      <Skeleton className="h-9 w-full" />
-                    ) : (
-                      <Combobox
-                        items={locationOptions}
-                        value={selectedLocation}
-                        onValueChange={(option: Option | null) => {
-                          setLocationId(option?.value ?? null);
+          <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pr-1">
+            {students.isPending || destinations.isPending ? (
+              <div role="status" aria-label="Loading pass options" className="flex flex-col gap-2">
+                <Skeleton className="h-9 w-full" />
+                <Skeleton className="h-9 w-full" />
+                <span className="sr-only">Loading students and destinations…</span>
+              </div>
+            ) : (
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="scheduled-student">Student</FieldLabel>
+                  <Combobox
+                    items={studentOptions}
+                    value={selectedStudent}
+                    onValueChange={(option: Option | null) => {
+                      setStudentId(option?.value ?? null);
+                    }}
+                    filter={(item: Option, query: string) =>
+                      item.label.toLowerCase().includes(query.toLowerCase())
+                    }
+                  >
+                    <ComboboxInput id="scheduled-student" placeholder="Search students" />
+                    <ComboboxContent>
+                      <ComboboxList>
+                        {(item: Option) => (
+                          <ComboboxItem key={item.value} value={item}>
+                            {item.label}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                      <ComboboxEmpty>No matching student.</ComboboxEmpty>
+                    </ComboboxContent>
+                  </Combobox>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="scheduled-destination">Destination</FieldLabel>
+                  <Combobox
+                    items={destinationOptions}
+                    value={selectedDestination}
+                    onValueChange={(option: Option | null) => {
+                      setDestinationId(option?.value ?? null);
+                    }}
+                    filter={(item: Option, query: string) =>
+                      item.label.toLowerCase().includes(query.toLowerCase())
+                    }
+                  >
+                    <ComboboxInput id="scheduled-destination" placeholder="Search destinations" />
+                    <ComboboxContent>
+                      <ComboboxList>
+                        {(item: Option) => (
+                          <ComboboxItem key={item.value} value={item}>
+                            {item.label}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                      <ComboboxEmpty>No matching destination.</ComboboxEmpty>
+                    </ComboboxContent>
+                  </Combobox>
+                </Field>
+                <FieldSet>
+                  <FieldLegend>Available</FieldLegend>
+                  <FieldDescription>Times shown in {zoneName(timeZone)}.</FieldDescription>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="scheduled-from">From</FieldLabel>
+                      <Input
+                        id="scheduled-from"
+                        type="datetime-local"
+                        required
+                        value={validFrom}
+                        onChange={(event) => {
+                          setValidFrom(event.target.value);
                         }}
-                        filter={(item: Option, query: string) =>
-                          item.label.toLowerCase().includes(query.toLowerCase())
-                        }
-                      >
-                        <ComboboxInput id="scheduled-location" placeholder="Search locations" />
-                        <ComboboxContent>
-                          <ComboboxList>
-                            {(item: Option) => (
-                              <ComboboxItem key={item.value} value={item}>
-                                {item.label}
-                              </ComboboxItem>
-                            )}
-                          </ComboboxList>
-                          <ComboboxEmpty>No matching location.</ComboboxEmpty>
-                        </ComboboxContent>
-                      </Combobox>
-                    )}
-                  </Field>
-                )}
-              </FieldSet>
-              <FieldSet>
-                <FieldLegend>Approval</FieldLegend>
-                <RadioGroup
-                  aria-label="Approval"
-                  value={approvalMode}
-                  onValueChange={(value) => {
-                    setApprovalMode(value as 'preapproved' | 'approval_required');
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="preapproved" id="approval-preapproved" />
-                    <Label htmlFor="approval-preapproved">Already approved</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="approval_required" id="approval-required" />
-                    <Label htmlFor="approval-required">Teacher approval still required</Label>
-                  </div>
-                </RadioGroup>
-                <FieldDescription>
-                  Already approved skips only ordinary classroom approval for this appointment.
-                  Other school policies still apply.
-                </FieldDescription>
-              </FieldSet>
-              {(students.isError || destinations.isError) && (
-                <FieldError>Students or destinations could not be loaded. Try again.</FieldError>
-              )}
-            </FieldGroup>
-          )}
-          {create.isError && (
-            <Alert variant="destructive">
-              <AlertTitle>Scheduled pass not created</AlertTitle>
-              <AlertDescription>{productMessage(create.error)}</AlertDescription>
-              {create.error instanceof UncertainCommandError && (
-                <AlertAction>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      create.mutate(create.variables);
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="scheduled-until">Until</FieldLabel>
+                      <Input
+                        id="scheduled-until"
+                        type="datetime-local"
+                        required
+                        value={validUntil}
+                        onChange={(event) => {
+                          setValidUntil(event.target.value);
+                        }}
+                      />
+                    </Field>
+                  </FieldGroup>
+                </FieldSet>
+                <FieldSet>
+                  <FieldLegend>Origin</FieldLegend>
+                  <RadioGroup
+                    aria-label="Origin"
+                    value={origin}
+                    onValueChange={(value) => {
+                      setOrigin(value as 'expected' | 'specific');
                     }}
                   >
-                    Check again
-                  </Button>
-                </AlertAction>
-              )}
-            </Alert>
-          )}
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="expected" id="origin-expected" />
+                      <Label htmlFor="origin-expected">Use student&apos;s expected location</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="specific" id="origin-specific" />
+                      <Label htmlFor="origin-specific">Specific location</Label>
+                    </div>
+                  </RadioGroup>
+                  {origin === 'specific' && (
+                    <Field>
+                      <FieldLabel htmlFor="scheduled-location">Location</FieldLabel>
+                      {locations.isPending ? (
+                        <Skeleton className="h-9 w-full" />
+                      ) : (
+                        <Combobox
+                          items={locationOptions}
+                          value={selectedLocation}
+                          onValueChange={(option: Option | null) => {
+                            setLocationId(option?.value ?? null);
+                          }}
+                          filter={(item: Option, query: string) =>
+                            item.label.toLowerCase().includes(query.toLowerCase())
+                          }
+                        >
+                          <ComboboxInput id="scheduled-location" placeholder="Search locations" />
+                          <ComboboxContent>
+                            <ComboboxList>
+                              {(item: Option) => (
+                                <ComboboxItem key={item.value} value={item}>
+                                  {item.label}
+                                </ComboboxItem>
+                              )}
+                            </ComboboxList>
+                            <ComboboxEmpty>No matching location.</ComboboxEmpty>
+                          </ComboboxContent>
+                        </Combobox>
+                      )}
+                    </Field>
+                  )}
+                </FieldSet>
+                <FieldSet>
+                  <FieldLegend>Approval</FieldLegend>
+                  <RadioGroup
+                    aria-label="Approval"
+                    value={approvalMode}
+                    onValueChange={(value) => {
+                      setApprovalMode(value as 'preapproved' | 'approval_required');
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="preapproved" id="approval-preapproved" />
+                      <Label htmlFor="approval-preapproved">Already approved</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="approval_required" id="approval-required" />
+                      <Label htmlFor="approval-required">Teacher approval still required</Label>
+                    </div>
+                  </RadioGroup>
+                  <FieldDescription>
+                    Already approved skips only ordinary classroom approval for this appointment.
+                    Other school policies still apply.
+                  </FieldDescription>
+                </FieldSet>
+                {(students.isError || destinations.isError) && (
+                  <FieldError>Students or destinations could not be loaded. Try again.</FieldError>
+                )}
+              </FieldGroup>
+            )}
+            {create.isError && (
+              <Alert variant="destructive">
+                <AlertTitle>Scheduled pass not created</AlertTitle>
+                <AlertDescription>{productMessage(create.error)}</AlertDescription>
+                {create.error instanceof UncertainCommandError && (
+                  <AlertAction>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        create.mutate(create.variables);
+                      }}
+                    >
+                      Check again
+                    </Button>
+                  </AlertAction>
+                )}
+              </Alert>
+            )}
+          </div>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
             <Button

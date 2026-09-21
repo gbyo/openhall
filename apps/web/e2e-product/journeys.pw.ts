@@ -551,21 +551,18 @@ test('admin staff access shows duties in school language', async ({ page }) => {
 
 test('admin scheduled passes read like appointments', async ({ page }) => {
   await shell(page, ADMIN);
+  const authorizations: unknown[] = [
+    {
+      id: 'auth-1',
+      student: { id: PERSON, displayName: 'Alex Rivera' },
+      destination: { id: DESTINATION, displayName: 'Nurse' },
+      validFrom: '2027-01-05T15:00:00Z',
+      validUntil: '2027-01-05T16:00:00Z',
+      status: 'active',
+    },
+  ];
   await page.route(`**/api/v1/organizations/${ORG}/scheduled-authorizations`, (route) =>
-    route.fulfill({
-      json: {
-        authorizations: [
-          {
-            id: 'auth-1',
-            student: { id: PERSON, displayName: 'Alex Rivera' },
-            destination: { id: DESTINATION, displayName: 'Nurse' },
-            validFrom: '2027-01-05T15:00:00Z',
-            validUntil: '2027-01-05T16:00:00Z',
-            status: 'active',
-          },
-        ],
-      },
-    }),
+    route.fulfill({ json: { authorizations } }),
   );
   await page.route(`**/api/v1/organizations/${ORG}/students*`, (route) =>
     route.fulfill({ json: { students: [{ id: PERSON, displayName: 'Alex Rivera' }] } }),
@@ -573,19 +570,91 @@ test('admin scheduled passes read like appointments', async ({ page }) => {
   await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
     route.fulfill({ json: orgDestinations() }),
   );
+  await page.route(`**/api/v1/me/organizations/${ORG}/destinations`, (route) =>
+    route.fulfill({ json: { destinations: orgDestinations().destinations } }),
+  );
   await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
     route.fulfill({ json: orgLocations() }),
   );
+  let created = false;
+  await page.unroute(`**/api/v1/organizations/${ORG}/scheduled-authorizations`);
+  await page.route(`**/api/v1/organizations/${ORG}/scheduled-authorizations`, async (route) => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().headers()['idempotency-key']).toBeTruthy();
+      created = true;
+      authorizations.push({
+        id: 'auth-2',
+        student: { id: PERSON, displayName: 'Alex Rivera' },
+        destination: { id: DESTINATION, displayName: 'Nurse' },
+        validFrom: '2027-01-06T15:00:00Z',
+        validUntil: '2027-01-06T16:00:00Z',
+        status: 'active',
+      });
+      await route.fulfill({ json: { id: 'auth-2' } });
+      return;
+    }
+    await route.fulfill({ json: { authorizations } });
+  });
   await page.goto(`/schools/${ORG}/admin/scheduled-passes`);
+  await expect(page).toHaveURL(new RegExp(`/schools/${ORG}/scheduled-passes`));
   await expect(page.getByRole('heading', { name: 'Scheduled passes' })).toBeVisible();
-  await expect(page.locator('.plain-list').getByText('Alex Rivera')).toBeVisible();
-  await expect(page.locator('.plain-list').getByText('Nurse')).toBeVisible();
-  await expect(page.getByLabel('Approval').locator('option')).toContainText([
-    'Already approved',
-    'Teacher approval still required',
-  ]);
-  await expect(page.getByText('skips only ordinary classroom approval')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Schedule pass' })).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Scheduled passes' }).getByText('Alex Rivera'),
+  ).toBeVisible();
+  await expect(page.getByText('Upcoming', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'New scheduled pass' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder('Search students').fill('Alex Rivera');
+  await page.getByRole('option', { name: 'Alex Rivera' }).click();
+  await dialog.getByPlaceholder('Search destinations').fill('Nurse');
+  await page.getByRole('option', { name: 'Nurse' }).click();
+  await dialog.getByLabel('From').fill('2027-01-06T15:00');
+  await dialog.getByLabel('Until').fill('2027-01-06T16:00');
+  await dialog.getByRole('radio', { name: 'Teacher approval still required' }).check();
+  await expect(dialog.getByText('skips only ordinary classroom approval')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Schedule pass' }).click();
+  expect(created).toBe(true);
+  await expect(dialog).toBeHidden();
+});
+
+test('admin cancels a scheduled pass only after confirmation', async ({ page }) => {
+  await shell(page, ADMIN);
+  const authorizations: unknown[] = [
+    {
+      id: 'auth-1',
+      student: { id: PERSON, displayName: 'Alex Rivera' },
+      destination: { id: DESTINATION, displayName: 'Nurse' },
+      validFrom: '2027-01-05T15:00:00Z',
+      validUntil: '2027-01-05T16:00:00Z',
+      status: 'active',
+    },
+  ];
+  await page.route(`**/api/v1/organizations/${ORG}/scheduled-authorizations`, (route) =>
+    route.fulfill({ json: { authorizations } }),
+  );
+  await page.route(`**/api/v1/scheduled-authorizations/auth-1`, (route) =>
+    route.fulfill({ json: { id: 'auth-1' }, headers: { ETag: '"auth:test:1"' } }),
+  );
+  let cancelled = false;
+  await page.route(`**/api/v1/scheduled-authorizations/auth-1/cancel`, async (route) => {
+    expect(route.request().headers()['if-match']).toBe('"auth:test:1"');
+    expect(route.request().headers()['idempotency-key']).toBeTruthy();
+    cancelled = true;
+    authorizations.pop();
+    await route.fulfill({ json: { id: 'auth-1', status: 'cancelled' } });
+  });
+  await page.goto(`/schools/${ORG}/scheduled-passes`);
+  await expect(page.getByRole('heading', { name: 'Scheduled passes' })).toBeVisible();
+  await page.getByRole('button', { name: "Actions for Alex Rivera's scheduled pass" }).click();
+  await page.getByRole('menuitem', { name: 'Cancel scheduled pass' }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(
+    confirm.getByRole('heading', { name: "Cancel Alex Rivera's scheduled pass?" }),
+  ).toBeVisible();
+  await confirm.getByRole('button', { name: 'Cancel scheduled pass' }).click();
+  await expect.poll(() => cancelled).toBe(true);
+  await expect(page.getByText('Alex Rivera')).toHaveCount(0);
 });
 
 test('admin people page is a directory with sign-in management, not roster editing', async ({
