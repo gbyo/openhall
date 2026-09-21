@@ -13,6 +13,31 @@ function listenForErrors(page: Page): string[] {
   return errors;
 }
 
+function hasVisibleShadowColor(shadow: string): boolean {
+  if (shadow === '' || shadow === 'none') return false;
+  const colors =
+    shadow.match(
+      /(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^)]*\)|#[\da-f]{3,8}\b|\btransparent\b/gi,
+    ) ?? [];
+
+  return colors.some((color) => {
+    const normalized = color.toLowerCase();
+    if (normalized === 'transparent') return false;
+
+    const slashAlpha = normalized.match(/\/\s*([\d.]+%?)\s*\)$/);
+    const commaAlpha = normalized.match(/(?:rgba|hsla)\([^)]*,\s*([\d.]+%?)\s*\)$/);
+    const alpha = slashAlpha?.[1] ?? commaAlpha?.[1];
+    if (alpha !== undefined) {
+      const value = Number.parseFloat(alpha);
+      return Number.isFinite(value) && (alpha.endsWith('%') ? value > 0 : value > 0);
+    }
+
+    if (/^#[\da-f]{4}$/i.test(normalized)) return normalized.slice(-1) !== '0';
+    if (/^#[\da-f]{8}$/i.test(normalized)) return normalized.slice(-2) !== '00';
+    return true;
+  });
+}
+
 async function openStudentNoPass(page: Page): Promise<string[]> {
   const errors = listenForErrors(page);
   await shell(page, STUDENT);
@@ -102,7 +127,7 @@ test('teacher can approve from the keyboard with a visible focus indicator', asy
     (focus.style !== 'none' &&
       Number.parseFloat(focus.width) > 0 &&
       focus.color !== 'rgba(0, 0, 0, 0)') ||
-    (focus.shadow !== 'none' && focus.shadow !== '');
+    hasVisibleShadowColor(focus.shadow);
   expect(hasOutlineRing).toBe(true);
   const box = await approve.evaluate((element) => {
     const rect = element.getBoundingClientRect();
