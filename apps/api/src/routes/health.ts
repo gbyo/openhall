@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-import { LivenessSchema, ProblemDetailsSchema, ReadinessSchema } from '@openhall/contracts';
+import {
+  LivenessSchema,
+  ProblemDetailsSchema,
+  ReadinessSchema,
+  schemaRef,
+} from '@openhall/contracts';
 import type { ReadinessProbe } from '@openhall/db';
 import { safeRequestPath } from '../http-privacy.js';
 
@@ -13,7 +18,7 @@ export function registerHealthRoutes(app: FastifyInstance, readinessProbe: Readi
       schema: {
         operationId: 'getLiveness',
         tags: ['health'],
-        response: { 200: LivenessSchema },
+        response: { 200: schemaRef(LivenessSchema) },
       },
     },
     () => ({ status: 'ok' as const }),
@@ -26,10 +31,10 @@ export function registerHealthRoutes(app: FastifyInstance, readinessProbe: Readi
         operationId: 'getReadiness',
         tags: ['health'],
         response: {
-          200: ReadinessSchema,
+          200: schemaRef(ReadinessSchema),
           503: {
             description: 'A required dependency is unavailable or not current.',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },

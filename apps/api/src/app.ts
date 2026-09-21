@@ -9,6 +9,7 @@ import fastifyStatic from '@fastify/static';
 import { TypeBoxValidatorCompiler } from '@fastify/type-provider-typebox';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import type { AppConfig } from '@openhall/config';
+import { PublicApiSchemas } from '@openhall/contracts';
 import type { DB as Database, ReadinessProbe } from '@openhall/db';
 import type { Kysely } from 'kysely';
 import { createAuthDependencies } from './auth/dependencies.js';
@@ -95,6 +96,10 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
 
   const typedApp = app.withTypeProvider<TypeBoxTypeProvider>();
 
+  for (const schema of PublicApiSchemas) {
+    typedApp.addSchema(schema);
+  }
+
   // Security headers first. Production enables HSTS; plain-HTTP localhost
   // development never forces it. OIDC is top-level navigation, so IdPs stay
   // out of connect-src.
@@ -159,6 +164,14 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
               'One-time operator credential: `Bootstrap <token>` on bootstrap prepare, `Recovery <token>` on recovery consume. Never sent in query or cookies.',
           },
         },
+      },
+    },
+    refResolver: {
+      buildLocalReference(json, _baseUri, _fragment, index) {
+        if (typeof json.$id === 'string' && json.$id.length > 0) {
+          return json.$id;
+        }
+        return `def-${String(index)}`;
       },
     },
   });

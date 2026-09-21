@@ -16,6 +16,7 @@ import {
   OkSchema,
   ProblemDetailsSchema,
   RecoveryResponseSchema,
+  schemaRef,
 } from '@openhall/contracts';
 import { Type } from 'typebox';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -127,7 +128,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
           'Returns the current session. Anonymous callers receive authenticated:false. Authenticated callers receive a stable per-session CSRF token derived from the session credential; reading never mutates authentication state.',
         security: OPTIONAL_SESSION_SECURITY,
         response: {
-          200: AuthSessionSchema,
+          200: schemaRef(AuthSessionSchema),
         },
       },
     },
@@ -164,10 +165,10 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
         description: 'Minimal canonical identity for the authenticated person (self-only).',
         security: COOKIE_SECURITY,
         response: {
-          200: MeSchema,
+          200: schemaRef(MeSchema),
           401: {
             description: 'Unauthenticated',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },
@@ -204,7 +205,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
         description:
           'Public login metadata. Returns tenant/provider display info for a single-tenant installation or a known slug; otherwise requires tenant selection without enumerating slugs.',
         querystring: DiscoveryQuerySchema,
-        response: { 200: AuthDiscoverySchema },
+        response: { 200: schemaRef(AuthDiscoverySchema) },
       },
     },
     async (request) => {
@@ -244,11 +245,11 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
           ),
           400: {
             description: 'Login cannot start',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           502: {
             description: 'Provider unavailable',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },
@@ -425,14 +426,14 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
           'Revokes the current session. Requires the session cookie, the X-CSRF-Token header, and a same-origin request.',
         security: CSRF_SECURITY,
         response: {
-          200: OkSchema,
+          200: schemaRef(OkSchema),
           401: {
             description: 'Unauthenticated',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           403: {
             description: 'CSRF or origin rejected',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },
@@ -470,14 +471,14 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
           'Revokes every session for the account by bumping session_revision. Requires the session cookie, the X-CSRF-Token header, and a same-origin request.',
         security: CSRF_SECURITY,
         response: {
-          200: OkSchema,
+          200: schemaRef(OkSchema),
           401: {
             description: 'Unauthenticated',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           403: {
             description: 'CSRF or origin rejected',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },
@@ -516,14 +517,14 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
           'Consumes a one-time recovery grant from the Authorization header (never query) and creates a short-lived recovery session.',
         security: OPERATOR_SECURITY,
         response: {
-          200: RecoveryResponseSchema,
+          200: schemaRef(RecoveryResponseSchema),
           401: {
             description: 'Invalid or expired recovery token',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           429: {
             description: 'Recovery endpoint rate limit exceeded',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },

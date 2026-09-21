@@ -13,6 +13,7 @@ import {
   PassResponseSchema,
   ProblemDetailsSchema,
   UuidSchema,
+  schemaRef,
 } from '@openhall/contracts';
 import { Type } from 'typebox';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -90,23 +91,23 @@ function unauthenticated(reply: FastifyReply, request: FastifyRequest): FastifyR
 const MUTATION_ERRORS = {
   400: {
     description: 'Malformed input or invalid idempotency key',
-    content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+    content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
   },
   401: {
     description: 'Unauthenticated',
-    content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+    content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
   },
   403: {
     description: 'Forbidden or recovery session restricted',
-    content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+    content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
   },
   404: {
     description: 'Concealed destination, student, or pass resource',
-    content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+    content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
   },
   409: {
     description: 'Active pass exists, key reused, invalid transition, or destination unavailable',
-    content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+    content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
   },
 };
 
@@ -130,7 +131,7 @@ export function registerPassesRoutes(app: FastifyInstance, options: RegisterPass
         security: COOKIE_CSRF_SECURITY,
         body: PassRequestBodySchema,
         headers: IdempotencyHeadersSchema,
-        response: { 201: PassResponseSchema, ...MUTATION_ERRORS },
+        response: { 201: schemaRef(PassResponseSchema), ...MUTATION_ERRORS },
       },
       // Authentication and CSRF run before schema validation so anonymous
       // callers always receive 401 rather than a validation artifact.
@@ -179,7 +180,7 @@ export function registerPassesRoutes(app: FastifyInstance, options: RegisterPass
         params: StudentIdParamsSchema,
         body: PassRequestBodySchema,
         headers: IdempotencyHeadersSchema,
-        response: { 201: PassResponseSchema, ...MUTATION_ERRORS },
+        response: { 201: schemaRef(PassResponseSchema), ...MUTATION_ERRORS },
       },
       // Authentication and CSRF run before schema validation so anonymous
       // callers always receive 401 rather than a validation artifact.
@@ -227,14 +228,14 @@ export function registerPassesRoutes(app: FastifyInstance, options: RegisterPass
           'Read the authenticated student\u2019s current active pass, or pass:null. Cookie-authenticated; not CSRF-protected. Success returns ETag when a pass exists. Cache-Control: no-store.',
         security: COOKIE_SECURITY,
         response: {
-          200: ActiveSelfPassSchema,
+          200: schemaRef(ActiveSelfPassSchema),
           401: {
             description: 'Unauthenticated',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           403: {
             description: 'Recovery session restricted',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },
@@ -270,15 +271,15 @@ export function registerPassesRoutes(app: FastifyInstance, options: RegisterPass
         params: PassIdParamsSchema,
         headers: CancelHeadersSchema,
         response: {
-          200: PassResponseSchema,
+          200: schemaRef(PassResponseSchema),
           ...MUTATION_ERRORS,
           412: {
             description: 'Stale pass revision',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           428: {
             description: 'If-Match required',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },

@@ -84,6 +84,51 @@ describe('foundation HTTP API', () => {
         '/api/v1/system/info': { get: { operationId: 'getSystemInfo' } },
       },
     });
+
+    const openapi = document as unknown as {
+      components?: {
+        schemas?: Record<string, unknown>;
+      };
+      paths: Record<
+        string,
+        {
+          get?: {
+            responses?: Record<
+              string,
+              {
+                content?: Record<
+                  string,
+                  {
+                    schema?: Record<string, unknown>;
+                  }
+                >;
+              }
+            >;
+          };
+        }
+      >;
+    };
+    const schemas = openapi.components?.schemas;
+    expect(schemas).toBeDefined();
+    for (const schemaName of [
+      'ProblemDetails',
+      'Liveness',
+      'Readiness',
+      'SystemInfo',
+      'Me',
+      'MyOrganizationContext',
+      'Pass',
+    ]) {
+      expect(schemas).toHaveProperty(schemaName);
+    }
+    expect(
+      openapi.paths['/health/live']?.get?.responses?.['200']?.content?.['application/json']?.schema,
+    ).toEqual({ $ref: '#/components/schemas/Liveness' });
+    expect(
+      openapi.paths['/health/ready']?.get?.responses?.['503']?.content?.['application/problem+json']
+        ?.schema,
+    ).toEqual({ $ref: '#/components/schemas/ProblemDetails' });
+
     await app.close();
     await database.destroy();
   });

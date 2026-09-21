@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
-import { SystemInfoSchema } from '@openhall/contracts';
+import { SystemInfoSchema, schemaRef } from '@openhall/contracts';
 
 export function registerSystemRoutes(app: FastifyInstance): void {
   app.withTypeProvider<TypeBoxTypeProvider>().get(
@@ -9,7 +9,7 @@ export function registerSystemRoutes(app: FastifyInstance): void {
       schema: {
         operationId: 'getSystemInfo',
         tags: ['system'],
-        response: { 200: SystemInfoSchema },
+        response: { 200: schemaRef(SystemInfoSchema) },
       },
     },
     () => ({

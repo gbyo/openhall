@@ -10,6 +10,7 @@ import {
   BootstrapPrepareSchema,
   BootstrapStatusSchema,
   ProblemDetailsSchema,
+  schemaRef,
 } from '@openhall/contracts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
@@ -54,7 +55,7 @@ export function registerBootstrapRoutes(
         tags: ['bootstrap'],
         description:
           'Reports whether initialization is required. Reveals nothing about active bootstrap tokens.',
-        response: { 200: BootstrapStatusSchema },
+        response: { 200: schemaRef(BootstrapStatusSchema) },
       },
     },
     async (_request, reply) => {
@@ -76,22 +77,22 @@ export function registerBootstrapRoutes(
         security: [{ operatorCredential: [] as string[] }],
         body: BootstrapPrepareSchema,
         response: {
-          200: BootstrapPrepareResponseSchema,
+          200: schemaRef(BootstrapPrepareResponseSchema),
           400: {
             description: 'Invalid setup details or provider configuration',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           401: {
             description: 'Invalid bootstrap token',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           409: {
             description: 'Installation already exists',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           429: {
             description: 'Operator-token endpoint rate limit exceeded',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },
