@@ -30,9 +30,11 @@ export function ConnectionStatus({ state, lastConfirmed, onRetry }: ConnectionSt
           </p>
         )}
       </div>
-      <Button variant="secondary" onClick={onRetry}>
-        Retry
-      </Button>
+      {onRetry && (
+        <Button variant="secondary" onClick={onRetry}>
+          Retry
+        </Button>
+      )}
     </aside>
   );
 }

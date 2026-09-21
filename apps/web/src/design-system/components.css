@@ -563,6 +563,7 @@
 
 .wf-pass-card {
   position: relative;
+  container-type: inline-size;
   overflow: hidden;
   border: var(--wf-border-width) solid var(--wf-border-strong);
   border-radius: var(--wf-radius-pass);
@@ -819,6 +820,12 @@
   }
 
   .wf-tabs__tab[data-selected] {
+    color: HighlightText;
+    background: Highlight;
+  }
+
+  .wf-listbox__item[data-selected],
+  .wf-menu__item[data-selected] {
     color: HighlightText;
     background: Highlight;
   }

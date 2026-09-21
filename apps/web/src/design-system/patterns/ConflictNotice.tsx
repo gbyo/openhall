@@ -15,9 +15,11 @@ export function ConflictNotice({ onReview }: ConflictNoticeProps) {
           This destination changed while you were editing.
         </h3>
         <p>Someone else saved a newer version. Your unsaved changes are still here.</p>
-        <Button variant="secondary" onClick={onReview}>
-          Review latest version
-        </Button>
+        {onReview && (
+          <Button variant="secondary" onClick={onReview}>
+            Review latest version
+          </Button>
+        )}
       </div>
     </aside>
   );

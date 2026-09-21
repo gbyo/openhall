@@ -3,6 +3,7 @@ import {
   Input,
   Label,
   SearchField as AriaSearchField,
+  Text,
   type SearchFieldProps as AriaSearchFieldProps,
 } from 'react-aria-components';
 
@@ -22,7 +23,11 @@ export function SearchField({ label, description, ...props }: SearchFieldProps) 
         <Input className="wf-input" />
         <AriaButton className="wf-search-field__clear">Clear</AriaButton>
       </div>
-      {description && <p className="wf-field__helper">{description}</p>}
+      {description && (
+        <Text slot="description" className="wf-field__helper">
+          {description}
+        </Text>
+      )}
     </AriaSearchField>
   );
 }
