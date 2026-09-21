@@ -1075,3 +1075,43 @@ describe('reconciler active-movement immunity', () => {
     }
   });
 });
+
+describe('allocator queue fairness', () => {
+  it('queues a newcomer behind waiters instead of granting a freed slot', async () => {
+    await clearFlowRules();
+    const destinationId = await makeDestination({ capacity: 1, queueEnabled: true });
+    const holder = await makeStudent(tenantA, schoolA, 'FairHolder');
+    const held = await requestPass(holder, destinationId);
+    const waiter = await makeStudent(tenantA, schoolA, 'FairWaiter');
+    const queued = await requestPass(waiter, destinationId);
+    expect(queued.pass.lifecycleState).toBe('queued');
+    // The holder cancels: capacity is physically free, but the waiter is owed it.
+    const cancel = await app.inject({
+      method: 'POST',
+      url: `/api/v1/me/passes/${held.pass.id}/cancel`,
+      headers: authHeaders(holder, randomUUID(), held.etag),
+    });
+    expect(cancel.statusCode).toBe(200);
+    const newcomer = await makeStudent(tenantA, schoolA, 'FairNewcomer');
+    const created = await requestPass(newcomer, destinationId);
+    expect(created.pass.lifecycleState).toBe('queued');
+    const readPosition = async (
+      session: { cookie: string; csrf: string },
+      passId: string,
+    ): Promise<number> => {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/v1/me/passes/${passId}/queue-status`,
+        headers: authHeaders(session),
+      });
+      expect(response.statusCode).toBe(200);
+      return response.json<{ position: number }>().position;
+    };
+    expect(await readPosition(waiter, queued.pass.id)).toBe(1);
+    expect(await readPosition(newcomer, created.pass.id)).toBe(2);
+    // The reconciler still promotes the waiter first.
+    await reconciler.runBatch(5);
+    expect((await passLifecycle(queued.pass.id)).state).toBe('ready');
+    expect((await passLifecycle(created.pass.id)).state).toBe('queued');
+  });
+});

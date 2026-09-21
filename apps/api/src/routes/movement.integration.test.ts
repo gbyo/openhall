@@ -1544,3 +1544,31 @@ describe('movement regression coverage', () => {
     expect((await passLifecycle(pass.id)).revision).toBe('4');
   });
 });
+
+describe('station display fallback', () => {
+  it('falls back to the service type when display name is missing', async () => {
+    if (officeStaff === null) throw new Error('office fixture missing');
+    const fallbackOffice = await makeDestination({
+      serviceType: 'office',
+      capacity: 1,
+      queueEnabled: true,
+      checkInMode: 'optional',
+    });
+    await pool.query(`UPDATE destination SET display_name = NULL WHERE id = $1`, [fallbackOffice]);
+    await pool.query(
+      `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id) VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
+      [tenantA, officeStaff.accountId, fallbackOffice],
+    );
+    const student = await makeStudent(tenantA, schoolA, 'FallbackStudent');
+    await requestReadyPass(student, fallbackOffice);
+    const view = await app.inject({
+      method: 'GET',
+      url: `/api/v1/destinations/${fallbackOffice}/station`,
+      headers: { cookie: `openhall_session_dev=${officeStaff.cookie}` },
+    });
+    expect(view.statusCode).toBe(200);
+    expect(
+      view.json<{ destination: { displayName: string; serviceType: string } }>().destination,
+    ).toMatchObject({ displayName: 'office', serviceType: 'office' });
+  });
+});

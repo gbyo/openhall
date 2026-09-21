@@ -200,7 +200,12 @@ export async function allocateDestinationFlow(
       : queueDeadline;
 
   const consuming = await flow.countConsumingReservations(context, pass.destinationId, at);
-  if (config.capacity === null || consuming < config.capacity) {
+  // Fairness: a freed slot belongs to the queue first. A newcomer waits
+  // behind active entries (excluding this pass) instead of leapfrogging them.
+  const waiting = config.queueEnabled
+    ? await flow.countActiveQueueEntries(context, pass.destinationId, pass.id)
+    : 0;
+  if ((config.capacity === null || consuming < config.capacity) && waiting === 0) {
     const claimDeadline = at.add({ seconds: config.readyClaimTimeoutSeconds });
     const readyExpiresAt =
       Temporal.Instant.compare(claimDeadline, flowExpiresAt) < 0 ? claimDeadline : flowExpiresAt;

@@ -82,10 +82,18 @@ export class DestinationFlowReconciler {
   /** Runs up to `limit` actions. Returns the number completed. */
   async runBatch(limit: number): Promise<number> {
     if (!Number.isInteger(limit) || limit <= 0) return 0;
+    const now = this.dependencies.clock.now();
+    // One tenant scan per batch. A tenant that just did work rotates to the
+    // back, so an early productive tenant cannot starve later tenants.
+    const pending = [...(await this.dependencies.flow.listTenantIds())];
     let completed = 0;
-    while (completed < limit) {
-      if (!(await this.runOne())) break;
-      completed += 1;
+    while (completed < limit && pending.length > 0) {
+      const tenantId = pending.shift();
+      if (tenantId === undefined) break;
+      if (await this.runOneForTenant(tenantId, now)) {
+        completed += 1;
+        pending.push(tenantId);
+      }
     }
     return completed;
   }

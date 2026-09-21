@@ -719,7 +719,7 @@ export class PostgresDestinationFlowRepository implements DestinationFlowReposit
 
     return {
       config,
-      displayName: destination.display_name ?? config.id,
+      displayName: destination.display_name ?? destination.service_type,
       serviceType: destination.service_type,
       consumingReservations: Number(consumingRow.count),
       queueCount: Number(queueRow.count),

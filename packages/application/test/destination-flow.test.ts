@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildMovementProjection,
   destinationFlowLockKey,
+  DestinationFlowReconciler,
   reasonCodeFromMetadata,
+  type ReconcilerDependencies,
 } from '../src/destination-flow/index.js';
 
 const AT = Temporal.Instant.from('2026-09-21T14:00:00Z');
@@ -143,5 +145,93 @@ describe('movement projection', () => {
     expect(reasonCodeFromMetadata(null)).toBeNull();
     expect(reasonCodeFromMetadata({ reasonCode: 42 })).toBeNull();
     expect(reasonCodeFromMetadata({ reasonCode: '' })).toBeNull();
+  });
+});
+
+describe('reconciler batch fairness', () => {
+  const NOW = Temporal.Instant.from('2026-09-21T14:00:00Z');
+
+  function queuedRow(passId: string, tenantId: string) {
+    return {
+      id: passId,
+      tenantId,
+      organizationId: 'school-a',
+      studentId: 'student-1',
+      originLocationId: null,
+      originSectionId: null,
+      originScheduleBlockId: null,
+      destinationId: 'dest-1',
+      returnLocationId: null,
+      requestSource: 'student_web',
+      requestedByPersonId: null,
+      requestedAt: NOW,
+      lifecycleState: 'queued',
+      expectedReturnAt: null,
+      scheduledAuthorizationId: null,
+      revision: 2n,
+      destinationDisplayName: 'Office',
+      destinationServiceType: 'office',
+      destinationCheckInMode: 'optional',
+      originBlock: null,
+      originSection: null,
+      originLocation: null,
+    };
+  }
+
+  it('scans tenants once per batch and shares work fairly', async () => {
+    let listCalls = 0;
+    let currentTenant = '';
+    const served: string[] = [];
+    // t1 stays productive forever; t2 has exactly one expired queue entry.
+    const remaining = new Map<string, number>([
+      ['t1', 1000],
+      ['t2', 1],
+    ]);
+    const passIdFor = (tenantId: string): string => (tenantId === 't1' ? 'p1' : 'p2');
+    const flow = {
+      listTenantIds: (): Promise<string[]> => {
+        listCalls += 1;
+        return Promise.resolve(['t1', 't2']);
+      },
+      findStaleReadyCandidate: () => Promise.resolve(null),
+      findExpiredQueueCandidate: () => {
+        const left = remaining.get(currentTenant) ?? 0;
+        if (left <= 0) return Promise.resolve(null);
+        remaining.set(currentTenant, left - 1);
+        return Promise.resolve({ entry: { passId: passIdFor(currentTenant) } });
+      },
+      findUnavailableFlowCandidate: () => Promise.resolve(null),
+      listQueuedDestinationIds: (): Promise<string[]> => Promise.resolve([]),
+      findOrphanedFlowRows: () => Promise.resolve(null),
+      loadActiveQueueEntryForPass: () => Promise.resolve({ id: 'qe-1', flowExpiresAt: NOW }),
+      releaseQueueEntry: () => Promise.resolve(true),
+    };
+    const passes = {
+      loadPassForUpdate: () => Promise.resolve(queuedRow(passIdFor(currentTenant), currentTenant)),
+      updatePassToExpired: () => {
+        served.push(passIdFor(currentTenant));
+        return Promise.resolve({ revision: 3n });
+      },
+      appendPassEvent: () => Promise.resolve(undefined),
+    };
+    const runner = {
+      run: (tenantId: string, fn: (ctx: never) => Promise<unknown>) => {
+        currentTenant = tenantId;
+        return fn(undefined as never);
+      },
+    };
+    const reconciler = new DestinationFlowReconciler({
+      clock: { now: () => NOW },
+      runner,
+      passes,
+      flow,
+      policy: { cancelAllPendingWorkflows: () => Promise.resolve(undefined) },
+      placement: {},
+      outbox: { append: () => Promise.resolve(undefined) },
+    } as unknown as ReconcilerDependencies);
+    expect(await reconciler.runBatch(2)).toBe(2);
+    // The endlessly productive first tenant must not starve the second.
+    expect(served).toEqual(['p1', 'p2']);
+    expect(listCalls).toBe(1);
   });
 });
