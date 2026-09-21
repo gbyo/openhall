@@ -163,6 +163,8 @@ interface DestinationBody {
   id: string;
   organizationId: string;
   locationId: string;
+  categoryId: string;
+  studentSelfRequestable: boolean;
   serviceType: string;
   displayName: string | null;
   capacity: number | null;
@@ -227,6 +229,32 @@ async function createLocation(
   };
 }
 
+const categoryCache = new Map<string, string>();
+
+async function createCategory(
+  admin: SessionFixture,
+  schoolId: string,
+  name = `Cat ${randomUUID().slice(0, 8)}`,
+): Promise<string> {
+  const cached = categoryCache.get(schoolId);
+  if (cached) return cached;
+  const response = await app.inject({
+    method: 'POST',
+    url: `/api/v1/organizations/${schoolId}/destination-categories`,
+    headers: authHeaders(admin, randomUUID()),
+    payload: {
+      name,
+      iconKey: 'generic',
+      toneKey: 'neutral',
+      studentSurface: 'primary',
+      sortOrder: 0,
+    },
+  });
+  const id = response.json<{ category: { id: string } }>().category.id;
+  categoryCache.set(schoolId, id);
+  return id;
+}
+
 async function createDestination(
   admin: SessionFixture,
   schoolId: string,
@@ -238,11 +266,18 @@ async function createDestination(
   destination: DestinationBody;
   etag: string;
 }> {
+  const categoryId =
+    typeof body.categoryId === 'string' ? body.categoryId : await createCategory(admin, schoolId);
   const response = await app.inject({
     method: 'POST',
     url: `/api/v1/organizations/${schoolId}/destinations`,
     headers: authHeaders(admin, key),
-    payload: { ...body, locationId },
+    payload: {
+      studentSelfRequestable: true,
+      ...body,
+      locationId,
+      categoryId,
+    },
   });
   return {
     response,
@@ -570,11 +605,17 @@ describe('control-plane destinations', () => {
     expect(created.response.statusCode).toBe(201);
 
     const adminBKey = randomUUID();
+    const updateBase = {
+      ...destinationBody,
+      locationId: location.location.id,
+      categoryId: created.destination.categoryId,
+      studentSelfRequestable: created.destination.studentSelfRequestable,
+    };
     const first = await app.inject({
       method: 'PUT',
       url: `/api/v1/destinations/${created.destination.id}`,
       headers: authHeaders(requireAdmin(), adminBKey, created.etag),
-      payload: { ...destinationBody, locationId: location.location.id, capacity: 2 },
+      payload: { ...updateBase, capacity: 2 },
     });
     expect(first.statusCode).toBe(200);
     expect(first.json<{ destination: DestinationBody }>().destination.revision).toBe('2');
@@ -583,7 +624,7 @@ describe('control-plane destinations', () => {
       method: 'PUT',
       url: `/api/v1/destinations/${created.destination.id}`,
       headers: authHeaders(requireAdmin(), randomUUID(), created.etag),
-      payload: { ...destinationBody, locationId: location.location.id, checkInMode: 'required' },
+      payload: { ...updateBase, checkInMode: 'required' },
     });
     expect(stale.statusCode).toBe(412);
 
@@ -591,7 +632,7 @@ describe('control-plane destinations', () => {
       method: 'PUT',
       url: `/api/v1/destinations/${created.destination.id}`,
       headers: authHeaders(requireAdmin(), adminBKey, created.etag),
-      payload: { ...destinationBody, locationId: location.location.id, capacity: 2 },
+      payload: { ...updateBase, capacity: 2 },
     });
     expect(replayed.statusCode).toBe(200);
     expect(replayed.json<{ destination: DestinationBody }>().destination.capacity).toBe(2);
@@ -719,9 +760,10 @@ describe('control-plane destinations', () => {
       displayName: 'Nurse Office',
       serviceType: 'nurse',
       checkInMode: 'optional',
+      categoryId: created.destination.categoryId,
     });
     expect(Object.keys(entry ?? {}).sort()).toEqual(
-      ['checkInMode', 'displayName', 'id', 'serviceType'].sort(),
+      ['categoryId', 'checkInMode', 'displayName', 'id', 'serviceType'].sort(),
     );
 
     const closedLocation = await createLocation(requireAdmin());

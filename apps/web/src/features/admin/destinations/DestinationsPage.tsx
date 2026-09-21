@@ -54,8 +54,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import {
   InputGroup,
   InputGroupAddon,
@@ -99,6 +109,7 @@ interface DestinationRow {
   id: string;
   displayName: string | null;
   serviceType: string;
+  categoryId: string;
   locationId: string;
   capacity: number | null;
   queueEnabled: boolean;
@@ -122,6 +133,10 @@ export function DestinationsPage() {
   const [creating, setCreating] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [serviceType, setServiceType] = useState('');
+  const [serviceTypeTouched, setServiceTypeTouched] = useState(false);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [studentAccess, setStudentAccess] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [locationId, setLocationId] = useState<string | null>(null);
   const [confirmingArchive, setConfirmingArchive] = useState<{
     id: string;
@@ -145,6 +160,25 @@ export function DestinationsPage() {
         }),
       ),
   });
+  const categories = useQuery({
+    queryKey: queryKeys.destinationCategories(organizationId),
+    queryFn: () =>
+      confirmed(
+        api.GET('/api/v1/organizations/{organizationId}/destination-categories', {
+          params: { path: { organizationId } },
+        }),
+      ),
+  });
+  const activeCategories = useMemo(
+    () => (categories.data?.categories ?? []).filter((item) => item.status === 'active'),
+    [categories.data],
+  );
+  const categoryName = useMemo(() => {
+    const names = new Map(
+      (categories.data?.categories ?? []).map((category) => [category.id, category.name]),
+    );
+    return (id: string) => names.get(id) ?? '—';
+  }, [categories.data]);
   const locationName = useMemo(() => {
     const names = new Map(
       (locations.data?.locations ?? []).map((location) => [location.id, location.name]),
@@ -156,11 +190,11 @@ export function DestinationsPage() {
     const all = (destinations.data?.destinations ?? []) as DestinationRow[];
     if (query.length === 0) return all;
     return all.filter((destination) =>
-      `${destination.displayName ?? ''} ${destination.serviceType} ${locationName(destination.locationId)}`
+      `${destination.displayName ?? ''} ${categoryName(destination.categoryId)} ${destination.serviceType} ${locationName(destination.locationId)}`
         .toLowerCase()
         .includes(query),
     );
-  }, [destinations.data, search, locationName]);
+  }, [destinations.data, search, locationName, categoryName]);
   const columns = [
     columnHelper.accessor((row) => row.displayName ?? row.serviceType, {
       id: 'destination',
@@ -178,6 +212,13 @@ export function DestinationsPage() {
           </span>
         </span>
       ),
+    }),
+    columnHelper.accessor((row) => categoryName(row.categoryId), {
+      id: 'category',
+      header: 'Category',
+      enableSorting: false,
+      meta: { className: 'hidden md:table-cell' },
+      cell: (info) => info.getValue(),
     }),
     columnHelper.accessor((row) => row.capacity ?? -1, {
       id: 'capacity',
@@ -253,7 +294,13 @@ export function DestinationsPage() {
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: queryKeys.destinations(organizationId) });
   const create = useMutation({
-    mutationFn: (body: { locationId: string; displayName: string | null; serviceType: string }) => {
+    mutationFn: (body: {
+      locationId: string;
+      categoryId: string;
+      studentSelfRequestable: boolean;
+      displayName: string | null;
+      serviceType: string;
+    }) => {
       const key = crypto.randomUUID();
       return confirmed(
         api.POST('/api/v1/organizations/{organizationId}/destinations', {
@@ -274,9 +321,7 @@ export function DestinationsPage() {
     },
     onSuccess: (result) => {
       setCreating(false);
-      setDisplayName('');
-      setServiceType('');
-      setLocationId(null);
+      resetCreateForm();
       refresh();
       void navigate(result.destination.id);
     },
@@ -333,16 +378,29 @@ export function DestinationsPage() {
     },
   });
 
+  function resetCreateForm() {
+    setDisplayName('');
+    setServiceType('');
+    setServiceTypeTouched(false);
+    setCategoryId(null);
+    setStudentAccess(true);
+    setAdvancedOpen(false);
+    setLocationId(null);
+  }
+
   function closeCreate() {
     if (create.isPending) return;
     setCreating(false);
-    setDisplayName('');
-    setServiceType('');
-    setLocationId(null);
+    resetCreateForm();
     create.reset();
   }
 
-  const createValid = serviceType.trim() !== '' && locationId !== null && !locations.isPending;
+  const createValid =
+    serviceType.trim() !== '' &&
+    locationId !== null &&
+    categoryId !== null &&
+    !locations.isPending &&
+    !categories.isPending;
   const error = create.error ?? toggle.error ?? archive.error;
 
   return (
@@ -354,9 +412,7 @@ export function DestinationsPage() {
           <Button
             onClick={() => {
               create.reset();
-              setDisplayName('');
-              setServiceType('');
-              setLocationId(null);
+              resetCreateForm();
               setCreating(true);
             }}
           >
@@ -523,17 +579,81 @@ export function DestinationsPage() {
                 />
               </Field>
               <Field>
-                <FieldLabel htmlFor="destination-type">Type</FieldLabel>
-                <Input
-                  id="destination-type"
-                  value={serviceType}
-                  required
-                  placeholder="e.g. nurse"
-                  onChange={(event) => {
-                    setServiceType(event.target.value);
+                <FieldLabel htmlFor="destination-category">Category</FieldLabel>
+                <Select
+                  value={categoryId ?? ''}
+                  onValueChange={(value) => {
+                    setCategoryId(value);
+                    if (!serviceTypeTouched) {
+                      const name = activeCategories.find((item) => item.id === value)?.name ?? '';
+                      setServiceType(
+                        name
+                          .trim()
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, '_')
+                          .replace(/^_|_$/g, ''),
+                      );
+                    }
+                  }}
+                >
+                  <SelectTrigger id="destination-category">
+                    <SelectValue placeholder="Choose a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeCategories.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {categories.isError ? (
+                  <FieldError>Categories could not be loaded. Try again.</FieldError>
+                ) : null}
+              </Field>
+              <Field orientation="horizontal">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="destination-student-access">
+                    Students can request this destination
+                  </Label>
+                  <FieldDescription>
+                    When off, staff and scheduled passes can still use this destination.
+                  </FieldDescription>
+                </div>
+                <Switch
+                  id="destination-student-access"
+                  checked={studentAccess}
+                  onCheckedChange={(checked) => {
+                    setStudentAccess(checked);
                   }}
                 />
               </Field>
+              <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+                <CollapsibleTrigger
+                  render={<Button variant="ghost" size="sm" type="button" className="px-0" />}
+                >
+                  Advanced
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  <Field>
+                    <FieldLabel htmlFor="destination-type">Internal type</FieldLabel>
+                    <FieldDescription>
+                      Machine-readable classification used for compatibility and integrations. It
+                      does not control how this destination is grouped for students.
+                    </FieldDescription>
+                    <Input
+                      id="destination-type"
+                      value={serviceType}
+                      required
+                      placeholder="e.g. nurse"
+                      onChange={(event) => {
+                        setServiceTypeTouched(true);
+                        setServiceType(event.target.value);
+                      }}
+                    />
+                  </Field>
+                </CollapsibleContent>
+              </Collapsible>
               <Field>
                 <FieldLabel htmlFor="destination-location">Location</FieldLabel>
                 <Combobox
@@ -589,9 +709,11 @@ export function DestinationsPage() {
               disabled={create.isPending || !createValid}
               aria-busy={create.isPending}
               onClick={() => {
-                if (createValid && locationId) {
+                if (createValid && locationId && categoryId) {
                   create.mutate({
                     locationId,
+                    categoryId,
+                    studentSelfRequestable: studentAccess,
                     displayName: displayName.trim() === '' ? null : displayName.trim(),
                     serviceType: serviceType.trim(),
                   });

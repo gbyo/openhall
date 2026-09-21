@@ -340,9 +340,13 @@ beforeAll(async () => {
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Room 214') RETURNING id`,
     [tenantA, schoolA],
   );
+  const categoryA = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Restrooms', 'primary') RETURNING id`,
+    [tenantA, schoolA],
+  );
   destinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'restroom', 'Restroom B') RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'restroom', 'Restroom B') RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
 
   const block = await insertReturningId(

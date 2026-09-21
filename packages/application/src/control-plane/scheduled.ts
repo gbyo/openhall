@@ -76,6 +76,12 @@ export interface ScheduledAuthStudentView {
     readonly id: string;
     readonly displayName: string;
     readonly serviceType: string;
+    readonly category: {
+      readonly id: string;
+      readonly name: string;
+      readonly iconKey: string;
+      readonly toneKey: string;
+    } | null;
   };
   readonly originLocation: {
     readonly id: string;
@@ -797,6 +803,15 @@ async function toStudentViews(
         id: destination.id,
         displayName: destination.displayName,
         serviceType: destination.serviceType,
+        category:
+          destination.categoryPresentation === null
+            ? null
+            : {
+                id: destination.categoryId,
+                name: destination.categoryPresentation.name,
+                iconKey: destination.categoryPresentation.iconKey,
+                toneKey: destination.categoryPresentation.toneKey,
+              },
       },
       originLocation,
     });

@@ -224,14 +224,19 @@ async function makeDestination(input: {
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', $3) RETURNING id`,
     [tenantA, schoolA, `Room ${randomUUID().slice(0, 8)}`],
   );
+  const categoryId = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, $3, 'primary') RETURNING id`,
+    [tenantA, schoolA, `Cat ${randomUUID().slice(0, 8)}`],
+  );
   return insertReturningId(
     `INSERT INTO destination
-       (tenant_id, organization_id, location_id, service_type, display_name, capacity, queue_enabled, check_in_mode, default_duration_seconds)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+       (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled, check_in_mode, default_duration_seconds)
+     VALUES ($1, $2, $3, $4, true, $5, $6, $7, $8, $9, $10) RETURNING id`,
     [
       tenantA,
       schoolA,
       locationId,
+      categoryId,
       input.serviceType ?? 'office',
       input.displayName ?? `Dest ${randomUUID().slice(0, 8)}`,
       input.capacity ?? null,
@@ -362,48 +367,60 @@ beforeAll(async () => {
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic A') RETURNING id`,
     [tenantA, schoolA],
   );
+  const categoryA = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
+    [tenantA, schoolA],
+  );
+  const categoryB = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
+    [tenantA, schoolB],
+  );
+  const categoryTB = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
+    [tenantB, tenantBSchool],
+  );
   restroom = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name, default_duration_seconds)
-     VALUES ($1, $2, $3, 'restroom', 'Restroom B', 600) RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, default_duration_seconds)
+     VALUES ($1, $2, $3, $4, true, 'restroom', 'Restroom B', 600) RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
   nurse = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name, capacity, queue_enabled, check_in_mode)
-     VALUES ($1, $2, $3, 'nurse', 'Nurse A', 2, true, 'required') RETURNING id`,
-    [tenantA, schoolA, clinicA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled, check_in_mode)
+     VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse A', 2, true, 'required') RETURNING id`,
+    [tenantA, schoolA, clinicA, categoryA],
   );
   office = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name, capacity, queue_enabled, check_in_mode)
-     VALUES ($1, $2, $3, 'office', 'Office A', 1, true, 'optional') RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled, check_in_mode)
+     VALUES ($1, $2, $3, $4, true, 'office', 'Office A', 1, true, 'optional') RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
   closet = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name, capacity, queue_enabled)
-     VALUES ($1, $2, $3, 'storage', 'Closet', 1, false) RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled)
+     VALUES ($1, $2, $3, $4, true, 'storage', 'Closet', 1, false) RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
   closedRestroom = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name, status)
-     VALUES ($1, $2, $3, 'restroom', 'Closed Restroom', 'closed') RETURNING id`,
-    [tenantA, schoolA, locationA],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, status)
+     VALUES ($1, $2, $3, $4, true, 'restroom', 'Closed Restroom', 'closed') RETURNING id`,
+    [tenantA, schoolA, locationA, categoryA],
   );
   const locationB = await insertReturningId(
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic B') RETURNING id`,
     [tenantA, schoolB],
   );
   otherSchoolNurse = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name)
-     VALUES ($1, $2, $3, 'nurse', 'Nurse B') RETURNING id`,
-    [tenantA, schoolB, locationB],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name)
+     VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse B') RETURNING id`,
+    [tenantA, schoolB, locationB, categoryB],
   );
   const tenantBLocation = await insertReturningId(
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'TB Clinic') RETURNING id`,
     [tenantB, tenantBSchool],
   );
   crossTenantDestination = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name)
-     VALUES ($1, $2, $3, 'nurse', 'TB Nurse') RETURNING id`,
-    [tenantB, tenantBSchool, tenantBLocation],
+    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name)
+     VALUES ($1, $2, $3, $4, true, 'nurse', 'TB Nurse') RETURNING id`,
+    [tenantB, tenantBSchool, tenantBLocation, categoryTB],
   );
 
   // Schedule fixtures so Expected Placement resolves for section members.

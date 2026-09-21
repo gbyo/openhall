@@ -2,6 +2,7 @@ import { SystemClock } from '@openhall/domain';
 import type {
   AuditDependencies,
   CredentialDigester,
+  DestinationCategoryDependencies,
   DestinationDependencies,
   EnrollmentDependencies,
   GrantDependencies,
@@ -18,6 +19,7 @@ import {
   PostgresAuditRepository,
   PostgresAuditWriter,
   PostgresAuthorizationRepository,
+  PostgresDestinationCategoryRepository,
   PostgresDestinationRepository,
   PostgresDestinationFlowRepository,
   PostgresEnrollmentRepository,
@@ -38,6 +40,7 @@ import type { DB as Database } from '@openhall/db';
 export interface ControlPlaneDependencies {
   readonly locations: LocationDependencies;
   readonly destinations: DestinationDependencies;
+  readonly destinationCategories: DestinationCategoryDependencies;
   readonly schedules: ScheduleDependencies;
   readonly policies: PolicyDependencies;
   readonly grants: GrantDependencies;
@@ -63,6 +66,7 @@ export function createControlPlaneDependencies(
 ): ControlPlaneDependencies {
   const clock = new SystemClock();
   const runner = new PostgresTenantTransactionRunner(database);
+  const destinationCategoriesRepo = new PostgresDestinationCategoryRepository();
   const facts = new PostgresAuthorizationRepository();
   const authorization = new RelationshipAuthorizationService(facts, runner);
   const locationsRepo = new PostgresLocationRepository();
@@ -88,8 +92,18 @@ export function createControlPlaneDependencies(
       runner,
       authorization,
       destinations: destinationsRepo,
+      categories: destinationCategoriesRepo,
       locations: locationsRepo,
       flow,
+      idempotency,
+      audit,
+      outbox,
+    },
+    destinationCategories: {
+      clock,
+      runner,
+      authorization,
+      categories: destinationCategoriesRepo,
       idempotency,
       audit,
       outbox,

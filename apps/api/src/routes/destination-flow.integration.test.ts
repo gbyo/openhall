@@ -191,14 +191,19 @@ async function makeDestination(input: {
     `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', $3) RETURNING id`,
     [tenantA, schoolA, `Room ${randomUUID().slice(0, 8)}`],
   );
+  const categoryId = await insertReturningId(
+    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, $3, 'primary') RETURNING id`,
+    [tenantA, schoolA, `Cat ${randomUUID().slice(0, 8)}`],
+  );
   return insertReturningId(
     `INSERT INTO destination
-       (tenant_id, organization_id, location_id, service_type, display_name, capacity, queue_enabled, check_in_mode)
-     VALUES ($1, $2, $3, 'office', $4, $5, $6, 'optional') RETURNING id`,
+       (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled, check_in_mode)
+     VALUES ($1, $2, $3, $4, true, 'office', $5, $6, $7, 'optional') RETURNING id`,
     [
       tenantA,
       schoolA,
       locationId,
+      categoryId,
       `Dest ${randomUUID().slice(0, 8)}`,
       input.capacity ?? null,
       input.queueEnabled ?? false,

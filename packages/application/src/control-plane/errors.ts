@@ -5,6 +5,9 @@ export type ControlPlaneErrorCode =
   | 'invalid_location_state'
   | 'destination_not_found'
   | 'destination_in_use'
+  | 'destination_category_not_found'
+  | 'destination_category_in_use'
+  | 'destination_category_exists'
   | 'destination_already_open'
   | 'destination_already_closed'
   | 'invalid_destination_state'
@@ -59,6 +62,7 @@ export function controlPlaneHttpStatus(code: ControlPlaneErrorCode): number {
   switch (code) {
     case 'location_not_found':
     case 'destination_not_found':
+    case 'destination_category_not_found':
     case 'schedule_block_not_found':
     case 'schedule_template_not_found':
     case 'schedule_day_not_found':
@@ -75,6 +79,8 @@ export function controlPlaneHttpStatus(code: ControlPlaneErrorCode): number {
       return 403;
     case 'location_in_use':
     case 'invalid_location_state':
+    case 'destination_category_in_use':
+    case 'destination_category_exists':
     case 'destination_in_use':
     case 'destination_already_open':
     case 'destination_already_closed':

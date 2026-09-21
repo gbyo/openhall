@@ -4,6 +4,8 @@ export * from './idempotency.js';
 export * from './shared.js';
 export * from './locations.js';
 export * from './destinations.js';
+export * from './destination-categories.js';
+export * from './destination-category-presentation.js';
 export * from './schedules.js';
 export * from './policies.js';
 export * from './enrollment.js';

@@ -21,6 +21,8 @@ import {
   type ControlPlaneCommand,
 } from './idempotency.js';
 import type {
+  DestinationCategoryRecord,
+  DestinationCategoryRepository,
   DestinationCheckInMode,
   DestinationRecord,
   DestinationRepository,
@@ -34,6 +36,7 @@ export interface DestinationDependencies {
   readonly runner: TenantTransactionRunner;
   readonly authorization: RelationshipAuthorizationService;
   readonly destinations: DestinationRepository;
+  readonly categories: DestinationCategoryRepository;
   readonly locations: LocationRepository;
   readonly flow: DestinationFlowRepository;
   readonly idempotency: IdempotencyTransactionStore;
@@ -45,6 +48,8 @@ export interface DestinationView {
   readonly id: string;
   readonly organizationId: string;
   readonly locationId: string;
+  readonly categoryId: string;
+  readonly studentSelfRequestable: boolean;
   readonly serviceType: string;
   readonly displayName: string | null;
   readonly capacity: number | null;
@@ -64,6 +69,25 @@ export interface DestinationCatalogEntry {
   readonly id: string;
   readonly displayName: string;
   readonly serviceType: string;
+  readonly categoryId: string;
+  readonly checkInMode: DestinationCheckInMode;
+}
+
+/** Category presentation metadata for the student launcher (no policy/admin internals). */
+export interface StudentCatalogCategory {
+  readonly id: string;
+  readonly name: string;
+  readonly iconKey: string;
+  readonly toneKey: string;
+  readonly studentSurface: 'primary' | 'secondary';
+  readonly sortOrder: number;
+  readonly destinations: readonly StudentCatalogDestination[];
+}
+
+export interface StudentCatalogDestination {
+  readonly id: string;
+  readonly displayName: string;
+  readonly location: { readonly id: string; readonly name: string };
   readonly checkInMode: DestinationCheckInMode;
 }
 
@@ -72,6 +96,8 @@ export function toDestinationView(row: DestinationRecord): DestinationView {
     id: row.id,
     organizationId: row.organizationId,
     locationId: row.locationId,
+    categoryId: row.categoryId,
+    studentSelfRequestable: row.studentSelfRequestable,
     serviceType: row.serviceType,
     displayName: row.displayName,
     capacity: row.capacity,
@@ -99,6 +125,8 @@ export interface DestinationCommandInput {
 
 export interface DestinationConfigBody {
   readonly locationId: string;
+  readonly categoryId: unknown;
+  readonly studentSelfRequestable: unknown;
   readonly serviceType: unknown;
   readonly displayName: string | null;
   readonly capacity: number | null;
@@ -135,6 +163,8 @@ export interface DestinationResult {
 
 interface CanonicalDestinationConfig {
   readonly locationId: string;
+  readonly categoryId: string;
+  readonly studentSelfRequestable: boolean;
   readonly serviceType: string;
   readonly displayName: string | null;
   readonly capacity: number | null;
@@ -192,6 +222,12 @@ function canonicalConfig(body: DestinationConfigBody): CanonicalDestinationConfi
   if (typeof body.queueEnabled !== 'boolean') {
     throw new ControlPlaneError('invalid_precondition', 'Invalid queueEnabled.');
   }
+  if (typeof body.categoryId !== 'string' || body.categoryId.trim().length === 0) {
+    throw new ControlPlaneError('invalid_precondition', 'Invalid categoryId.');
+  }
+  if (typeof body.studentSelfRequestable !== 'boolean') {
+    throw new ControlPlaneError('invalid_precondition', 'Invalid studentSelfRequestable.');
+  }
   const serviceType = cleanName(body.serviceType, 'serviceType', 100);
   const displayName = cleanOptionalName(body.displayName, 'displayName', 200);
   const capacity = cleanOptionalPositiveInt(body.capacity, 'capacity');
@@ -225,6 +261,8 @@ function canonicalConfig(body: DestinationConfigBody): CanonicalDestinationConfi
   );
   return {
     locationId: body.locationId,
+    categoryId: body.categoryId.trim(),
+    studentSelfRequestable: body.studentSelfRequestable,
     serviceType,
     displayName,
     capacity,
@@ -244,6 +282,8 @@ function fingerprintComponents(
   return [
     organizationId,
     config.locationId,
+    config.categoryId,
+    config.studentSelfRequestable ? 'self-requestable' : 'not-self-requestable',
     config.serviceType,
     config.displayName ?? '',
     config.capacity === null ? '' : String(config.capacity),
@@ -341,10 +381,120 @@ export async function listMyDestinations(
           id: row.id,
           displayName: row.displayName ?? row.serviceType,
           serviceType: row.serviceType,
+          categoryId: row.categoryId,
           checkInMode: row.checkInMode,
         })),
     };
   });
+}
+
+/**
+ * GET /api/v1/me/organizations/:organizationId/student-destination-catalog —
+ * purpose-built student launcher catalog. Authorized with the canonical
+ * `pass.request.self` relationship semantics: only a student who may request
+ * their own pass sees it. Returns only what the launcher needs: active
+ * primary/secondary categories with their eligible destinations. Hidden
+ * categories, archived categories, non-requestable destinations, and empty
+ * categories never appear. Staff and scheduled flows are unaffected — they
+ * use the flat member catalog and direct creation paths.
+ *
+ * This is the future extension point for per-grade/per-student visibility;
+ * such filtering belongs here, never in React.
+ */
+export async function listMyStudentDestinationCatalog(
+  principal: Principal,
+  organizationId: string,
+  studentId: string,
+  dependencies: DestinationDependencies,
+): Promise<{ readonly categories: readonly StudentCatalogCategory[] }> {
+  const now = dependencies.clock.now();
+  return dependencies.runner.run(principal.tenantId, async (context) => {
+    const decision = await dependencies.authorization.decideWithContext(context, {
+      principal,
+      capability: 'pass.request.self',
+      resource: { kind: 'student', organizationId, studentId },
+      at: now,
+    });
+    if (!decision.allowed) {
+      throw new ControlPlaneError('destination_not_found', 'Destination not found.');
+    }
+    const [categories, destinations, locations] = await Promise.all([
+      dependencies.categories.listByOrganization(context, organizationId),
+      dependencies.destinations.listActiveCatalog(context, organizationId),
+      dependencies.locations.listByOrganization(context, organizationId),
+    ]);
+    const locationNames = new Map(
+      locations
+        .filter((location) => location.tenantId === principal.tenantId)
+        .map((location) => [location.id, location.name] as const),
+    );
+    const eligibleByCategory = new Map<string, StudentCatalogDestination[]>();
+    for (const row of destinations) {
+      if (row.tenantId !== principal.tenantId) continue;
+      if (row.status !== 'active' || !row.studentSelfRequestable) continue;
+      const list = eligibleByCategory.get(row.categoryId);
+      const entry: StudentCatalogDestination = {
+        id: row.id,
+        displayName: row.displayName ?? row.serviceType,
+        location: {
+          id: row.locationId,
+          name: locationNames.get(row.locationId) ?? '',
+        },
+        checkInMode: row.checkInMode,
+      };
+      if (list) list.push(entry);
+      else eligibleByCategory.set(row.categoryId, [entry]);
+    }
+    const result: StudentCatalogCategory[] = [];
+    for (const category of categories) {
+      if (category.tenantId !== principal.tenantId) continue;
+      if (category.status !== 'active') continue;
+      if (category.studentSurface !== 'primary' && category.studentSurface !== 'secondary')
+        continue;
+      const eligible = eligibleByCategory.get(category.id);
+      if (!eligible || eligible.length === 0) continue;
+      eligible.sort((a, b) =>
+        a.displayName.localeCompare(b.displayName, 'en', { sensitivity: 'base' }),
+      );
+      result.push({
+        id: category.id,
+        name: category.name,
+        iconKey: category.iconKey,
+        toneKey: category.toneKey,
+        studentSurface: category.studentSurface,
+        sortOrder: category.sortOrder,
+        destinations: eligible,
+      });
+    }
+    result.sort(
+      (a, b) =>
+        a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }),
+    );
+    return { categories: result };
+  });
+}
+
+/**
+ * Validates a destination's category reference: the category must exist in
+ * the same tenant and school and be active. Cross-school and archived
+ * references are rejected as invalid_precondition.
+ */
+async function requireActiveCategory(
+  context: TenantTransactionContext,
+  dependencies: DestinationDependencies,
+  principal: Principal,
+  organizationId: string,
+  categoryId: string,
+): Promise<DestinationCategoryRecord> {
+  const category = await dependencies.categories.loadById(context, categoryId);
+  if (
+    category?.tenantId !== principal.tenantId ||
+    category.organizationId !== organizationId ||
+    category.status !== 'active'
+  ) {
+    throw new ControlPlaneError('invalid_precondition', 'Invalid destination category.');
+  }
+  return category;
 }
 
 /**
@@ -395,6 +545,13 @@ export async function createDestination(
       ) {
         throw new ControlPlaneError('invalid_precondition', 'Invalid destination location.');
       }
+      await requireActiveCategory(
+        context,
+        dependencies,
+        input.principal,
+        input.organizationId,
+        config.categoryId,
+      );
       const row = await dependencies.destinations.insert(context, {
         organizationId: input.organizationId,
         ...config,
@@ -496,6 +653,13 @@ export async function updateDestination(
       ) {
         throw new ControlPlaneError('invalid_precondition', 'Invalid destination location.');
       }
+      await requireActiveCategory(
+        context,
+        dependencies,
+        input.principal,
+        current.organizationId,
+        config.categoryId,
+      );
       const row = await dependencies.destinations.updateToRevision(
         context,
         current.id,
@@ -740,6 +904,8 @@ async function appendDestinationAudit(
     metadata: {
       destinationId: row.id,
       organizationId: row.organizationId,
+      categoryId: row.categoryId,
+      studentSelfRequestable: row.studentSelfRequestable ? 'true' : 'false',
       revision: row.revision.toString(10),
       requestId: input.requestId,
     },
@@ -764,6 +930,8 @@ async function appendDestinationOutbox(
       schemaVersion: 1,
       organizationId: row.organizationId,
       destinationId: row.id,
+      categoryId: row.categoryId,
+      studentSelfRequestable: row.studentSelfRequestable,
       revision: row.revision.toString(10),
       status: row.status,
       checkInMode: row.checkInMode,

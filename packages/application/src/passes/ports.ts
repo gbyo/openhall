@@ -9,6 +9,21 @@ export interface PassDestinationRecord {
   readonly tenantId: TenantId;
   readonly organizationId: OrganizationId;
   readonly locationId: string;
+  readonly categoryId: string;
+  readonly studentSelfRequestable: boolean;
+  /** Active/archived state of the destination's category at read time. */
+  readonly categoryStatus: 'active' | 'archived';
+  /** Student launcher surface of the destination's category at read time. */
+  readonly categorySurface: 'primary' | 'secondary' | 'hidden';
+  /**
+   * Current category presentation (joined, never snapshotted). Null when the
+   * category row is missing; reads fall back to destination-only display.
+   */
+  readonly categoryPresentation: {
+    readonly name: string;
+    readonly iconKey: string;
+    readonly toneKey: string;
+  } | null;
   readonly serviceType: string;
   readonly displayName: string;
   readonly status: 'active' | 'closed' | 'archived';
@@ -50,6 +65,17 @@ export interface PassRow {
   readonly destinationDisplayName: string;
   readonly destinationServiceType: string;
   readonly destinationCheckInMode: DestinationCheckInMode;
+  /**
+   * Current category presentation for the destination (joined, never
+   * snapshotted into the pass row). Null when the category is missing,
+   * which reads handle by falling back to destination-only display.
+   */
+  readonly destinationCategory: {
+    readonly id: string;
+    readonly name: string;
+    readonly iconKey: string;
+    readonly toneKey: string;
+  } | null;
   readonly originBlock: { id: string; code: string; displayName: string } | null;
   readonly originSection: { id: string; code: string | null; title: string } | null;
   readonly originLocation: { id: string; name: string } | null;

@@ -1,11 +1,20 @@
 import { PassApplicationError } from './errors.js';
 import type { DestinationCheckInMode, PassRow } from './ports.js';
 
+export interface PassDestinationCategoryView {
+  readonly id: string;
+  readonly name: string;
+  readonly iconKey: string;
+  readonly toneKey: string;
+}
+
 export interface PassDestinationView {
   readonly id: string;
   readonly displayName: string;
   readonly serviceType: string;
   readonly checkInMode: DestinationCheckInMode;
+  /** Current category presentation; null when the category is unavailable. */
+  readonly category: PassDestinationCategoryView | null;
 }
 
 /**
@@ -153,6 +162,7 @@ export function toPassRepresentation(
       displayName: row.destinationDisplayName,
       serviceType: row.destinationServiceType,
       checkInMode: row.destinationCheckInMode,
+      category: row.destinationCategory,
     },
     origin: {
       placementKind: placementKindFromRow(row),

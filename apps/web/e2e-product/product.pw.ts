@@ -6,6 +6,7 @@ const PERSON = '00000000-0000-4000-8000-000000000011';
 const DESTINATION = '00000000-0000-4000-8000-000000000012';
 const SECTION = '00000000-0000-4000-8000-000000000013';
 const PASS = '00000000-0000-4000-8000-000000000014';
+const LOCATION = '00000000-0000-4000-8000-000000000015';
 
 interface Context {
   affiliations: string[];
@@ -88,6 +89,7 @@ function pass(state: string, mode: 'none' | 'optional' | 'required' | null = nul
       displayName: 'Nurse',
       serviceType: 'nurse',
       checkInMode: 'required',
+      category: { id: 'cat-nurse', name: 'Nurse', iconKey: 'medical', toneKey: 'rose' },
     },
     origin: {
       placementKind: 'resolved',
@@ -123,7 +125,32 @@ async function studentApis(page: Page, active: { current: ReturnType<typeof pass
             id: DESTINATION,
             displayName: 'Nurse',
             serviceType: 'nurse',
+            categoryId: 'cat-nurse',
             checkInMode: 'required',
+          },
+        ],
+      },
+    }),
+  );
+  await page.route(`**/api/v1/me/organizations/${ORG}/student-destination-catalog`, (route) =>
+    route.fulfill({
+      json: {
+        categories: [
+          {
+            id: 'cat-nurse',
+            name: 'Nurse',
+            iconKey: 'medical',
+            toneKey: 'rose',
+            studentSurface: 'primary',
+            sortOrder: 20,
+            destinations: [
+              {
+                id: DESTINATION,
+                displayName: 'Nurse',
+                location: { id: LOCATION, name: 'Health Office' },
+                checkInMode: 'required',
+              },
+            ],
           },
         ],
       },
@@ -159,8 +186,10 @@ test('student requests and starts one authoritative WayPass', async ({ page }) =
   await page.goto(`/schools/${ORG}/pass`);
   await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
   await page.getByRole('button', { name: /Nurse/ }).click();
+  await expect(page.getByRole('heading', { name: 'Request a WayPass' })).toBeVisible();
+  await page.getByRole('button', { name: 'Request WayPass' }).click();
   await expect(page.getByRole('heading', { name: "You're ready." })).toBeVisible();
-  await page.getByRole('button', { name: 'Start pass' }).click();
+  await page.getByRole('button', { name: 'Start WayPass' }).click();
   await expect(page.getByRole('heading', { name: 'On the way to Nurse' })).toBeVisible();
   await expect(page.getByText('Station staff will record it.')).toBeVisible();
 });

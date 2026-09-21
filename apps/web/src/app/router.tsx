@@ -34,7 +34,7 @@ import { ClassPage } from '../features/teacher/ClassPage';
 import { LiveMovementPage } from '../features/movement/LiveMovementPage';
 import { StationPage } from '../features/station/StationPage';
 import { AdminIndex, AdminLayout } from '../features/admin/AdminLayout';
-import { DestinationsPage } from '../features/admin/destinations/DestinationsPage';
+import { DestinationWorkspace } from '../features/admin/destinations/DestinationWorkspace';
 import { DestinationDetailPage } from '../features/admin/destinations/DestinationDetailPage';
 import { DemoPage, demoLoader, type DemoInfo } from '../features/demo/DemoPage';
 
@@ -120,7 +120,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminIndex /> },
           { path: 'live', element: <Navigate replace to="../../movement" /> },
-          { path: 'destinations', element: <DestinationsPage /> },
+          { path: 'destinations', element: <DestinationWorkspace /> },
           { path: 'destinations/:destinationId', element: <DestinationDetailPage /> },
           { path: 'locations', lazy: () => import('../features/admin/locations/LocationsPage') },
           { path: 'schedules', lazy: () => import('../features/admin/schedules/SchedulesPage') },

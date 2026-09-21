@@ -178,6 +178,7 @@ describe('reconciler batch fairness', () => {
       destinationDisplayName: 'Office',
       destinationServiceType: 'office',
       destinationCheckInMode: 'optional',
+      destinationCategory: null,
       originBlock: null,
       originSection: null,
       originLocation: null,

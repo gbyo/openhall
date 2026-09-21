@@ -390,6 +390,8 @@ export interface DestinationRecord {
   readonly tenantId: string;
   readonly organizationId: string;
   readonly locationId: string;
+  readonly categoryId: string;
+  readonly studentSelfRequestable: boolean;
   readonly serviceType: string;
   readonly displayName: string | null;
   readonly capacity: number | null;
@@ -407,6 +409,8 @@ export interface DestinationRecord {
 export interface NewDestination {
   readonly organizationId: string;
   readonly locationId: string;
+  readonly categoryId: string;
+  readonly studentSelfRequestable: boolean;
   readonly serviceType: string;
   readonly displayName: string | null;
   readonly capacity: number | null;
@@ -420,6 +424,8 @@ export interface NewDestination {
 
 export interface DestinationUpdate {
   readonly locationId: string;
+  readonly categoryId: string;
+  readonly studentSelfRequestable: boolean;
   readonly serviceType: string;
   readonly displayName: string | null;
   readonly capacity: number | null;
@@ -429,6 +435,89 @@ export interface DestinationUpdate {
   readonly maxDurationSeconds: number | null;
   readonly readyClaimTimeoutSeconds: number;
   readonly queueTimeoutSeconds: number;
+}
+
+/** Server-owned destination-category row projection. Revisions are bigint end to end. */
+export interface DestinationCategoryRecord {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly organizationId: string;
+  readonly name: string;
+  readonly iconKey: string;
+  readonly toneKey: string;
+  readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly sortOrder: number;
+  readonly status: 'active' | 'archived';
+  readonly revision: bigint;
+  readonly createdAt: Temporal.Instant;
+  readonly updatedAt: Temporal.Instant;
+}
+
+export interface NewDestinationCategory {
+  readonly organizationId: string;
+  readonly name: string;
+  readonly iconKey: string;
+  readonly toneKey: string;
+  readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly sortOrder: number;
+}
+
+export interface DestinationCategoryUpdate {
+  readonly name: string;
+  readonly iconKey: string;
+  readonly toneKey: string;
+  readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly sortOrder: number;
+}
+
+/** Purpose-built destination-category persistence port; no generic SQL escape hatch. */
+export interface DestinationCategoryRepository {
+  listByOrganization(
+    context: TenantTransactionContext,
+    organizationId: string,
+  ): Promise<readonly DestinationCategoryRecord[]>;
+  loadById(
+    context: TenantTransactionContext,
+    categoryId: string,
+  ): Promise<DestinationCategoryRecord | null>;
+  loadForUpdate(
+    context: TenantTransactionContext,
+    categoryId: string,
+  ): Promise<DestinationCategoryRecord | null>;
+  insert(
+    context: TenantTransactionContext,
+    input: NewDestinationCategory,
+  ): Promise<DestinationCategoryRecord>;
+  /**
+   * Full replacement of mutable presentation metadata, incrementing revision
+   * once. Returns null when the row no longer matches the expected revision.
+   */
+  updateToRevision(
+    context: TenantTransactionContext,
+    categoryId: string,
+    expectedRevision: bigint,
+    update: DestinationCategoryUpdate,
+    at: Temporal.Instant,
+  ): Promise<DestinationCategoryRecord | null>;
+  /**
+   * Semantic archive (status -> archived), incrementing revision once.
+   * Returns null when the row no longer matches the expected revision.
+   */
+  archiveToRevision(
+    context: TenantTransactionContext,
+    categoryId: string,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<DestinationCategoryRecord | null>;
+  /**
+   * Non-archived destinations referencing this category. Closed destinations
+   * count: archiving their category would still silently alter student
+   * grouping, so the guard is conservative by design.
+   */
+  countActiveDestinationReferences(
+    context: TenantTransactionContext,
+    categoryId: string,
+  ): Promise<number>;
 }
 
 /** Purpose-built destination persistence port; no generic SQL escape hatch. */

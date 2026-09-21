@@ -94,7 +94,7 @@ export interface PassPolicy {
 
 export function mockPass(
   state: string,
-  mode: 'optional' | 'required' | null = null,
+  mode: 'none' | 'optional' | 'required' | null = null,
   policy: PassPolicy | null = null,
   organizationId: string = ORG,
 ) {
@@ -108,6 +108,7 @@ export function mockPass(
       displayName: 'Nurse',
       serviceType: 'nurse',
       checkInMode: 'required',
+      category: { id: 'cat-nurse', name: 'Nurse', iconKey: 'medical', toneKey: 'rose' },
     },
     origin: {
       placementKind: 'resolved',
@@ -140,6 +141,110 @@ export const APPROVAL_PENDING: PassPolicy = {
   overridePending: false,
 };
 
+export interface HomeCategory {
+  id: string;
+  name: string;
+  iconKey: string;
+  toneKey: string;
+  studentSurface: 'primary' | 'secondary';
+  sortOrder: number;
+  destinations: {
+    id: string;
+    displayName: string;
+    location: { id: string; name: string };
+    checkInMode: string;
+  }[];
+}
+
+export const HOME_CATEGORIES: HomeCategory[] = [
+  {
+    id: 'cat-restroom',
+    name: 'Restroom',
+    iconKey: 'restroom',
+    toneKey: 'aqua',
+    studentSurface: 'primary',
+    sortOrder: 10,
+    destinations: [
+      {
+        id: `${DESTINATION.slice(0, 24)}0021`,
+        displayName: 'First floor restroom',
+        location: { id: LOCATION, name: 'Main hallway' },
+        checkInMode: 'none',
+      },
+      {
+        id: `${DESTINATION.slice(0, 24)}0022`,
+        displayName: 'Second floor restroom',
+        location: { id: LOCATION, name: 'Science wing' },
+        checkInMode: 'none',
+      },
+    ],
+  },
+  {
+    id: 'cat-nurse',
+    name: 'Nurse',
+    iconKey: 'medical',
+    toneKey: 'rose',
+    studentSurface: 'primary',
+    sortOrder: 20,
+    destinations: [
+      {
+        id: DESTINATION,
+        displayName: 'Nurse',
+        location: { id: LOCATION, name: 'Health Office' },
+        checkInMode: 'required',
+      },
+    ],
+  },
+  {
+    id: 'cat-counselor',
+    name: 'Counselor',
+    iconKey: 'chat',
+    toneKey: 'violet',
+    studentSurface: 'primary',
+    sortOrder: 30,
+    destinations: [
+      {
+        id: `${DESTINATION.slice(0, 24)}0023`,
+        displayName: 'Counseling Center',
+        location: { id: LOCATION, name: 'Counseling Center' },
+        checkInMode: 'optional',
+      },
+    ],
+  },
+  {
+    id: 'cat-library',
+    name: 'Library',
+    iconKey: 'book',
+    toneKey: 'amber',
+    studentSurface: 'primary',
+    sortOrder: 40,
+    destinations: [
+      {
+        id: `${DESTINATION.slice(0, 24)}0024`,
+        displayName: 'Library Media Center',
+        location: { id: LOCATION, name: 'Library' },
+        checkInMode: 'optional',
+      },
+    ],
+  },
+  {
+    id: 'cat-planetarium',
+    name: 'Planetarium',
+    iconKey: 'generic',
+    toneKey: 'neutral',
+    studentSurface: 'secondary',
+    sortOrder: 100,
+    destinations: [
+      {
+        id: `${DESTINATION.slice(0, 24)}0025`,
+        displayName: 'Planetarium',
+        location: { id: LOCATION, name: 'Science wing' },
+        checkInMode: 'none',
+      },
+    ],
+  },
+];
+
 export async function studentApis(
   page: Page,
   active: { current: ReturnType<typeof mockPass> | null },
@@ -156,7 +261,32 @@ export async function studentApis(
             id: DESTINATION,
             displayName: 'Nurse',
             serviceType: 'nurse',
+            categoryId: 'cat-nurse',
             checkInMode: 'required',
+          },
+        ],
+      },
+    }),
+  );
+  await page.route(`**/api/v1/me/organizations/${ORG}/student-destination-catalog`, (route) =>
+    route.fulfill({
+      json: {
+        categories: [
+          {
+            id: 'cat-nurse',
+            name: 'Nurse',
+            iconKey: 'medical',
+            toneKey: 'rose',
+            studentSurface: 'primary',
+            sortOrder: 20,
+            destinations: [
+              {
+                id: DESTINATION,
+                displayName: 'Nurse',
+                location: { id: LOCATION, name: 'Health Office' },
+                checkInMode: 'required',
+              },
+            ],
           },
         ],
       },
@@ -167,6 +297,70 @@ export async function studentApis(
   );
 }
 
+export interface HomeDestination {
+  id: string;
+  displayName: string;
+  serviceType: string;
+  checkInMode: string;
+}
+
+export const HOME_CATALOG: HomeDestination[] = [
+  { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse', checkInMode: 'required' },
+  {
+    id: `${DESTINATION.slice(0, 24)}0021`,
+    displayName: 'First floor restroom',
+    serviceType: 'restroom',
+    checkInMode: 'none',
+  },
+  {
+    id: `${DESTINATION.slice(0, 24)}0022`,
+    displayName: 'Second floor restroom',
+    serviceType: 'restroom',
+    checkInMode: 'none',
+  },
+  {
+    id: `${DESTINATION.slice(0, 24)}0023`,
+    displayName: 'Counseling Center',
+    serviceType: 'counseling',
+    checkInMode: 'optional',
+  },
+  {
+    id: `${DESTINATION.slice(0, 24)}0024`,
+    displayName: 'Library Media Center',
+    serviceType: 'library',
+    checkInMode: 'optional',
+  },
+  {
+    id: `${DESTINATION.slice(0, 24)}0025`,
+    displayName: 'Planetarium',
+    serviceType: 'planetarium',
+    checkInMode: 'none',
+  },
+];
+
+export async function studentHomeApis(
+  page: Page,
+  active: { current: ReturnType<typeof mockPass> | null },
+  options: {
+    destinations?: HomeDestination[];
+    categories?: HomeCategory[];
+    scheduled?: unknown[];
+  } = {},
+) {
+  await page.route('**/api/v1/me/passes/active', (route) =>
+    route.fulfill({ json: { pass: active.current }, headers: { ETag: '"pass:test:1"' } }),
+  );
+  await page.route(`**/api/v1/me/organizations/${ORG}/destinations`, (route) =>
+    route.fulfill({ json: { destinations: options.destinations ?? HOME_CATALOG } }),
+  );
+  await page.route(`**/api/v1/me/organizations/${ORG}/student-destination-catalog`, (route) =>
+    route.fulfill({ json: { categories: options.categories ?? HOME_CATEGORIES } }),
+  );
+  await page.route('**/api/v1/me/scheduled-authorizations', (route) =>
+    route.fulfill({ json: { authorizations: options.scheduled ?? [] } }),
+  );
+}
+
 export function orgDestinations() {
   return {
     destinations: [
@@ -174,6 +368,8 @@ export function orgDestinations() {
         id: DESTINATION,
         organizationId: ORG,
         locationId: LOCATION,
+        categoryId: 'cat-nurse',
+        studentSelfRequestable: true,
         serviceType: 'nurse',
         displayName: 'Nurse',
         capacity: 3,
@@ -185,6 +381,25 @@ export function orgDestinations() {
         queueTimeoutSeconds: 1800,
         status: 'active',
         revision: '2',
+        updatedAt: '2026-09-21T14:00:00Z',
+      },
+    ],
+  };
+}
+
+export function orgCategories() {
+  return {
+    categories: [
+      {
+        id: 'cat-nurse',
+        organizationId: ORG,
+        name: 'Nurse',
+        iconKey: 'medical',
+        toneKey: 'rose',
+        studentSurface: 'primary',
+        sortOrder: 20,
+        status: 'active',
+        revision: '1',
         updatedAt: '2026-09-21T14:00:00Z',
       },
     ],

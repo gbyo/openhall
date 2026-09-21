@@ -94,16 +94,40 @@ async function seed() {
       [tenantA, organizationA],
     )
   ).rows[0]?.id;
-  const destination = (
+  const category = (
     await pool.query<{ id: string }>(
-      "INSERT INTO destination (tenant_id, organization_id, location_id, service_type) VALUES ($1, $2, $3, 'room') RETURNING id",
-      [tenantA, organizationA, location],
+      "INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Room') RETURNING id",
+      [tenantA, organizationA],
     )
   ).rows[0]?.id;
-  if (!organizationA || !organizationB || !student || !staff || !location || !destination) {
+  const destination = (
+    await pool.query<{ id: string }>(
+      "INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type) VALUES ($1, $2, $3, $4, 'room') RETURNING id",
+      [tenantA, organizationA, location, category],
+    )
+  ).rows[0]?.id;
+  if (
+    !organizationA ||
+    !organizationB ||
+    !student ||
+    !staff ||
+    !location ||
+    !destination ||
+    !category
+  ) {
     throw new Error('Fixture insert failed');
   }
-  return { tenantA, tenantB, organizationA, organizationB, student, staff, location, destination };
+  return {
+    tenantA,
+    tenantB,
+    organizationA,
+    organizationB,
+    student,
+    staff,
+    location,
+    destination,
+    category,
+  };
 }
 
 async function insertPass(fixture: Awaited<ReturnType<typeof seed>>, state = 'requested') {
@@ -332,9 +356,9 @@ describe('foundation migration on PostgreSQL 18', () => {
     ).rejects.toMatchObject({ code: '23503' });
     await expect(
       pool.query(
-        `INSERT INTO destination (tenant_id, organization_id, location_id, service_type)
-         VALUES ($1, $2, $3, 'cross-school')`,
-        [fixture.tenantA, fixture.organizationA, locationB],
+        `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type)
+         VALUES ($1, $2, $3, $4, 'cross-school')`,
+        [fixture.tenantA, fixture.organizationA, locationB, fixture.category],
       ),
     ).rejects.toMatchObject({ code: '23503' });
     expect(blockA).toBeDefined();
@@ -497,7 +521,7 @@ describe('foundation migration on PostgreSQL 18', () => {
     const handle = createDatabase(databaseUrl, { max: 1 });
     const probe = new PostgresReadinessProbe(handle.database);
     await expect(probe.check()).resolves.toEqual({
-      migration: '009_guided_setup_authentication',
+      migration: '010_destination_categories',
     });
     await handle.destroy();
     await expect(probe.check()).rejects.toBeDefined();

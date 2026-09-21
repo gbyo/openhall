@@ -62,6 +62,8 @@ export class PostgresPassRepository implements PassRepository {
         'tenant_id',
         'organization_id',
         'location_id',
+        'category_id',
+        'student_self_requestable',
         'service_type',
         'display_name',
         'status',
@@ -86,11 +88,31 @@ export class PostgresPassRepository implements PassRepository {
         : row.check_in_mode === 'required'
           ? 'required'
           : 'none';
+    const category = await connection
+      .selectFrom('destination_category')
+      .select(['name', 'icon_key', 'tone_key', 'student_surface', 'status'])
+      .where('tenant_id', '=', context.tenantId)
+      .where('id', '=', row.category_id)
+      .executeTakeFirst();
+    const categorySurface =
+      category?.student_surface === 'primary'
+        ? 'primary'
+        : category?.student_surface === 'hidden'
+          ? 'hidden'
+          : 'secondary';
     return {
       id: row.id,
       tenantId: row.tenant_id,
       organizationId: row.organization_id,
       locationId: row.location_id,
+      categoryId: row.category_id,
+      studentSelfRequestable: row.student_self_requestable,
+      categoryStatus: category?.status === 'archived' ? 'archived' : 'active',
+      categorySurface,
+      categoryPresentation:
+        category == null
+          ? null
+          : { name: category.name, iconKey: category.icon_key, toneKey: category.tone_key },
       serviceType: row.service_type,
       displayName: row.display_name ?? row.service_type,
       status,
@@ -425,10 +447,19 @@ export class PostgresPassRepository implements PassRepository {
   ): Promise<PassRow> {
     const destination = await connection
       .selectFrom('destination')
-      .select(['display_name', 'service_type', 'check_in_mode'])
+      .select(['display_name', 'service_type', 'check_in_mode', 'category_id'])
       .where('tenant_id', '=', row.tenant_id)
       .where('id', '=', row.destination_id)
       .executeTakeFirst();
+    const destinationCategory =
+      destination?.category_id == null
+        ? null
+        : await connection
+            .selectFrom('destination_category')
+            .select(['id', 'name', 'icon_key', 'tone_key'])
+            .where('tenant_id', '=', row.tenant_id)
+            .where('id', '=', destination.category_id)
+            .executeTakeFirst();
     const block =
       row.origin_schedule_block_id === null
         ? null
@@ -487,6 +518,15 @@ export class PostgresPassRepository implements PassRepository {
           : destination?.check_in_mode === 'required'
             ? 'required'
             : 'none',
+      destinationCategory:
+        destinationCategory == null
+          ? null
+          : {
+              id: destinationCategory.id,
+              name: destinationCategory.name,
+              iconKey: destinationCategory.icon_key,
+              toneKey: destinationCategory.tone_key,
+            },
       originBlock:
         block === null || block === undefined
           ? null

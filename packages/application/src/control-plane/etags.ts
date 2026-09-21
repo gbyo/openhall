@@ -9,6 +9,7 @@ import { ControlPlaneError } from './errors.js';
 export const CONTROL_PLANE_ETAG_KINDS = [
   'location',
   'destination',
+  'destination-category',
   'schedule',
   'policy',
   'grant',

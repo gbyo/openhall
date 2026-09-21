@@ -10,6 +10,7 @@ import {
   SECTION,
   shell,
   studentApis,
+  studentHomeApis,
 } from './fixtures';
 
 const STUDENT = {
@@ -310,6 +311,38 @@ test('admin schedules have no page-level horizontal overflow at 320px', async ({
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(overflow).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('student home has no overflow at 390px and no serious axe findings', async ({ page }) => {
+  const errors = listenForErrors(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await shell(page, STUDENT);
+  await studentHomeApis(page, { current: null });
+  await page.goto(`/schools/${ORG}/pass`);
+  await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Restroom' })).toBeVisible();
+  const overflow = await page
+    .locator('main')
+    .evaluate((element) => element.scrollWidth - element.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(
+    results.violations.filter((violation) =>
+      ['serious', 'critical'].includes(violation.impact ?? ''),
+    ),
+  ).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('student category tiles stay labeled in forced colors', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  const errors = listenForErrors(page);
+  await shell(page, STUDENT);
+  await studentHomeApis(page, { current: null });
+  await page.goto(`/schools/${ORG}/pass`);
+  await expect(page.getByRole('button', { name: 'Nurse' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'More' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
