@@ -131,6 +131,62 @@ test('preserves controls and truthful route structure in forced colors', async (
   );
 });
 
+test('renders no enabled action without its handler', async ({ page }) => {
+  await openReference(page);
+  await expect(page.getByRole('button', { name: 'Review latest version' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
+});
+
+test('associates the search field description with its input', async ({ page }) => {
+  await openReference(page);
+  const search = page.getByRole('searchbox', { name: 'Search destinations' });
+  const descriptionText = await search.evaluate((element) => {
+    const firstId = (element.getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .slice(0, 1)
+      .join('');
+    return document.getElementById(firstId)?.textContent ?? '';
+  });
+  expect(descriptionText).toBe('Results update as you type.');
+});
+
+test('declares pass cards as inline-size query containers', async ({ page }) => {
+  await openReference(page);
+  await expect(page.locator('.wf-pass-card').first()).toHaveCSS('container-type', 'inline-size');
+});
+
+test('keeps selected options legible in forced colors', async ({ page }) => {
+  await page.emulateMedia({ forcedColors: 'active' });
+  await openReference(page);
+  const selectors = await page.evaluate(() => {
+    const found: string[] = [];
+    for (const sheet of document.styleSheets) {
+      let rules: CSSRuleList;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        continue;
+      }
+      for (const rule of rules) {
+        if (rule instanceof CSSMediaRule && rule.conditionText.includes('forced-colors')) {
+          for (const inner of rule.cssRules) {
+            if (
+              inner instanceof CSSStyleRule &&
+              inner.selectorText.includes('[data-selected]') &&
+              (inner.selectorText.includes('.wf-listbox__item') ||
+                inner.selectorText.includes('.wf-menu__item'))
+            ) {
+              found.push(inner.selectorText);
+            }
+          }
+        }
+      }
+    }
+    return found;
+  });
+  expect(selectors.length).toBeGreaterThan(0);
+});
+
 test('keeps content and controls usable at 200 percent text size', async ({ page }) => {
   await openReference(page);
   await page.locator('html').evaluate((element) => {
