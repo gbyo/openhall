@@ -9,6 +9,7 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:4178',
+    timezoneId: 'America/New_York',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
