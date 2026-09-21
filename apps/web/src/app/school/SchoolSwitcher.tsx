@@ -96,7 +96,7 @@ export function SchoolSwitcher({ schoolName }: { schoolName: string }) {
               <DropdownMenuItem
                 key={school.id}
                 disabled={school.id === organizationId}
-                onSelect={() => void switchSchool(school.id)}
+                onClick={() => void switchSchool(school.id)}
               >
                 <span className="truncate">{school.name}</span>
                 {school.id === organizationId ? (
