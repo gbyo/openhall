@@ -58,7 +58,11 @@ export function UserMenu({ variant = 'sidebar' }: { variant?: 'sidebar' | 'heade
   }
 
   const menuContent = (
-    <DropdownMenuContent align="end" side={variant === 'header' ? 'bottom' : 'top'} className="w-56">
+    <DropdownMenuContent
+      align="end"
+      side={variant === 'header' ? 'bottom' : 'top'}
+      className="w-56"
+    >
       <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
