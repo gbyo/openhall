@@ -3,15 +3,18 @@ import {
   AuthenticationError,
   beginOidcLogin,
   completeBootstrap,
+  completeIdentityEnrollment,
   completeOidcLogin,
   consumeRecoveryGrant,
   logoutAllSessions,
   logoutSession,
+  startIdentityEnrollment,
   toBase64Url,
 } from '@openhall/application';
 import {
   AuthDiscoverySchema,
   AuthSessionSchema,
+  EnrollmentStartResponseSchema,
   MeSchema,
   OkSchema,
   ProblemDetailsSchema,
@@ -297,6 +300,78 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
     },
   );
 
+  typedApp.post(
+    '/api/v1/auth/enrollment/start',
+    {
+      schema: {
+        operationId: 'startIdentityEnrollment',
+        tags: ['auth'],
+        description:
+          'Starts an OIDC enrollment from a one-time invitation. The raw enrollment token travels in the Authorization header (`Enrollment <token>`), never the query string. Responds 200 with the provider authorization URL; the invitation is consumed only at callback. Status documented: 200 success; 400/401/502 problem on failure.',
+        security: OPERATOR_SECURITY,
+        response: {
+          200: EnrollmentStartResponseSchema,
+          400: {
+            description: 'Enrollment cannot start',
+            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+          },
+          401: {
+            description: 'Missing enrollment credential',
+            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+          },
+          502: {
+            description: 'Provider unavailable',
+            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+          },
+        },
+      },
+      config: { rateLimit: { max: 100, timeWindow: '1 minute' } },
+    },
+    async (request, reply) => {
+      const d = id();
+      const token = bearerToken(request.headers.authorization, 'Enrollment');
+      if (token === undefined) {
+        await sendAuthProblem(reply, request, new AuthenticationError('unauthenticated'));
+        return;
+      }
+      let binding = bindingTokenFrom(request, d.isProduction);
+      if (typeof binding !== 'string' || decodeCookieToken(binding) === undefined) {
+        binding = toBase64Url(d.random.randomBytes(32));
+        setLoginBindingCookie(reply, d.isProduction, binding);
+      }
+      try {
+        const begun = await startIdentityEnrollment(
+          { enrollmentToken: token, browserBinding: binding },
+          {
+            directory: d.directory,
+            transactions: d.transactions,
+            sessions: d.sessions,
+            enrollments: d.enrollments,
+            audit: d.audit,
+            adapter: d.adapter,
+            random: d.random,
+            digester: d.digester,
+            hasher: d.hasher,
+            protector: d.protector,
+            clock: d.clock,
+            runner: d.tenantRunner,
+            redirectUri: d.redirectUri,
+            allowInsecureHttp: d.allowInsecureHttp,
+          },
+        );
+        await reply.header('Cache-Control', 'no-store').send({
+          authorizationUrl: begun.authorizationUrl,
+        });
+      } catch (error) {
+        if (error instanceof AuthenticationError) {
+          await sendAuthProblem(reply, request, error);
+          return;
+        }
+        throw error;
+      }
+    },
+  );
+
   typedApp.get(
     '/api/v1/auth/oidc/callback',
     {
@@ -330,12 +405,49 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
       }
       try {
         // The OIDC redirect URI is shared: peek at the transaction purpose
-        // (non-consuming) and dispatch to the bootstrap or login completion.
-        // The completing use case still enforces the atomic claim, so a
-        // raced or replayed callback fails closed either way.
+        // (non-consuming) and dispatch to the bootstrap, enrollment, or
+        // login completion. The completing use case still enforces the
+        // atomic claim, so a raced or replayed callback fails closed either
+        // way.
         const pending = await d.transactions.peekByStateDigest(
           d.digester.digest(new TextEncoder().encode(state)),
         );
+        if (pending?.purpose === 'enrollment') {
+          const enrolled = await completeIdentityEnrollment(
+            {
+              state,
+              browserBinding: binding,
+              callbackUrl,
+              requestId: request.id,
+            },
+            {
+              directory: d.directory,
+              transactions: d.transactions,
+              sessions: d.sessions,
+              enrollments: d.enrollments,
+              audit: d.audit,
+              adapter: d.adapter,
+              random: d.random,
+              digester: d.digester,
+              hasher: d.hasher,
+              protector: d.protector,
+              clock: d.clock,
+              runner: d.tenantRunner,
+              redirectUri: d.redirectUri,
+              allowInsecureHttp: d.allowInsecureHttp,
+            },
+          );
+          const enrollmentMaxAge = Math.max(
+            60,
+            Math.floor(
+              (enrolled.session.absoluteExpiresAt.epochMilliseconds -
+                d.clock.now().epochMilliseconds) /
+                1000,
+            ),
+          );
+          setSessionCookie(reply, d.isProduction, enrolled.sessionToken, enrollmentMaxAge);
+          return await reply.header('Cache-Control', 'no-store').redirect(enrolled.returnPath);
+        }
         if (pending?.purpose === 'bootstrap') {
           const installed = await completeBootstrap(
             {

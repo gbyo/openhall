@@ -1025,3 +1025,287 @@ describe('override workflow', () => {
     ).toBe(0);
   });
 });
+
+describe('Phase 8 policy rule administration', () => {
+  let schoolAdmin: SessionFixture | null = null;
+
+  async function ensureSchoolAdmin(): Promise<SessionFixture> {
+    if (schoolAdmin !== null) return schoolAdmin;
+    const admin = await makeStaff(tenantA, schoolA, 'PolicyAdmin');
+    await pool.query(
+      `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, organization_id) VALUES ($1, $2, 'school_admin', 'organization', $3)`,
+      [tenantA, admin.accountId, schoolA],
+    );
+    schoolAdmin = admin;
+    return admin;
+  }
+
+  interface RuleBody {
+    id: string;
+    revision: number;
+    enabled: boolean;
+  }
+
+  async function createRule(
+    admin: SessionFixture,
+    body: Record<string, unknown>,
+  ): Promise<{
+    status: number;
+    code: string | undefined;
+    rule: RuleBody | undefined;
+    etag: string | undefined;
+  }> {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/policy-rules`,
+      headers: authHeaders(admin, randomUUID()),
+      payload: body,
+    });
+    const parsed = response.json<{ rule?: RuleBody; code?: string }>();
+    const etag = response.headers.etag;
+    return {
+      status: response.statusCode,
+      code: parsed.code,
+      rule: parsed.rule,
+      etag: typeof etag === 'string' ? etag : undefined,
+    };
+  }
+
+  function boundaryBody(configuration: Record<string, unknown>): Record<string, unknown> {
+    return {
+      name: 'Admin boundary',
+      ruleType: 'schedule_boundary',
+      scope: {
+        kind: 'organization',
+        organizationId: schoolA,
+        sectionId: null,
+        destinationId: null,
+      },
+      priority: 0,
+      configuration,
+      overrideMode: 'never',
+      validFrom: null,
+      validUntil: null,
+    };
+  }
+
+  const VALID_BOUNDARY = {
+    schemaVersion: 1,
+    firstMinutes: 60,
+    lastMinutes: 60,
+    blockKinds: ['instructional'],
+    requestSources: ['student_web'],
+  };
+
+  const VALID_APPROVAL = {
+    schemaVersion: 1,
+    requestSources: ['student_web'],
+    approver: 'current_section_teacher',
+  };
+
+  it('rejects invalid configurations with 409 policy_rule_invalid', async () => {
+    await clearRules();
+    const admin = await ensureSchoolAdmin();
+    const cases: { label: string; body: Record<string, unknown> }[] = [
+      { label: 'negative minutes', body: boundaryBody({ ...VALID_BOUNDARY, firstMinutes: -1 }) },
+      { label: 'fractional minutes', body: boundaryBody({ ...VALID_BOUNDARY, firstMinutes: 1.5 }) },
+      {
+        label: 'minutes above day bound',
+        body: boundaryBody({ ...VALID_BOUNDARY, firstMinutes: 1441 }),
+      },
+      {
+        label: 'empty window',
+        body: boundaryBody({ ...VALID_BOUNDARY, firstMinutes: 0, lastMinutes: 0 }),
+      },
+      {
+        label: 'unknown block kind',
+        body: boundaryBody({ ...VALID_BOUNDARY, blockKinds: ['bogus'] }),
+      },
+      {
+        label: 'empty block kinds',
+        body: boundaryBody({ ...VALID_BOUNDARY, blockKinds: [] }),
+      },
+      {
+        label: 'unknown request source',
+        body: boundaryBody({ ...VALID_BOUNDARY, requestSources: ['sms'] }),
+      },
+      {
+        label: 'empty request sources',
+        body: boundaryBody({ ...VALID_BOUNDARY, requestSources: [] }),
+      },
+      {
+        label: 'unknown property',
+        body: boundaryBody({ ...VALID_BOUNDARY, extra: 'nope' }),
+      },
+      {
+        label: 'unsupported schema version',
+        body: boundaryBody({ ...VALID_BOUNDARY, schemaVersion: 2 }),
+      },
+      {
+        label: 'unknown approver',
+        body: {
+          name: 'Admin approval',
+          ruleType: 'approval_requirement',
+          scope: {
+            kind: 'section',
+            organizationId: null,
+            sectionId: sectionA1,
+            destinationId: null,
+          },
+          priority: 0,
+          configuration: { ...VALID_APPROVAL, approver: 'principal' },
+          overrideMode: 'approval_required',
+          validFrom: null,
+          validUntil: null,
+        },
+      },
+      {
+        label: 'missing approver',
+        body: {
+          name: 'Admin approval',
+          ruleType: 'approval_requirement',
+          scope: {
+            kind: 'section',
+            organizationId: null,
+            sectionId: sectionA1,
+            destinationId: null,
+          },
+          priority: 0,
+          configuration: { schemaVersion: 1, requestSources: ['student_web'] },
+          overrideMode: 'approval_required',
+          validFrom: null,
+          validUntil: null,
+        },
+      },
+    ];
+    for (const entry of cases) {
+      const result = await createRule(admin, entry.body);
+      expect(result.status, `${entry.label}: status`).toBe(409);
+      expect(result.code, `${entry.label}: code`).toBe('policy_rule_invalid');
+    }
+    expect(await tableCount('policy_rule')).toBe(0);
+  });
+
+  it('accepts both closed rule shapes starting disabled at revision 1', async () => {
+    await clearRules();
+    const admin = await ensureSchoolAdmin();
+    const boundary = await createRule(admin, boundaryBody(VALID_BOUNDARY));
+    expect(boundary.status).toBe(201);
+    expect(boundary.rule?.revision).toBe(1);
+    expect(boundary.rule?.enabled).toBe(false);
+    if (boundary.etag === undefined) throw new Error('Expected rule ETag');
+
+    const approval = await createRule(admin, {
+      name: 'Admin approval',
+      ruleType: 'approval_requirement',
+      scope: {
+        kind: 'section',
+        organizationId: null,
+        sectionId: sectionA1,
+        destinationId: null,
+      },
+      priority: 0,
+      configuration: VALID_APPROVAL,
+      overrideMode: 'approval_required',
+      validFrom: null,
+      validUntil: null,
+    });
+    expect(approval.status).toBe(201);
+    expect(approval.rule?.revision).toBe(1);
+    expect(approval.rule?.enabled).toBe(false);
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/policy-rules`,
+      headers: authHeaders(admin),
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json<{ rules: RuleBody[] }>().rules).toHaveLength(2);
+  });
+
+  it('enforces a boundary deny only after activation and preserves snapshots', async () => {
+    await clearRules();
+    const admin = await ensureSchoolAdmin();
+    // A full-day instructional boundary: deterministic deny whatever time the
+    // suite runs in the school time zone.
+    const created = await createRule(
+      admin,
+      boundaryBody({
+        schemaVersion: 1,
+        firstMinutes: 1440,
+        lastMinutes: 1440,
+        blockKinds: ['instructional'],
+        requestSources: ['student_web'],
+      }),
+    );
+    expect(created.status).toBe(201);
+    const ruleId = created.rule?.id;
+    if (ruleId === undefined || created.etag === undefined) throw new Error('Expected rule');
+
+    // Disabled rules never affect students.
+    const allowedStudent = await makePassStudent('BoundaryAllowed');
+    const allowed = await requestPass(allowedStudent);
+    expect(allowed.statusCode).toBe(201);
+    const allowedPass = allowed.json<{ pass: PassBody }>().pass;
+    expect(allowedPass.lifecycleState).toBe('ready');
+    expect(allowedPass.policy?.decision).toBe('allow');
+
+    const activated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/policy-rules/${ruleId}/activate`,
+      headers: authHeaders(admin, randomUUID(), created.etag),
+    });
+    expect(activated.statusCode).toBe(200);
+    const activeBody = activated.json<{ rule: RuleBody }>().rule;
+    expect(activeBody.enabled).toBe(true);
+    expect(activeBody.revision).toBe(2);
+    const activeEtag = activated.headers.etag;
+    if (typeof activeEtag !== 'string') throw new Error('Expected activation ETag');
+
+    const deniedStudent = await makePassStudent('BoundaryDenied');
+    const denied = await requestPass(deniedStudent);
+    expect(denied.statusCode).toBe(201);
+    const deniedPass = denied.json<{ pass: PassBody }>().pass;
+    expect(deniedPass.lifecycleState).toBe('denied');
+    expect(deniedPass.policy?.decision).toBe('deny');
+
+    // Updating the rule must not rewrite the evaluation history: the denied
+    // pass keeps pointing at revision 2 with its immutable snapshot.
+    const updated = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/policy-rules/${ruleId}`,
+      headers: authHeaders(admin, randomUUID(), activeEtag),
+      payload: boundaryBody({
+        schemaVersion: 1,
+        firstMinutes: 1440,
+        lastMinutes: 1440,
+        blockKinds: ['instructional'],
+        requestSources: ['student_web'],
+      }),
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json<{ rule: RuleBody }>().rule.revision).toBe(3);
+
+    const snapshots = (
+      await pool.query<{ revision: number; snapshot: Record<string, unknown>; reason: string }>(
+        `SELECT r.policy_rule_revision AS revision, r.rule_snapshot AS snapshot, r.reason_code AS reason
+         FROM policy_evaluation_result r
+         JOIN policy_evaluation e ON e.id = r.evaluation_id
+         WHERE e.pass_id = $1`,
+        [deniedPass.id],
+      )
+    ).rows;
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]?.revision).toBe(2);
+    expect(snapshots[0]?.reason).toBe('schedule_boundary_blackout');
+    const snapshot = snapshots[0]?.snapshot as { revision?: number; ruleType?: string };
+    expect(snapshot.revision).toBe(2);
+    expect(snapshot.ruleType).toBe('schedule_boundary');
+
+    const allowedSnapshots = await tableCount(
+      'policy_evaluation_result r JOIN policy_evaluation e ON e.id = r.evaluation_id',
+      `WHERE e.pass_id = '${allowedPass.id}'`,
+    );
+    expect(allowedSnapshots).toBe(0);
+  });
+});

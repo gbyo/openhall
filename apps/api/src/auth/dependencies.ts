@@ -3,6 +3,7 @@ import {
   PostgresAuditWriter,
   PostgresBootstrapFinalizer,
   PostgresBootstrapRepository,
+  PostgresEnrollmentRepository,
   PostgresIdentityDirectory,
   PostgresOidcTransactionStore,
   PostgresOperatorGrantStore,
@@ -36,6 +37,7 @@ export interface AuthDependencies {
   readonly sessions: PostgresSessionRepository;
   readonly lookup: PostgresSessionCredentialLookup;
   readonly transactions: PostgresOidcTransactionStore;
+  readonly enrollments: PostgresEnrollmentRepository;
   readonly grants: PostgresOperatorGrantStore;
   readonly drafts: PostgresBootstrapRepository;
   readonly audit: PostgresAuditWriter;
@@ -80,6 +82,7 @@ export function createAuthDependencies(
     sessions: new PostgresSessionRepository(),
     lookup: new PostgresSessionCredentialLookup(database),
     transactions: new PostgresOidcTransactionStore(database),
+    enrollments: new PostgresEnrollmentRepository(database),
     grants: new PostgresOperatorGrantStore(database),
     drafts: new PostgresBootstrapRepository(),
     audit: new PostgresAuditWriter(),

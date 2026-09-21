@@ -318,7 +318,7 @@ beforeAll(async () => {
     rateLimitDisabled: true,
     destinationFlowWorkerEnabled: false,
     readinessProbe: {
-      check: () => Promise.resolve({ migration: '007_destination_flow_and_movement' }),
+      check: () => Promise.resolve({ migration: '008_school_control_plane' }),
     },
   });
 
