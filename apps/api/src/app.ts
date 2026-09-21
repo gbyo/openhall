@@ -266,11 +266,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
 
   typedApp.addHook('onSend', async (request, reply) => {
     const pathname = safeRequestPath(request.url);
-    const contentType = reply.getHeader('content-type');
-    if (
-      !(typeof contentType === 'string' && contentType.startsWith('text/event-stream')) &&
-      NO_STORE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix))
-    ) {
+    if (NO_STORE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix))) {
       void reply.header('Cache-Control', 'no-store');
     }
   });

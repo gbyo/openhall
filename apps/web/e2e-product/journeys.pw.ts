@@ -729,9 +729,5 @@ test('student no-pass view works at 320px from the keyboard without axe violatio
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: "You're ready." })).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
-  expect(
-    results.violations.filter((violation) =>
-      ['serious', 'critical'].includes(violation.impact ?? ''),
-    ),
-  ).toEqual([]);
+  expect(results.violations).toEqual([]);
 });

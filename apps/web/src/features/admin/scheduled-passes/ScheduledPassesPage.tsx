@@ -79,17 +79,22 @@ export function Component() {
     onSuccess: refresh,
   });
   const cancel = useMutation({
-    mutationFn: (input: { id: string; key: string; etag: string }) => {
+    mutationFn: async (input: { id: string; key: string }) => {
+      const detail = await api.GET('/api/v1/scheduled-authorizations/{scheduledAuthorizationId}', {
+        params: { path: { scheduledAuthorizationId: input.id } },
+      });
+      requireData(detail);
+      const etag = detail.response.headers.get('etag') ?? '';
       return confirmed(
         api.POST('/api/v1/scheduled-authorizations/{scheduledAuthorizationId}/cancel', {
           params: {
             path: { scheduledAuthorizationId: input.id },
-            header: { 'idempotency-key': input.key, 'if-match': input.etag },
+            header: { 'idempotency-key': input.key, 'if-match': etag },
           },
           headers: {
             'X-CSRF-Token': getCsrfToken(),
             'Idempotency-Key': input.key,
-            'If-Match': input.etag,
+            'If-Match': etag,
           },
         }),
       );
@@ -114,17 +119,9 @@ export function Component() {
       },
     });
   }
-  async function beginCancel(id: string, studentName: string, destinationName: string) {
+  function beginCancel(id: string, studentName: string, destinationName: string) {
     if (!window.confirm(`Cancel ${studentName}'s scheduled pass to ${destinationName}?`)) return;
-    const detail = await api.GET('/api/v1/scheduled-authorizations/{scheduledAuthorizationId}', {
-      params: { path: { scheduledAuthorizationId: id } },
-    });
-    requireData(detail);
-    cancel.mutate({
-      id,
-      key: crypto.randomUUID(),
-      etag: detail.response.headers.get('etag') ?? '',
-    });
+    cancel.mutate({ id, key: crypto.randomUUID() });
   }
   return (
     <section className="workspace">
@@ -268,11 +265,7 @@ export function Component() {
                 <Button
                   variant="danger"
                   onClick={() => {
-                    void beginCancel(
-                      item.id,
-                      item.student.displayName,
-                      item.destination.displayName,
-                    );
+                    beginCancel(item.id, item.student.displayName, item.destination.displayName);
                   }}
                 >
                   Cancel

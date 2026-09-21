@@ -78,17 +78,22 @@ export function Component() {
     onSuccess: refresh,
   });
   const revoke = useMutation({
-    mutationFn: (input: { grantId: string; key: string; etag: string }) => {
+    mutationFn: async (input: { grantId: string; key: string }) => {
+      const detail = await api.GET('/api/v1/authorization-grants/{grantId}', {
+        params: { path: { grantId: input.grantId } },
+      });
+      requireData(detail);
+      const etag = detail.response.headers.get('etag') ?? '';
       return confirmed(
         api.POST('/api/v1/authorization-grants/{grantId}/revoke', {
           params: {
             path: { grantId: input.grantId },
-            header: { 'idempotency-key': input.key, 'if-match': input.etag },
+            header: { 'idempotency-key': input.key, 'if-match': etag },
           },
           headers: {
             'X-CSRF-Token': getCsrfToken(),
             'Idempotency-Key': input.key,
-            'If-Match': input.etag,
+            'If-Match': etag,
           },
         }),
       );
@@ -109,7 +114,7 @@ export function Component() {
       },
     });
   }
-  async function beginRevoke(grant: NonNullable<typeof grants.data>['grants'][number]) {
+  function beginRevoke(grant: NonNullable<typeof grants.data>['grants'][number]) {
     const scope = grant.destination?.displayName ?? context.organization.name;
     if (
       !window.confirm(
@@ -117,15 +122,7 @@ export function Component() {
       )
     )
       return;
-    const detail = await api.GET('/api/v1/authorization-grants/{grantId}', {
-      params: { path: { grantId: grant.id } },
-    });
-    requireData(detail);
-    revoke.mutate({
-      grantId: grant.id,
-      key: crypto.randomUUID(),
-      etag: detail.response.headers.get('etag') ?? '',
-    });
+    revoke.mutate({ grantId: grant.id, key: crypto.randomUUID() });
   }
   return (
     <section className="workspace">
@@ -236,7 +233,7 @@ export function Component() {
                   variant="danger"
                   pending={revoke.isPending && revoke.variables.grantId === grant.id}
                   onClick={() => {
-                    void beginRevoke(grant);
+                    beginRevoke(grant);
                   }}
                 >
                   Remove access

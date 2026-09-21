@@ -102,6 +102,7 @@ export class PostgresOutboxListener {
   private disconnected(client: Client): void {
     if (this.client === client) this.client = null;
     client.removeAllListeners();
+    void client.end().catch(() => undefined);
     this.setHealthy(false);
     this.scheduleReconnect();
   }
@@ -119,6 +120,7 @@ export class PostgresOutboxListener {
 
   private async handleNotification(client: Client, message: Notification): Promise<void> {
     if (message.channel !== 'openhall_outbox_v1' || message.payload === undefined) return;
+    let row: OutboxRow | undefined;
     try {
       const result = await client.query<OutboxRow>(
         `select id, tenant_id, organization_id, aggregate_kind, aggregate_id, event_type, payload
@@ -126,20 +128,29 @@ export class PostgresOutboxListener {
           where id = $1`,
         [message.payload],
       );
-      const row = result.rows[0];
-      if (row === undefined) return;
-      const event: ObservedOutboxEvent = {
-        id: row.id,
-        tenantId: row.tenant_id,
-        organizationId: row.organization_id,
-        aggregateKind: row.aggregate_kind,
-        aggregateId: row.aggregate_id,
-        eventType: row.event_type,
-        payload: row.payload,
-      };
-      for (const handler of this.eventHandlers) handler(event);
+      row = result.rows[0];
     } catch {
       this.disconnected(client);
+      return;
+    }
+    if (row === undefined) return;
+    const event: ObservedOutboxEvent = {
+      id: row.id,
+      tenantId: row.tenant_id,
+      organizationId: row.organization_id,
+      aggregateKind: row.aggregate_kind,
+      aggregateId: row.aggregate_id,
+      eventType: row.event_type,
+      payload: row.payload,
+    };
+    // Subscriber bugs must not look like database failures: a throwing
+    // handler neither drops this connection nor blocks later subscribers.
+    for (const handler of this.eventHandlers) {
+      try {
+        handler(event);
+      } catch {
+        continue;
+      }
     }
   }
 

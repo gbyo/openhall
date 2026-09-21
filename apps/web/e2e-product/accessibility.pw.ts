@@ -89,9 +89,13 @@ test('teacher can approve from the keyboard with a visible focus indicator', asy
   const approve = page.getByRole('button', { name: 'Approve' });
   await approve.focus();
   await expect(approve).toBeFocused();
-  expect(await approve.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe(
-    'none',
-  );
+  const outline = await approve.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor };
+  });
+  expect(outline.style).not.toBe('none');
+  expect(Number.parseFloat(outline.width)).toBeGreaterThan(0);
+  expect(outline.color).not.toBe('rgba(0, 0, 0, 0)');
   const box = await approve.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return { top: rect.top, bottom: rect.bottom, height: window.innerHeight };

@@ -2,6 +2,23 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ConnectionStatus } from '../../design-system/patterns/ConnectionStatus';
 import { queryKeys } from '../../api/query-keys';
+import type { OrganizationContext } from '../../api/types';
+
+function contextRevisionOf(context: OrganizationContext | undefined): string | null {
+  if (!context) return null;
+  return [
+    [...context.affiliations].sort().join(','),
+    [...context.capabilities].sort().join(','),
+    context.teachingSections
+      .map((section) => section.id)
+      .sort()
+      .join(','),
+    context.staffedDestinations
+      .map((destination) => destination.id)
+      .sort()
+      .join(','),
+  ].join('|');
+}
 
 type Status = 'connecting' | 'live' | 'reconnecting' | 'stale' | 'unreachable';
 
@@ -57,6 +74,17 @@ export function RealtimeProvider({
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<Status>('connecting');
   const [lastConfirmedAt, setLastConfirmedAt] = useState<Date | null>(null);
+  // Track the organization context without mounting a query observer: the
+  // loader already caches it, and reading it from the cache avoids disturbing
+  // in-flight route transitions. When the cached affiliations, capabilities,
+  // teaching sections, or staffed destinations change, the revision below
+  // changes and the EventSource subscription below reconnects so the hub
+  // authorizes with the current context.
+  const [contextRevision, setContextRevision] = useState<string | null>(() =>
+    contextRevisionOf(
+      queryClient.getQueryData<OrganizationContext>(queryKeys.organizationContext(organizationId)),
+    ),
+  );
   useEffect(
     () =>
       queryClient.getQueryCache().subscribe((event) => {
@@ -65,6 +93,19 @@ export function RealtimeProvider({
       }),
     [queryClient],
   );
+  useEffect(() => {
+    const syncRevision = () => {
+      setContextRevision(
+        contextRevisionOf(
+          queryClient.getQueryData<OrganizationContext>(
+            queryKeys.organizationContext(organizationId),
+          ),
+        ),
+      );
+    };
+    syncRevision();
+    return queryClient.getQueryCache().subscribe(syncRevision);
+  }, [organizationId, queryClient]);
   useEffect(() => {
     const source = new EventSource(`/api/v1/organizations/${organizationId}/events`);
     let staleTimer: number | null = null;
@@ -85,10 +126,11 @@ export function RealtimeProvider({
     source.addEventListener('resync', () => {
       clearStaleTimer();
       setStatus('live');
-      void queryClient.invalidateQueries({
-        predicate: (query) =>
-          query.queryKey.includes(organizationId) || query.queryKey[0] === 'active-self-pass',
-      });
+      // Recover everything mounted, not just organization-scoped keys:
+      // staff views (requests, rosters, stations) and student scheduling
+      // keys carry no organization id and would otherwise stay stale after
+      // a dropped connection. Inactive queries only revalidate on remount.
+      void queryClient.invalidateQueries();
     });
     source.addEventListener('realtime-unavailable', () => {
       setStatus('unreachable');
@@ -105,7 +147,7 @@ export function RealtimeProvider({
       clearStaleTimer();
       source.close();
     };
-  }, [organizationId, queryClient]);
+  }, [organizationId, queryClient, contextRevision]);
   const lastConfirmed = lastConfirmedAt?.toLocaleTimeString([], {
     hour: 'numeric',
     minute: '2-digit',

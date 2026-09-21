@@ -23,7 +23,7 @@ export function PassCard({
     <article className={`wf-pass-card wf-pass-card--${tone}`}>
       <header className="wf-pass-card__header">
         <p className="wf-pass-card__context">{context}</p>
-        <h3 className="wf-pass-card__title">{title}</h3>
+        <h1 className="wf-pass-card__title">{title}</h1>
         {supporting && <div className="wf-pass-card__supporting">{supporting}</div>}
       </header>
       {children && <div className="wf-pass-card__content">{children}</div>}

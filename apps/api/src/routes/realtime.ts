@@ -80,7 +80,7 @@ export function registerRealtimeRoutes(
       reply.hijack();
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
-        'Cache-Control': 'no-cache, no-transform',
+        'Cache-Control': 'no-store, no-transform',
         Connection: 'keep-alive',
         'X-Accel-Buffering': 'no',
       });
