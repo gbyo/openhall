@@ -975,8 +975,17 @@ test('student no-pass view works at 320px from the keyboard without axe violatio
 test('staff account footer opens menu without routing or throwing', async ({ page }) => {
   await shell(page, { affiliations: ['staff'], capabilities: [] });
   const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
+
   page.on('pageerror', (error) => {
     pageErrors.push(`${error.message}\n${error.stack ?? ''}`);
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  page.on('requestfailed', (request) => {
+    failedRequests.push(`${request.method()} ${request.url()} :: ${request.failure()?.errorText ?? ''}`);
   });
 
   await page.goto(`/schools/${ORG}`);
@@ -985,30 +994,35 @@ test('staff account footer opens menu without routing or throwing', async ({ pag
   const beforeHtml = await trigger.evaluate((element) => element.outerHTML);
 
   await trigger.click();
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(250);
 
-  const afterHtml = await trigger.evaluate((element) => element.outerHTML);
+  const afterUrl = page.url();
+  const bodyText = (await page.locator('body').innerText()).slice(0, 4000);
+  const triggerCount = await page.getByRole('button', { name: /Account, signed in as/ }).count();
   const contentCount = await page.locator('[data-slot="dropdown-menu-content"]').count();
   const menuCount = await page.getByRole('menu').count();
-  const errorCount = await page.getByText('WayPass hit a problem').count();
 
   if (
     pageErrors.length > 0 ||
-    page.url() !== beforeUrl ||
+    consoleErrors.length > 0 ||
+    failedRequests.length > 0 ||
+    afterUrl !== beforeUrl ||
+    triggerCount === 0 ||
     contentCount === 0 ||
-    menuCount === 0 ||
-    errorCount > 0
+    menuCount === 0
   ) {
     throw new Error(
       [
         `beforeUrl=${beforeUrl}`,
-        `afterUrl=${page.url()}`,
-        `pageErrors=${pageErrors.join('\n---\n') || '(none)'}`,
+        `afterUrl=${afterUrl}`,
+        `pageErrors=\n${pageErrors.join('\n---\n') || '(none)'}`,
+        `consoleErrors=\n${consoleErrors.join('\n---\n') || '(none)'}`,
+        `failedRequests=\n${failedRequests.join('\n---\n') || '(none)'}`,
+        `triggerCount=${String(triggerCount)}`,
         `contentCount=${String(contentCount)}`,
         `menuCount=${String(menuCount)}`,
-        `errorCount=${String(errorCount)}`,
         `beforeTrigger=${beforeHtml}`,
-        `afterTrigger=${afterHtml}`,
+        `body=\n${bodyText}`,
       ].join('\n'),
     );
   }
