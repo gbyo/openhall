@@ -86,18 +86,26 @@ describe('foundation HTTP API', () => {
     });
 
     const openapi = document as unknown as {
-      components?: { schemas?: Record<string, unknown> };
+      components?: {
+        schemas?: Record<string, unknown>;
+      };
       paths: Record<
         string,
-        Record<
-          string,
-          {
+        {
+          get?: {
             responses?: Record<
               string,
-              { content?: Record<string, { schema?: Record<string, unknown> }> }
+              {
+                content?: Record<
+                  string,
+                  {
+                    schema?: Record<string, unknown>;
+                  }
+                >;
+              }
             >;
-          }
-        >
+          };
+        }
       >;
     };
     const schemas = openapi.components?.schemas;
