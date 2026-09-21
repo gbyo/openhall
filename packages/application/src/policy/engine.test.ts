@@ -45,6 +45,7 @@ function approvalRule(): PolicyRuleInput {
     configuration: {
       schemaVersion: 1,
       requestSources: ['student_web'],
+      approver: 'current_section_teacher',
     },
   });
 }
