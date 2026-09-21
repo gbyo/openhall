@@ -116,6 +116,7 @@ function capabilityAllowsResourceKind(capability: Capability, kind: string): boo
     case 'incident.view':
     case 'incident.manage':
     case 'audit.view':
+    case 'identity.enroll':
       return kind === 'organization';
     case 'pass.request.self':
     case 'pass.override.request.self':
@@ -354,6 +355,7 @@ export class RelationshipAuthorizationService {
       'incident.view',
       'incident.manage',
       'audit.view',
+      'identity.enroll',
     ];
     for (const capability of orgChecks) {
       const decision = await this.decideWithContext(context, {

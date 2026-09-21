@@ -44,6 +44,8 @@ export interface PassRepresentation {
   readonly destination: PassDestinationView;
   readonly origin: PassOriginView;
   readonly requestSource: string;
+  /** Exact scheduled authorization backing this movement, if scheduled. */
+  readonly scheduledAuthorizationId: string | null;
   readonly requestedAt: string;
   readonly lifecycleState: string;
   /** Decimal string: the underlying value is PostgreSQL bigint. */
@@ -151,6 +153,7 @@ export function toPassRepresentation(
       location: row.originLocation,
     },
     requestSource: row.requestSource,
+    scheduledAuthorizationId: row.scheduledAuthorizationId,
     requestedAt: row.requestedAt.toString(),
     lifecycleState: row.lifecycleState,
     revision: row.revision.toString(10),

@@ -12,6 +12,7 @@ export interface PassDestinationRecord {
   readonly serviceType: string;
   readonly displayName: string;
   readonly status: 'active' | 'closed' | 'archived';
+  readonly revision: bigint;
   readonly checkInMode: DestinationCheckInMode;
   readonly capacity: number | null;
   readonly queueEnabled: boolean;
@@ -43,6 +44,9 @@ export interface PassRow {
   readonly expectedReturnAt: Temporal.Instant | null;
   readonly scheduledAuthorizationId: string | null;
   readonly revision: bigint;
+  /** Departure-time check-in snapshot; null for passes that departed before Phase 8. */
+  readonly departureCheckInMode: DestinationCheckInMode | null;
+  readonly departureDestinationRevision: bigint | null;
   readonly destinationDisplayName: string;
   readonly destinationServiceType: string;
   readonly destinationCheckInMode: DestinationCheckInMode;
@@ -59,7 +63,8 @@ export interface NewPassRow {
   readonly originSectionId: string | null;
   readonly originScheduleBlockId: string | null;
   readonly destinationId: DestinationId;
-  readonly requestSource: 'student_web' | 'staff_web';
+  readonly requestSource: 'student_web' | 'staff_web' | 'scheduled';
+  readonly scheduledAuthorizationId: string | null;
   readonly requestedByPersonId: PersonId;
   readonly requestedAt: Temporal.Instant;
 }
@@ -168,6 +173,10 @@ export interface PassRepository {
     expectedRevision: bigint,
     at: Temporal.Instant,
     expectedReturnAt: Temporal.Instant | null,
+    departure: {
+      readonly checkInMode: DestinationCheckInMode;
+      readonly destinationRevision: bigint;
+    },
   ): Promise<PassRow | null>;
   updatePassToAtDestination(
     context: TenantTransactionContext,

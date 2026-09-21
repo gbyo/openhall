@@ -38,6 +38,18 @@ export interface PolicyOverrideEvidence {
   readonly decision: 'pending' | 'approved' | 'denied' | 'cancelled' | 'expired';
 }
 
+/**
+ * Typed scheduled-preapproval evidence. A preapproved scheduled
+ * authorization may satisfy only an approval_requirement that would
+ * otherwise require a classroom approval for the exact scheduled movement.
+ * It never bypasses deny contributions, overrides, capacity, or status.
+ */
+export interface ScheduledPreapprovalEvidence {
+  readonly scheduledAuthorizationId: string;
+  readonly studentId: string;
+  readonly destinationId: string;
+}
+
 export interface PolicyPassFacts {
   readonly id: string;
   readonly revision: bigint;
@@ -63,6 +75,8 @@ export interface PolicyEvaluationContext {
   readonly rules: readonly PolicyRuleInput[];
   readonly approvals: readonly PolicyApprovalEvidence[];
   readonly overrides: readonly PolicyOverrideEvidence[];
+  /** Scheduled preapprovals bound to this exact pass command, if any. */
+  readonly scheduledPreapprovals: readonly ScheduledPreapprovalEvidence[];
 }
 
 export type { PolicyOverrideMode, PolicyRuleType };

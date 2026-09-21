@@ -91,6 +91,7 @@ export interface ResourceByCapability {
 
   'audit.view': OrganizationResource;
 
+  'identity.enroll': OrganizationResource;
   'identity.manage': TenantResource;
   'system.manage': TenantResource;
 }

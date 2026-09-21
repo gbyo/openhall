@@ -9,6 +9,7 @@ export const POLICY_REASON_CODES = [
   'current_section_teacher_approval_required',
   'approval_context_unavailable',
   'approval_satisfied',
+  'scheduled_preapproval_satisfied',
   'approval_denied',
   'override_denied',
   'rule_overridden',

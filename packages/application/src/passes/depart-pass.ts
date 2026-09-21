@@ -178,6 +178,10 @@ async function executeDeparture(
         row.revision,
         now,
         expectedReturnAt,
+        {
+          checkInMode: destination.checkInMode,
+          destinationRevision: destination.revision,
+        },
       );
       if (updated === null) {
         throw new PassApplicationError(
@@ -204,6 +208,7 @@ async function executeDeparture(
           maxDurationSeconds: destination.maxDurationSeconds,
           expectedReturnAt: expectedReturnAt?.toString() ?? null,
           checkInMode: destination.checkInMode,
+          destinationRevision: destination.revision.toString(10),
         },
       });
       await audit.append(context, {

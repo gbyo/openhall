@@ -47,6 +47,7 @@ export const ROLE_CAPABILITIES: Record<ExplicitRole, readonly Capability[]> = {
     'incident.view',
     'incident.manage',
     'audit.view',
+    'identity.enroll',
   ],
   // system_admin is handled structurally in the service (tenant-wide, all
   // capabilities except relationship-specific self semantics), not via this
@@ -79,6 +80,7 @@ export const SYSTEM_ADMIN_CAPABILITIES: readonly Capability[] = [
   'incident.view',
   'incident.manage',
   'audit.view',
+  'identity.enroll',
   'identity.manage',
   'system.manage',
 ];
