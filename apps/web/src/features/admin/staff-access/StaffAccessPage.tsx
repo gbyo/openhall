@@ -6,9 +6,35 @@ import { productMessage, UncertainCommandError } from '../../../api/problems';
 import { queryKeys } from '../../../api/query-keys';
 import { getCsrfToken } from '../../../api/session';
 import { formString } from '../../../api/forms';
-import { Button } from '../../../design-system/primitives/Button';
-import { Alert } from '../../../design-system/primitives/Alert';
 import { useSchool } from '../../../app/school/SchoolShell';
+import { PageHeader } from '../../../components/workspace/PageHeader';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const roleLabel = {
   destination_staff: 'Destination staff',
@@ -16,6 +42,14 @@ const roleLabel = {
   office_staff: 'Office staff',
   school_admin: 'School administrator',
 } as const;
+
+interface Grant {
+  id: string;
+  role: keyof typeof roleLabel;
+  person: { displayName: string | null };
+  destination: { displayName: string | null } | null;
+  status: string;
+}
 
 function optionalInstant(local: string, timeZone: string): string | null {
   return local
@@ -27,6 +61,7 @@ export function Component() {
   const { organizationId, context } = useSchool();
   const queryClient = useQueryClient();
   const [role, setRole] = useState<keyof typeof roleLabel>('destination_staff');
+  const [confirmingRevoke, setConfirmingRevoke] = useState<Grant | null>(null);
   const grants = useQuery({
     queryKey: queryKeys.grants(organizationId),
     queryFn: () =>
@@ -98,7 +133,10 @@ export function Component() {
         }),
       );
     },
-    onSuccess: refresh,
+    onSuccess: () => {
+      setConfirmingRevoke(null);
+      refresh();
+    },
   });
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,135 +152,197 @@ export function Component() {
       },
     });
   }
-  function beginRevoke(grant: NonNullable<typeof grants.data>['grants'][number]) {
-    const scope = grant.destination?.displayName ?? context.organization.name;
-    if (
-      !window.confirm(
-        `Remove ${roleLabel[grant.role]} access for ${grant.person.displayName}? They will no longer be able to use ${scope} tools.`,
-      )
-    )
-      return;
-    revoke.mutate({ grantId: grant.id, key: crypto.randomUUID() });
-  }
+  const list = (grants.data?.grants ?? []) as Grant[];
+  const revokeScope = confirmingRevoke?.destination?.displayName ?? context.organization.name;
   return (
-    <section className="workspace">
-      <header className="workspace__header">
-        <p className="auth-kicker">Permissions</p>
-        <h1 className="wf-type-page-title">Staff access</h1>
-        <p>
-          Assign a specific school duty. Teacher and student access comes from school records, not
-          this page.
-        </p>
-      </header>
+    <section className="grid gap-6">
+      <PageHeader
+        title="Staff access"
+        description="Assign a specific school duty. Teacher and student access comes from school records, not this page."
+      />
       {(issue.isError || revoke.isError) && (
-        <Alert tone="danger" title="Access change not confirmed">
-          <p>{productMessage(issue.error ?? revoke.error)}</p>
-          {issue.error instanceof UncertainCommandError && issue.variables && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                issue.mutate(issue.variables);
-              }}
-            >
-              Check again
-            </Button>
+        <Alert variant="destructive">
+          <AlertTitle>Access change not confirmed</AlertTitle>
+          <AlertDescription>{productMessage(issue.error ?? revoke.error)}</AlertDescription>
+          {issue.error instanceof UncertainCommandError && (
+            <AlertAction>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  issue.mutate(issue.variables);
+                }}
+              >
+                Check again
+              </Button>
+            </AlertAction>
           )}
-          {revoke.error instanceof UncertainCommandError && revoke.variables && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                revoke.mutate(revoke.variables);
-              }}
-            >
-              Check again
-            </Button>
+          {revoke.error instanceof UncertainCommandError && (
+            <AlertAction>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  revoke.mutate(revoke.variables);
+                }}
+              >
+                Check again
+              </Button>
+            </AlertAction>
           )}
         </Alert>
       )}
-      <form className="inline-form" onSubmit={submit}>
-        <label>
-          Staff member
-          <select className="wf-input" name="personId" required>
-            {people.data?.people.map((person) => (
-              <option key={person.personId} value={person.personId}>
-                {person.displayName}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Duty
-          <select
-            className="wf-input"
-            name="role"
-            value={role}
-            onChange={(event) => {
-              setRole(event.target.value as keyof typeof roleLabel);
-            }}
-          >
-            {Object.entries(roleLabel).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {role === 'destination_staff' && (
-          <label>
-            Destination
-            <select className="wf-input" name="destinationId" required>
-              {destinations.data?.destinations
-                .filter((destination) => destination.status !== 'archived')
-                .map((destination) => (
-                  <option key={destination.id} value={destination.id}>
-                    {destination.displayName ?? destination.serviceType}
-                  </option>
+      <Card>
+        <CardHeader>
+          <CardTitle>Grant access</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>
+            <Field>
+              <FieldLabel htmlFor="grant-person">Staff member</FieldLabel>
+              <NativeSelect id="grant-person" name="personId" required>
+                {people.data?.people.map((person) => (
+                  <NativeSelectOption key={person.personId} value={person.personId}>
+                    {person.displayName}
+                  </NativeSelectOption>
                 ))}
-            </select>
-          </label>
-        )}
-        <label>
-          Starts (optional)
-          <input className="wf-input" type="datetime-local" name="validFrom" />
-        </label>
-        <label>
-          Ends (optional)
-          <input className="wf-input" type="datetime-local" name="validUntil" />
-        </label>
-        <Button type="submit" pending={issue.isPending}>
-          Grant access
-        </Button>
-      </form>
-      <div className="data-table">
-        <div className="data-table__head">
-          <span>Person</span>
-          <span>Duty</span>
-          <span>Scope</span>
-          <span>Status</span>
-          <span>Action</span>
+              </NativeSelect>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="grant-duty">Duty</FieldLabel>
+              <NativeSelect
+                id="grant-duty"
+                name="role"
+                value={role}
+                onChange={(event) => {
+                  setRole(event.target.value as keyof typeof roleLabel);
+                }}
+              >
+                {Object.entries(roleLabel).map(([value, label]) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </Field>
+            {role === 'destination_staff' && (
+              <Field>
+                <FieldLabel htmlFor="grant-destination">Destination</FieldLabel>
+                <NativeSelect id="grant-destination" name="destinationId" required>
+                  {destinations.data?.destinations
+                    .filter((destination) => destination.status !== 'archived')
+                    .map((destination) => (
+                      <NativeSelectOption key={destination.id} value={destination.id}>
+                        {destination.displayName ?? destination.serviceType}
+                      </NativeSelectOption>
+                    ))}
+                </NativeSelect>
+              </Field>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <Field>
+                <FieldLabel htmlFor="grant-from">Starts (optional)</FieldLabel>
+                <Input id="grant-from" type="datetime-local" name="validFrom" />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="grant-until">Ends (optional)</FieldLabel>
+                <Input id="grant-until" type="datetime-local" name="validUntil" />
+              </Field>
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={issue.isPending}>
+                {issue.isPending ? 'Granting…' : 'Grant access'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+      {grants.isPending ? (
+        <div className="grid gap-2" role="status" aria-label="Loading access grants">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
-        {grants.data?.grants.map((grant) => (
-          <div className="data-table__row" key={grant.id}>
-            <strong>{grant.person.displayName}</strong>
-            <span>{roleLabel[grant.role]}</span>
-            <span>{grant.destination?.displayName ?? 'Whole school'}</span>
-            <span>{grant.status === 'active' ? 'Active' : 'Revoked'}</span>
-            <span>
-              {grant.status === 'active' && (
-                <Button
-                  variant="danger"
-                  pending={revoke.isPending && revoke.variables.grantId === grant.id}
-                  onClick={() => {
-                    beginRevoke(grant);
-                  }}
-                >
-                  Remove access
-                </Button>
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
+      ) : list.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No extra duties assigned</EmptyTitle>
+            <EmptyDescription>
+              Grant destination or office duties to staff who need them.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border">
+          <Table aria-label="Staff access grants">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Person</TableHead>
+                <TableHead>Duty</TableHead>
+                <TableHead>Scope</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {list.map((grant) => (
+                <TableRow key={grant.id} className="data-table__row">
+                  <TableCell className="font-medium">{grant.person.displayName}</TableCell>
+                  <TableCell>{roleLabel[grant.role]}</TableCell>
+                  <TableCell>{grant.destination?.displayName ?? 'Whole school'}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">
+                      {grant.status === 'active' ? 'Active' : 'Revoked'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {grant.status === 'active' && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={revoke.isPending}
+                        onClick={() => {
+                          setConfirmingRevoke(grant);
+                        }}
+                      >
+                        Remove access
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      <AlertDialog
+        open={confirmingRevoke !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingRevoke(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove access?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmingRevoke &&
+                `Remove ${roleLabel[confirmingRevoke.role]} access for ${confirmingRevoke.person.displayName ?? 'this person'}? They will no longer be able to use ${revokeScope} tools.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep access</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmingRevoke)
+                  revoke.mutate({ grantId: confirmingRevoke.id, key: crypto.randomUUID() });
+              }}
+            >
+              Remove access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
