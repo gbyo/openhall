@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
+import { toast } from 'sonner';
 import { Logout01Icon, UnfoldMoreIcon } from '@hugeicons/core-free-icons';
 import { clearSessionMemory, getCsrfToken } from '../../api/session';
 import { queryClient } from '../query-client';
 import { meQuery } from '../queries';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +44,7 @@ function initials(name: string): string {
  * Account menu in SidebarFooter: Avatar + person name with a DropdownMenu
  * for school switching and sign-out. Composes shadcn primitives only.
  */
-export function UserMenu() {
+export function UserMenu({ variant = 'sidebar' }: { variant?: 'sidebar' | 'header' }) {
   const { data: me } = useQuery(meQuery);
   const [signingOut, setSigningOut] = useState(false);
   const displayName = me?.person.displayName ?? 'Account';
@@ -50,8 +52,55 @@ export function UserMenu() {
   function handleSignOut(all: boolean) {
     setSigningOut(true);
     void signOut(all).catch(() => {
+      toast.error('Couldn’t sign out. Try again.');
       setSigningOut(false);
     });
+  }
+
+  const menuContent = (
+    <DropdownMenuContent align="end" side={variant === 'header' ? 'bottom' : 'top'} className="w-56">
+      <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem render={<Link to="/schools" />}>View all schools</DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuItem
+          disabled={signingOut}
+          onClick={() => {
+            handleSignOut(false);
+          }}
+        >
+          <HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
+          {signingOut ? 'Signing out…' : 'Sign out'}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={signingOut}
+          onClick={() => {
+            handleSignOut(true);
+          }}
+        >
+          <HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
+          Sign out everywhere
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
+  );
+
+  if (variant === 'header') {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="sm" />}
+          aria-label={`Account, signed in as ${displayName}`}
+        >
+          <span className="max-w-40 truncate">{displayName}</span>
+          <HugeiconsIcon icon={UnfoldMoreIcon} strokeWidth={2} />
+        </DropdownMenuTrigger>
+        {menuContent}
+      </DropdownMenu>
+    );
   }
 
   return (
@@ -71,34 +120,7 @@ export function UserMenu() {
             </span>
             <HugeiconsIcon icon={UnfoldMoreIcon} strokeWidth={2} className="ml-auto" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" className="w-56">
-            <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem render={<Link to="/schools" />}>View all schools</DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem
-                disabled={signingOut}
-                onClick={() => {
-                  handleSignOut(false);
-                }}
-              >
-                <HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
-                {signingOut ? 'Signing out…' : 'Sign out'}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={signingOut}
-                onClick={() => {
-                  handleSignOut(true);
-                }}
-              >
-                <HugeiconsIcon icon={Logout01Icon} strokeWidth={2} />
-                Sign out everywhere
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
+          {menuContent}
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
