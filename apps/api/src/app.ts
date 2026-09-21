@@ -18,10 +18,12 @@ import { startDestinationFlowWorker } from './destination-flow/reconciler-runner
 import { carriedStatus, safeRequestPath, scrubForLog } from './http-privacy.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerBootstrapRoutes } from './routes/bootstrap.js';
+import { registerControlPlaneRoutes } from './routes/control-plane.js';
 import { registerMeRoutes } from './routes/me.js';
 import { registerMovementRoutes } from './routes/movement.js';
 import { registerPassesRoutes } from './routes/passes.js';
 import { registerPolicyRoutes } from './routes/policy.js';
+import { createControlPlaneDependencies } from './control-plane/dependencies.js';
 import { createPassDependencies } from './passes/dependencies.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerSystemRoutes } from './routes/system.js';
@@ -54,7 +56,18 @@ export interface CreateAppOptions {
  * Sensitive paths always carry Cache-Control: no-store: auth session
  * payloads, identity, bootstrap/recovery exchanges, and OIDC callbacks.
  */
-const NO_STORE_PREFIXES = ['/api/v1/auth/', '/api/v1/me', '/api/v1/bootstrap/'] as const;
+const NO_STORE_PREFIXES = [
+  '/api/v1/auth/',
+  '/api/v1/me',
+  '/api/v1/bootstrap/',
+  '/api/v1/organizations/',
+  '/api/v1/locations',
+  '/api/v1/destinations',
+  '/api/v1/policy-rules',
+  '/api/v1/authorization-grants',
+  '/api/v1/identity-enrollments',
+  '/api/v1/scheduled-authorizations',
+] as const;
 
 export async function createApp(options: CreateAppOptions): Promise<FastifyInstance> {
   const isProduction = options.config.nodeEnv === 'production';
@@ -264,6 +277,15 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   });
   registerMovementRoutes(typedApp, {
     passes: passDependencies,
+    auth: dependencies,
+  });
+  registerControlPlaneRoutes(typedApp, {
+    controlPlane: createControlPlaneDependencies(options.database, {
+      directory: dependencies.directory,
+      random: dependencies.random,
+      digester: dependencies.digester,
+      requestPass: passDependencies.request,
+    }),
     auth: dependencies,
   });
 
