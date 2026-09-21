@@ -1,0 +1,55 @@
+:root {
+  color-scheme: light;
+
+  --wf-color-text: #182321;
+  --wf-color-text-muted: #56615e;
+  --wf-color-text-inverse: #ffffff;
+  --wf-surface-canvas: #f6f7f4;
+  --wf-surface-default: #ffffff;
+  --wf-surface-subtle: #eef1ed;
+  --wf-surface-selected: #dcebf0;
+  --wf-border-default: #d6dcd8;
+  --wf-border-strong: #aeb9b3;
+  --wf-focus: #0b5870;
+  --wf-action-primary: #1f5e72;
+  --wf-action-primary-hover: #174b5b;
+  --wf-action-primary-pressed: #123e4b;
+  --wf-action-secondary: #edf3f4;
+  --wf-action-danger: #9b302d;
+  --wf-status-ready: #1c6b4b;
+  --wf-status-ready-subtle: #e4f1ea;
+  --wf-status-queued: #8a5800;
+  --wf-status-queued-subtle: #f8efd8;
+  --wf-status-danger: #b23a36;
+  --wf-status-danger-subtle: #f9e8e6;
+  --wf-status-neutral: #52605c;
+  --wf-accent-signal: #e5b84c;
+
+  --wf-space-0: 0;
+  --wf-space-1: 0.125rem;
+  --wf-space-2: 0.25rem;
+  --wf-space-3: 0.5rem;
+  --wf-space-4: 0.75rem;
+  --wf-space-5: 1rem;
+  --wf-space-6: 1.5rem;
+  --wf-space-7: 2rem;
+  --wf-space-8: 3rem;
+  --wf-space-9: 4rem;
+
+  --wf-radius-detail: 0.25rem;
+  --wf-radius-control: 0.5rem;
+  --wf-radius-surface: 0.625rem;
+  --wf-radius-container: 0.75rem;
+  --wf-radius-pass: 1rem;
+
+  --wf-border-width: 1px;
+  --wf-elevation-overlay: 0 0.75rem 2rem rgb(24 35 33 / 14%);
+  --wf-control-height: 2.75rem;
+  --wf-control-height-compact: 2.25rem;
+
+  --wf-motion-pressed: 80ms;
+  --wf-motion-state: 120ms;
+  --wf-motion-standard: 180ms;
+  --wf-motion-overlay: 180ms;
+  --wf-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
