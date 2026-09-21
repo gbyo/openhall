@@ -100,15 +100,19 @@ describe('foundation HTTP API', () => {
         >
       >;
     };
-    expect(openapi.components?.schemas).toMatchObject({
-      ProblemDetails: expect.any(Object),
-      Liveness: expect.any(Object),
-      Readiness: expect.any(Object),
-      SystemInfo: expect.any(Object),
-      Me: expect.any(Object),
-      MyOrganizationContext: expect.any(Object),
-      Pass: expect.any(Object),
-    });
+    const schemas = openapi.components?.schemas;
+    expect(schemas).toBeDefined();
+    for (const schemaName of [
+      'ProblemDetails',
+      'Liveness',
+      'Readiness',
+      'SystemInfo',
+      'Me',
+      'MyOrganizationContext',
+      'Pass',
+    ]) {
+      expect(schemas).toHaveProperty(schemaName);
+    }
     expect(
       openapi.paths['/health/live']?.get?.responses?.['200']?.content?.['application/json']?.schema,
     ).toEqual({ $ref: '#/components/schemas/Liveness' });
