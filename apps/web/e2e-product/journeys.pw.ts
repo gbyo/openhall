@@ -970,3 +970,27 @@ test('student no-pass view works at 320px from the keyboard without axe violatio
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
 });
+
+
+test('staff account footer opens menu without routing or throwing', async ({ page }) => {
+  await shell(page, { affiliations: ['staff'], capabilities: [] });
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => {
+    pageErrors.push(`${error.message}\n${error.stack ?? ''}`);
+  });
+
+  await page.goto(`/schools/${ORG}`);
+  const before = page.url();
+  await page.getByRole('button', { name: /Account, signed in as/ }).click();
+
+  if (pageErrors.length > 0) {
+    throw new Error(
+      `Opening account menu threw a page error at ${page.url()}:\n${pageErrors.join('\n---\n')}`,
+    );
+  }
+
+  await expect(page).toHaveURL(before);
+  await expect(page.getByRole('menuitem', { name: 'View all schools' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Sign out', exact: true })).toBeVisible();
+  await expect(page.getByText('WayPass hit a problem')).toHaveCount(0);
+});
