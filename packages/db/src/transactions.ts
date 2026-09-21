@@ -4,7 +4,7 @@ import type {
   SystemTransactionRunner,
   TenantTransactionContext,
   TenantTransactionRunner,
-  type TenantTransactionSettings,
+  TenantTransactionSettings,
 } from '@openhall/application';
 import type { TenantId as DomainTenantId } from '@openhall/domain';
 import type { Kysely, Transaction } from 'kysely';
