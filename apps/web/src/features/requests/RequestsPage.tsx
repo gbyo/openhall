@@ -3,14 +3,45 @@ import { api, confirmed } from '../../api/client';
 import { productMessage, UncertainCommandError } from '../../api/problems';
 import { queryKeys } from '../../api/query-keys';
 import { getCsrfToken } from '../../api/session';
-import { Alert } from '../../design-system/primitives/Alert';
-import { Button } from '../../design-system/primitives/Button';
 import { StatusAnnouncer } from '../../design-system/primitives/StatusAnnouncer';
 import { useSchool } from '../../app/school/SchoolShell';
+import { PageHeader } from '../../components/workspace/PageHeader';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from '@/components/ui/item';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 
 type RequestAction =
   | { kind: 'approval'; id: string; decision: 'approve' | 'deny'; etag: string; key: string }
   | { kind: 'override'; id: string; decision: 'approve' | 'deny'; etag: string; key: string };
+
+interface RequestRow {
+  kind: 'approval' | 'override';
+  id: string;
+  etag: string;
+  student: { displayName: string };
+  destination: { displayName: string };
+  requestedAt: string;
+  context: string;
+}
+
+function relativeMinutes(requestedAt: string): string {
+  return new Intl.RelativeTimeFormat([], { numeric: 'auto' }).format(
+    -Math.max(1, Math.round((Date.now() - new Date(requestedAt).getTime()) / 60_000)),
+    'minute',
+  );
+}
 
 export function RequestsPage() {
   const { organizationId } = useSchool();
@@ -74,7 +105,7 @@ export function RequestsPage() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.pendingOverrides });
     },
   });
-  const rows = [
+  const rows: RequestRow[] = [
     ...(approvals.data?.approvals
       .filter((row) => row.organizationId === organizationId)
       .map((row) => ({
@@ -98,8 +129,21 @@ export function RequestsPage() {
         context: 'Staff review',
       })) ?? []),
   ].sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+  const loading = approvals.isPending || overrides.isPending;
+  const active = mutation.isPending ? mutation.variables : null;
+
+  function resolve(row: RequestRow, decision: 'approve' | 'deny') {
+    mutation.mutate({
+      kind: row.kind,
+      id: row.id,
+      decision,
+      etag: row.etag,
+      key: crypto.randomUUID(),
+    });
+  }
+
   return (
-    <section className="workspace" aria-labelledby="requests-title">
+    <section aria-labelledby="requests-title" className="flex flex-col gap-4">
       <StatusAnnouncer
         message={
           mutation.isSuccess
@@ -109,96 +153,96 @@ export function RequestsPage() {
             : ''
         }
       />
-      <header className="workspace__header">
-        <p className="auth-kicker">Teacher tools</p>
-        <h1 className="wf-type-page-title" id="requests-title">
-          Requests
-        </h1>
-        <p>Oldest requests stay first so new arrivals do not move your current task.</p>
-      </header>
+      <PageHeader
+        title="Requests"
+        description="Oldest requests stay first so new arrivals do not move your current task."
+      />
       {mutation.isError && (
-        <Alert tone="danger" title="Request changed">
-          <p>{productMessage(mutation.error)}</p>
+        <Alert variant="destructive">
+          <AlertTitle>Request changed</AlertTitle>
+          <AlertDescription>{productMessage(mutation.error)}</AlertDescription>
           {mutation.error instanceof UncertainCommandError && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                mutation.mutate(mutation.variables);
-              }}
-            >
-              Check again
-            </Button>
+            <AlertAction>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  mutation.mutate(mutation.variables);
+                }}
+              >
+                Check again
+              </Button>
+            </AlertAction>
           )}
         </Alert>
       )}
-      <div className="request-list">
-        {rows.length === 0 && !approvals.isPending && !overrides.isPending ? (
-          <p className="empty-copy">No requests need attention.</p>
-        ) : (
-          rows.map((row) => (
-            <article className="request-row" key={`${row.kind}:${row.id}`}>
-              <div>
-                <h2>{row.student.displayName}</h2>
-                <p>
-                  {row.destination.displayName} · {row.context}
-                </p>
-                <time>
-                  {new Intl.RelativeTimeFormat([], { numeric: 'auto' }).format(
-                    -Math.max(
-                      1,
-                      Math.round((Date.now() - new Date(row.requestedAt).getTime()) / 60_000),
-                    ),
-                    'minute',
-                  )}
-                </time>
-              </div>
-              <div className="request-row__actions">
-                <Button
-                  size="compact"
-                  pending={
-                    mutation.isPending &&
-                    mutation.variables.id === row.id &&
-                    mutation.variables.decision === 'approve'
-                  }
-                  pendingLabel="Approving…"
-                  onClick={() => {
-                    mutation.mutate({
-                      kind: row.kind,
-                      id: row.id,
-                      decision: 'approve',
-                      etag: row.etag,
-                      key: crypto.randomUUID(),
-                    });
-                  }}
-                >
-                  Approve
-                </Button>
-                <Button
-                  size="compact"
-                  variant="quiet"
-                  pending={
-                    mutation.isPending &&
-                    mutation.variables.id === row.id &&
-                    mutation.variables.decision === 'deny'
-                  }
-                  pendingLabel="Denying…"
-                  onClick={() => {
-                    mutation.mutate({
-                      kind: row.kind,
-                      id: row.id,
-                      decision: 'deny',
-                      etag: row.etag,
-                      key: crypto.randomUUID(),
-                    });
-                  }}
-                >
-                  Deny
-                </Button>
-              </div>
-            </article>
-          ))
-        )}
-      </div>
+      {loading ? (
+        <div role="status" aria-label="Loading requests" className="flex flex-col gap-2">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <span className="sr-only">Loading requests…</span>
+        </div>
+      ) : rows.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No requests need attention.</EmptyTitle>
+            <EmptyDescription>
+              New student requests will appear here, oldest first.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <ItemGroup aria-label="Pending requests">
+          {rows.map((row) => {
+            const rowBusy = active !== null && active.id === row.id;
+            const approving =
+              active !== null && active.id === row.id && active.decision === 'approve';
+            const denying = active !== null && active.id === row.id && active.decision === 'deny';
+            return (
+              <Item role="listitem" key={`${row.kind}:${row.id}`}>
+                <ItemContent>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ItemTitle>{row.student.displayName}</ItemTitle>
+                    {row.kind === 'override' ? <Badge>Staff review</Badge> : null}
+                  </div>
+                  <ItemDescription>
+                    {row.destination.displayName} · {row.context} ·{' '}
+                    <time dateTime={row.requestedAt}>{relativeMinutes(row.requestedAt)}</time>
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <ButtonGroup aria-label={`Decide request from ${row.student.displayName}`}>
+                    <Button
+                      size="sm"
+                      disabled={rowBusy}
+                      aria-busy={approving}
+                      onClick={() => {
+                        resolve(row, 'approve');
+                      }}
+                    >
+                      {approving ? <Spinner data-icon="inline-start" /> : null}
+                      {approving ? 'Approving…' : 'Approve'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={rowBusy}
+                      aria-busy={denying}
+                      onClick={() => {
+                        resolve(row, 'deny');
+                      }}
+                    >
+                      {denying ? <Spinner data-icon="inline-start" /> : null}
+                      {denying ? 'Denying…' : 'Deny'}
+                    </Button>
+                  </ButtonGroup>
+                </ItemActions>
+              </Item>
+            );
+          })}
+        </ItemGroup>
+      )}
     </section>
   );
 }

@@ -163,13 +163,22 @@ test('teacher creates a pass for a student from the class roster', async ({ page
   await page.goto(`/schools/${ORG}/classes/${SECTION}`);
   await expect(page.getByRole('heading', { name: 'Science 7' })).toBeVisible();
   await expect(page.getByText('Blake Chen')).toBeVisible();
+  await page.getByRole('tab', { name: /Out now/ }).click();
   await expect(page.getByText('No one is out right now.')).toBeVisible();
-  const row = page.locator('.roster-row', { hasText: 'Alex Rivera' });
+  await page.getByRole('tab', { name: 'Roster' }).click();
+  const row = page.locator('[data-slot="item"]', { hasText: 'Alex Rivera' });
   await row.getByRole('button', { name: 'Create pass' }).click();
-  await row.getByRole('button', { name: 'Nurse' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder('Search destinations').fill('Nurse');
+  await page.getByRole('option', { name: 'Nurse' }).click();
+  await dialog.getByRole('button', { name: 'Create pass' }).click();
   expect(created).toBe(true);
   await expect(page.getByText('Out · Nurse')).toBeVisible();
-  await expect(page.locator('.students-out').getByText('Alex Rivera')).toBeVisible();
+  await page.getByRole('tab', { name: /Out now/ }).click();
+  await expect(
+    page.getByRole('list', { name: 'Students out' }).getByText('Alex Rivera'),
+  ).toBeVisible();
 });
 
 test('teacher starts a ready pass from the roster', async ({ page }) => {
@@ -311,15 +320,15 @@ test('station moves students from on-the-way through Here with row ETags', async
   expect(etags.checkIn).toBe('"pass:test:4"');
   await expect(page.getByText('2 here')).toBeVisible();
   await page
-    .locator('.station-row', { hasText: 'Alex Rivera' })
+    .locator('[data-slot="item"]', { hasText: 'Alex Rivera' })
     .getByRole('button', {
       name: 'Begin return',
     })
     .click();
   expect(etags.beginReturn).toBe('"pass:test:5"');
-  await expect(page.locator('.station-row', { hasText: 'Alex Rivera' })).toHaveCount(0);
+  await expect(page.locator('[data-slot="item"]', { hasText: 'Alex Rivera' })).toHaveCount(0);
   await page
-    .locator('.station-row', { hasText: 'Blake Chen' })
+    .locator('[data-slot="item"]', { hasText: 'Blake Chen' })
     .getByRole('button', {
       name: 'Complete here',
     })
@@ -405,10 +414,14 @@ test('office searches live movement and creates a pass', async ({ page }) => {
   await expect(page.getByText('Blake Chen')).toHaveCount(0);
   await expect(page.getByText('Alex Rivera')).toBeVisible();
   await page.getByLabel('Search live movement').fill('');
-  await page.locator('.workspace__actions').getByRole('button', { name: 'Create pass' }).click();
-  await page.getByLabel('Student').selectOption(PERSON);
-  await page.getByLabel('Destination').selectOption(DESTINATION);
-  await page.locator('form.inline-form').getByRole('button', { name: 'Create pass' }).click();
+  await page.getByRole('button', { name: 'Create pass' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder('Search students').fill('Alex Rivera');
+  await page.getByRole('option', { name: 'Alex Rivera' }).click();
+  await dialog.getByPlaceholder('Search destinations').fill('Nurse');
+  await page.getByRole('option', { name: 'Nurse' }).click();
+  await dialog.getByRole('button', { name: 'Create pass' }).click();
   expect(created).toMatchObject({ destinationId: DESTINATION });
 });
 

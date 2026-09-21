@@ -1,23 +1,149 @@
-import { useState, type SubmitEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Temporal } from '@js-temporal/polyfill';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { MoreHorizontalIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { api, confirmed, requireData } from '../../../api/client';
 import { productMessage, UncertainCommandError } from '../../../api/problems';
 import { queryKeys } from '../../../api/query-keys';
 import { getCsrfToken } from '../../../api/session';
-import { formString } from '../../../api/forms';
-import { Button } from '../../../design-system/primitives/Button';
-import { Alert } from '../../../design-system/primitives/Alert';
 import { useSchool } from '../../../app/school/SchoolShell';
+import { PageHeader } from '../../../components/workspace/PageHeader';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from '@/components/ui/item';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 
 function instant(local: string, timeZone: string): string {
   return Temporal.PlainDateTime.from(local).toZonedDateTime(timeZone).toInstant().toString();
 }
 
+function zoneName(timeZone: string): string {
+  const part = new Intl.DateTimeFormat([], { timeZone, timeZoneName: 'long' })
+    .formatToParts()
+    .find((entry) => entry.type === 'timeZoneName');
+  return part?.value ?? timeZone;
+}
+
+function windowLabel(validFrom: string, timeZone: string): string {
+  return new Intl.DateTimeFormat([], {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone,
+  }).format(new Date(validFrom));
+}
+
+type EffectiveStatus = 'upcoming' | 'used' | 'cancelled' | 'expired';
+
+function effectiveStatus(status: string, validUntil: string): EffectiveStatus {
+  if (
+    status === 'active' &&
+    Temporal.Instant.compare(Temporal.Instant.from(validUntil), Temporal.Now.instant()) <= 0
+  )
+    return 'expired';
+  if (status === 'active') return 'upcoming';
+  if (status === 'used') return 'used';
+  return 'cancelled';
+}
+
+function statusLabel(status: EffectiveStatus): string {
+  switch (status) {
+    case 'upcoming':
+      return 'Upcoming';
+    case 'used':
+      return 'Used';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'expired':
+      return 'Expired';
+  }
+}
+
+interface Option {
+  value: string;
+  label: string;
+}
+
 export function Component() {
   const { organizationId, context } = useSchool();
   const queryClient = useQueryClient();
+  const timeZone = context.organization.timeZone;
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [creating, setCreating] = useState(false);
+  const [studentId, setStudentId] = useState<string | null>(null);
+  const [destinationId, setDestinationId] = useState<string | null>(null);
+  const [validFrom, setValidFrom] = useState('');
+  const [validUntil, setValidUntil] = useState('');
   const [origin, setOrigin] = useState<'expected' | 'specific'>('expected');
+  const [locationId, setLocationId] = useState<string | null>(null);
+  const [approvalMode, setApprovalMode] = useState<'preapproved' | 'approval_required'>(
+    'preapproved',
+  );
+  const [cancelling, setCancelling] = useState<{ id: string; studentName: string } | null>(null);
   const appointments = useQuery({
     queryKey: queryKeys.scheduledAdmin(organizationId),
     queryFn: () =>
@@ -29,6 +155,7 @@ export function Component() {
   });
   const students = useQuery({
     queryKey: ['scheduled-students', organizationId],
+    enabled: creating,
     queryFn: () =>
       confirmed(
         api.GET('/api/v1/organizations/{organizationId}/students', {
@@ -38,6 +165,7 @@ export function Component() {
   });
   const destinations = useQuery({
     queryKey: queryKeys.destinations(organizationId),
+    enabled: creating,
     queryFn: () =>
       confirmed(
         api.GET('/api/v1/organizations/{organizationId}/destinations', {
@@ -47,6 +175,7 @@ export function Component() {
   });
   const locations = useQuery({
     queryKey: queryKeys.locations(organizationId),
+    enabled: creating && origin === 'specific',
     queryFn: () =>
       confirmed(
         api.GET('/api/v1/organizations/{organizationId}/locations', {
@@ -76,7 +205,11 @@ export function Component() {
         }),
       );
     },
-    onSuccess: refresh,
+    onSuccess: () => {
+      setCreating(false);
+      resetCreate();
+      refresh();
+    },
   });
   const cancel = useMutation({
     mutationFn: async (input: { id: string; key: string }) => {
@@ -99,182 +232,505 @@ export function Component() {
         }),
       );
     },
-    onSuccess: refresh,
+    onSuccess: () => {
+      setCancelling(null);
+      refresh();
+    },
   });
-  function submit(event: SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
+
+  function resetCreate() {
+    setStudentId(null);
+    setDestinationId(null);
+    setValidFrom('');
+    setValidUntil('');
+    setOrigin('expected');
+    setLocationId(null);
+    setApprovalMode('preapproved');
+    create.reset();
+  }
+
+  function closeCreate() {
+    if (create.isPending) return;
+    setCreating(false);
+    resetCreate();
+  }
+
+  const studentOptions = useMemo<Option[]>(
+    () =>
+      students.data?.students.map((student) => ({
+        value: student.id,
+        label: student.gradeLevel
+          ? `${student.displayName} · Grade ${String(student.gradeLevel)}`
+          : student.displayName,
+      })) ?? [],
+    [students.data],
+  );
+  const destinationOptions = useMemo<Option[]>(
+    () =>
+      destinations.data?.destinations
+        .filter((item) => item.status === 'active')
+        .map((item) => ({
+          value: item.id,
+          label: item.displayName ?? item.serviceType,
+        })) ?? [],
+    [destinations.data],
+  );
+  const locationOptions = useMemo<Option[]>(
+    () =>
+      locations.data?.locations
+        .filter((item) => item.status !== 'archived')
+        .map((item) => ({ value: item.id, label: item.name })) ?? [],
+    [locations.data],
+  );
+  const selectedStudent = studentOptions.find((option) => option.value === studentId) ?? null;
+  const selectedDestination =
+    destinationOptions.find((option) => option.value === destinationId) ?? null;
+  const selectedLocation = locationOptions.find((option) => option.value === locationId) ?? null;
+
+  const rows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (appointments.data?.authorizations ?? [])
+      .map((item) => ({ item, status: effectiveStatus(item.status, item.validUntil) }))
+      .filter(({ item, status }) => {
+        if (
+          query.length > 0 &&
+          !`${item.student.displayName} ${item.destination.displayName}`
+            .toLowerCase()
+            .includes(query)
+        )
+          return false;
+        if (statusFilter !== 'all' && status !== statusFilter) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const aUp = a.status === 'upcoming' ? 0 : 1;
+        const bUp = b.status === 'upcoming' ? 0 : 1;
+        if (aUp !== bUp) return aUp - bUp;
+        return aUp === 0
+          ? a.item.validFrom.localeCompare(b.item.validFrom)
+          : b.item.validFrom.localeCompare(a.item.validFrom);
+      });
+  }, [appointments.data, search, statusFilter]);
+
+  const createValid =
+    studentId !== null &&
+    destinationId !== null &&
+    validFrom !== '' &&
+    validUntil !== '' &&
+    (origin === 'expected' || locationId !== null);
+
+  function submitCreate() {
+    if (!createValid) return;
     create.mutate({
       key: crypto.randomUUID(),
       body: {
-        studentId: formString(data, 'studentId'),
-        destinationId: formString(data, 'destinationId'),
-        validFrom: instant(formString(data, 'validFrom'), context.organization.timeZone),
-        validUntil: instant(formString(data, 'validUntil'), context.organization.timeZone),
-        approvalMode: formString(data, 'approvalMode') as 'preapproved' | 'approval_required',
+        studentId: studentId as string,
+        destinationId: destinationId as string,
+        validFrom: instant(validFrom, timeZone),
+        validUntil: instant(validUntil, timeZone),
+        approvalMode,
         origin:
           origin === 'expected'
             ? { strategy: 'expected' }
-            : { strategy: 'specific', locationId: formString(data, 'locationId') },
+            : { strategy: 'specific', locationId: locationId as string },
       },
     });
   }
-  function beginCancel(id: string, studentName: string, destinationName: string) {
-    if (!window.confirm(`Cancel ${studentName}'s scheduled pass to ${destinationName}?`)) return;
-    cancel.mutate({ id, key: crypto.randomUUID() });
-  }
+
+  const cancellingRow = cancelling
+    ? rows.find(({ item }) => item.id === cancelling.id)?.item ?? null
+    : null;
+  const cancelPending = cancel.isPending;
+
   return (
-    <section className="workspace">
-      <header className="workspace__header">
-        <p className="auth-kicker">Appointments · {context.organization.timeZone}</p>
-        <h1 className="wf-type-page-title">Scheduled passes</h1>
-        <p>Give a student a specific window to start an ordinary WayPass.</p>
-      </header>
+    <section aria-labelledby="scheduled-title" className="flex flex-col gap-4">
+      <PageHeader
+        title="Scheduled passes"
+        description="Appointments that let students start a WayPass during a set window."
+        actions={
+          <Button
+            onClick={() => {
+              resetCreate();
+              setCreating(true);
+            }}
+          >
+            New scheduled pass
+          </Button>
+        }
+      />
+      <p className="text-sm text-muted-foreground">Times shown in {zoneName(timeZone)}.</p>
       {(create.isError || cancel.isError) && (
-        <Alert tone="danger" title="Scheduled pass change not confirmed">
-          <p>{productMessage(create.error ?? cancel.error)}</p>
-          {create.error instanceof UncertainCommandError && create.variables && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                create.mutate(create.variables);
-              }}
-            >
-              Check again
-            </Button>
+        <Alert variant="destructive">
+          <AlertTitle>Scheduled pass change not confirmed</AlertTitle>
+          <AlertDescription>{productMessage(create.error ?? cancel.error)}</AlertDescription>
+          {create.error instanceof UncertainCommandError && (
+            <AlertAction>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  create.mutate(create.variables);
+                }}
+              >
+                Check again
+              </Button>
+            </AlertAction>
           )}
-          {cancel.error instanceof UncertainCommandError && cancel.variables && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                cancel.mutate(cancel.variables);
-              }}
-            >
-              Check again
-            </Button>
+          {cancel.error instanceof UncertainCommandError && (
+            <AlertAction>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  cancel.mutate(cancel.variables);
+                }}
+              >
+                Check again
+              </Button>
+            </AlertAction>
           )}
         </Alert>
       )}
-      <form className="editor" onSubmit={submit}>
-        <fieldset>
-          <legend>New scheduled pass</legend>
-          <label>
-            Student
-            <select className="wf-input" name="studentId" required>
-              {students.data?.students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.displayName}
-                  {student.gradeLevel ? ` · grade ${student.gradeLevel}` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Destination
-            <select className="wf-input" name="destinationId" required>
-              {destinations.data?.destinations
-                .filter((item) => item.status === 'active')
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.displayName ?? item.serviceType}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            Available from
-            <input className="wf-input" type="datetime-local" name="validFrom" required />
-          </label>
-          <label>
-            Available until
-            <input className="wf-input" type="datetime-local" name="validUntil" required />
-          </label>
-          <label>
-            Origin
-            <select
-              className="wf-input"
-              value={origin}
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-52 flex-1">
+          <InputGroup>
+            <InputGroupAddon>
+              <InputGroupText>
+                <HugeiconsIcon icon={Search01Icon} strokeWidth={2} aria-hidden="true" />
+              </InputGroupText>
+            </InputGroupAddon>
+            <InputGroupInput
+              aria-label="Search scheduled passes"
+              placeholder="Search students or destinations"
+              value={search}
               onChange={(event) => {
-                setOrigin(event.target.value as typeof origin);
+                setSearch(event.target.value);
               }}
-            >
-              <option value="expected">Use student's expected class or location</option>
-              <option value="specific">Specific location</option>
-            </select>
-          </label>
-          {origin === 'specific' && (
-            <label>
-              Location
-              <select className="wf-input" name="locationId">
-                {locations.data?.locations
-                  .filter((item) => item.status !== 'archived')
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
-          <label>
-            Approval
-            <select className="wf-input" name="approvalMode">
-              <option value="preapproved">Already approved</option>
-              <option value="approval_required">Teacher approval still required</option>
-            </select>
-          </label>
-          <p className="form-help">
-            Already approved skips only ordinary classroom approval for this appointment. Other
-            school policies still apply.
-          </p>
-        </fieldset>
-        <Button type="submit" pending={create.isPending}>
-          Schedule pass
-        </Button>
-      </form>
-      <ul className="plain-list">
-        {appointments.data?.authorizations.map((item) => {
-          const effectiveStatus =
-            item.status === 'active' &&
-            Temporal.Instant.compare(
-              Temporal.Instant.from(item.validUntil),
-              Temporal.Now.instant(),
-            ) <= 0
-              ? 'expired'
-              : item.status;
-          return (
-            <li key={item.id}>
-              <div>
-                <strong>{item.student.displayName}</strong>
-                <span>{item.destination.displayName}</span>
-              </div>
-              <span>
-                <time>
-                  {new Intl.DateTimeFormat([], {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                    timeZone: context.organization.timeZone,
-                  }).format(new Date(item.validFrom))}
-                </time>
-              </span>
-              <span>
-                {effectiveStatus[0]?.toUpperCase()}
-                {effectiveStatus.slice(1)}
-              </span>
-              {effectiveStatus === 'active' && (
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    beginCancel(item.id, item.student.displayName, item.destination.displayName);
+            />
+          </InputGroup>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="scheduled-status-filter">Status</Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger id="scheduled-status-filter" className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="used">Used</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {appointments.isPending ? (
+        <div role="status" aria-label="Loading scheduled passes" className="flex flex-col gap-2">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <span className="sr-only">Loading scheduled passes…</span>
+        </div>
+      ) : rows.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No scheduled passes found.</EmptyTitle>
+            <EmptyDescription>
+              {search.trim().length > 0 || statusFilter !== 'all'
+                ? 'Try a different search or filter.'
+                : 'Create an appointment window with New scheduled pass.'}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <ItemGroup aria-label="Scheduled passes">
+          {rows.map(({ item, status }) => {
+            const cancellingThis = cancel.isPending && cancel.variables.id === item.id;
+            return (
+              <Item role="listitem" key={item.id}>
+                <ItemContent>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ItemTitle>{item.student.displayName}</ItemTitle>
+                    <Badge variant="secondary">{statusLabel(status)}</Badge>
+                  </div>
+                  <ItemDescription>
+                    {item.destination.displayName} ·{' '}
+                    <time>{windowLabel(item.validFrom, timeZone)}</time>
+                  </ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  {status === 'upcoming' || item.status === 'active' ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={<Button variant="ghost" size="icon-sm" />}
+                        aria-label={`Actions for ${item.student.displayName}'s scheduled pass`}
+                      >
+                        <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          variant="destructive"
+                          disabled={cancellingThis}
+                          onSelect={() => {
+                            setCancelling({ id: item.id, studentName: item.student.displayName });
+                          }}
+                        >
+                          Cancel scheduled pass
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : null}
+                </ItemActions>
+              </Item>
+            );
+          })}
+        </ItemGroup>
+      )}
+      <Dialog
+        open={creating}
+        onOpenChange={(open) => {
+          if (!open) closeCreate();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New scheduled pass</DialogTitle>
+            <DialogDescription>
+              Set an appointment window. Times use {zoneName(timeZone)}.
+            </DialogDescription>
+          </DialogHeader>
+          {students.isPending || destinations.isPending ? (
+            <div role="status" aria-label="Loading pass options" className="flex flex-col gap-2">
+              <Skeleton className="h-9 w-full" />
+              <Skeleton className="h-9 w-full" />
+              <span className="sr-only">Loading students and destinations…</span>
+            </div>
+          ) : (
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="scheduled-student">Student</FieldLabel>
+                <Combobox
+                  items={studentOptions}
+                  value={selectedStudent}
+                  onValueChange={(option: Option | null) => {
+                    setStudentId(option?.value ?? null);
+                  }}
+                  filter={(item: Option, query: string) =>
+                    item.label.toLowerCase().includes(query.toLowerCase())
+                  }
+                >
+                  <ComboboxInput id="scheduled-student" placeholder="Search students" />
+                  <ComboboxContent>
+                    <ComboboxList>
+                      {(item: Option) => (
+                        <ComboboxItem key={item.value} value={item}>
+                          {item.label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                    <ComboboxEmpty>No matching student.</ComboboxEmpty>
+                  </ComboboxContent>
+                </Combobox>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="scheduled-destination">Destination</FieldLabel>
+                <Combobox
+                  items={destinationOptions}
+                  value={selectedDestination}
+                  onValueChange={(option: Option | null) => {
+                    setDestinationId(option?.value ?? null);
+                  }}
+                  filter={(item: Option, query: string) =>
+                    item.label.toLowerCase().includes(query.toLowerCase())
+                  }
+                >
+                  <ComboboxInput id="scheduled-destination" placeholder="Search destinations" />
+                  <ComboboxContent>
+                    <ComboboxList>
+                      {(item: Option) => (
+                        <ComboboxItem key={item.value} value={item}>
+                          {item.label}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                    <ComboboxEmpty>No matching destination.</ComboboxEmpty>
+                  </ComboboxContent>
+                </Combobox>
+              </Field>
+              <FieldSet>
+                <FieldLegend>Available</FieldLegend>
+                <FieldDescription>Times shown in {zoneName(timeZone)}.</FieldDescription>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="scheduled-from">From</FieldLabel>
+                    <Input
+                      id="scheduled-from"
+                      type="datetime-local"
+                      required
+                      value={validFrom}
+                      onChange={(event) => {
+                        setValidFrom(event.target.value);
+                      }}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="scheduled-until">Until</FieldLabel>
+                    <Input
+                      id="scheduled-until"
+                      type="datetime-local"
+                      required
+                      value={validUntil}
+                      onChange={(event) => {
+                        setValidUntil(event.target.value);
+                      }}
+                    />
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
+              <FieldSet>
+                <FieldLegend>Origin</FieldLegend>
+                <RadioGroup
+                  aria-label="Origin"
+                  value={origin}
+                  onValueChange={(value) => {
+                    setOrigin(value as 'expected' | 'specific');
                   }}
                 >
-                  Cancel
-                </Button>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="expected" id="origin-expected" />
+                    <Label htmlFor="origin-expected">Use student&apos;s expected location</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="specific" id="origin-specific" />
+                    <Label htmlFor="origin-specific">Specific location</Label>
+                  </div>
+                </RadioGroup>
+                {origin === 'specific' && (
+                  <Field>
+                    <FieldLabel htmlFor="scheduled-location">Location</FieldLabel>
+                    {locations.isPending ? (
+                      <Skeleton className="h-9 w-full" />
+                    ) : (
+                      <Combobox
+                        items={locationOptions}
+                        value={selectedLocation}
+                        onValueChange={(option: Option | null) => {
+                          setLocationId(option?.value ?? null);
+                        }}
+                        filter={(item: Option, query: string) =>
+                          item.label.toLowerCase().includes(query.toLowerCase())
+                        }
+                      >
+                        <ComboboxInput id="scheduled-location" placeholder="Search locations" />
+                        <ComboboxContent>
+                          <ComboboxList>
+                            {(item: Option) => (
+                              <ComboboxItem key={item.value} value={item}>
+                                {item.label}
+                              </ComboboxItem>
+                            )}
+                          </ComboboxList>
+                          <ComboboxEmpty>No matching location.</ComboboxEmpty>
+                        </ComboboxContent>
+                      </Combobox>
+                    )}
+                  </Field>
+                )}
+              </FieldSet>
+              <FieldSet>
+                <FieldLegend>Approval</FieldLegend>
+                <RadioGroup
+                  aria-label="Approval"
+                  value={approvalMode}
+                  onValueChange={(value) => {
+                    setApprovalMode(value as 'preapproved' | 'approval_required');
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="preapproved" id="approval-preapproved" />
+                    <Label htmlFor="approval-preapproved">Already approved</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="approval_required" id="approval-required" />
+                    <Label htmlFor="approval-required">Teacher approval still required</Label>
+                  </div>
+                </RadioGroup>
+                <FieldDescription>
+                  Already approved skips only ordinary classroom approval for this appointment.
+                  Other school policies still apply.
+                </FieldDescription>
+              </FieldSet>
+              {(students.isError || destinations.isError) && (
+                <FieldError>Students or destinations could not be loaded. Try again.</FieldError>
               )}
-            </li>
-          );
-        })}
-      </ul>
+            </FieldGroup>
+          )}
+          {create.isError && (
+            <Alert variant="destructive">
+              <AlertTitle>Scheduled pass not created</AlertTitle>
+              <AlertDescription>{productMessage(create.error)}</AlertDescription>
+              {create.error instanceof UncertainCommandError && (
+                <AlertAction>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      create.mutate(create.variables);
+                    }}
+                  >
+                    Check again
+                  </Button>
+                </AlertAction>
+              )}
+            </Alert>
+          )}
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+            <Button
+              disabled={create.isPending || !createValid}
+              aria-busy={create.isPending}
+              onClick={submitCreate}
+            >
+              {create.isPending ? <Spinner data-icon="inline-start" /> : null}
+              {create.isPending ? 'Scheduling…' : 'Schedule pass'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        open={cancelling !== null}
+        onOpenChange={(open) => {
+          if (!open && !cancel.isPending) setCancelling(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {cancelling ? `Cancel ${cancelling.studentName}'s scheduled pass?` : 'Cancel pass?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancellingRow
+                ? `${cancellingRow.student.displayName} won't be able to start this appointment afterward.`
+                : 'This appointment will no longer be available.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep pass</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={cancelPending}
+              onClick={(event) => {
+                event.preventDefault();
+                if (cancelling && !cancel.isPending)
+                  cancel.mutate({ id: cancelling.id, key: crypto.randomUUID() });
+              }}
+            >
+              {cancelPending ? <Spinner data-icon="inline-start" /> : null}
+              {cancelPending ? 'Cancelling…' : 'Cancel scheduled pass'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
