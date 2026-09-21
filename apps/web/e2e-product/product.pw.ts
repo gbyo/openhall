@@ -159,8 +159,10 @@ test('student requests and starts one authoritative WayPass', async ({ page }) =
   await page.goto(`/schools/${ORG}/pass`);
   await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
   await page.getByRole('button', { name: /Nurse/ }).click();
+  await expect(page.getByRole('heading', { name: 'Request a WayPass' })).toBeVisible();
+  await page.getByRole('button', { name: 'Request WayPass' }).click();
   await expect(page.getByRole('heading', { name: "You're ready." })).toBeVisible();
-  await page.getByRole('button', { name: 'Start pass' }).click();
+  await page.getByRole('button', { name: 'Start WayPass' }).click();
   await expect(page.getByRole('heading', { name: 'On the way to Nurse' })).toBeVisible();
   await expect(page.getByText('Station staff will record it.')).toBeVisible();
 });

@@ -81,7 +81,7 @@ test('account menu opens without menu context errors', async ({ page }) => {
   expectClean(captured);
 });
 
-test('scheduled start stays disabled before the appointment window opens', async ({ page }) => {
+test('scheduled start renders no action before the appointment window opens', async ({ page }) => {
   const captured = captureErrors(page);
   await shell(page, STUDENT);
   const active: { current: null } = { current: null };
@@ -100,8 +100,7 @@ test('scheduled start stays disabled before the appointment window opens', async
   ]);
   await page.goto(`/schools/${ORG}/pass`);
   await expect(page.getByRole('heading', { name: 'Upcoming' })).toBeVisible();
-  const start = page.getByRole('button', { name: 'Start WayPass' });
-  await expect(start).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Start WayPass' })).toHaveCount(0);
   await expect(page.getByText('WayPass hit a problem')).toHaveCount(0);
   expectClean(captured);
 });

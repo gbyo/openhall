@@ -94,7 +94,7 @@ export interface PassPolicy {
 
 export function mockPass(
   state: string,
-  mode: 'optional' | 'required' | null = null,
+  mode: 'none' | 'optional' | 'required' | null = null,
   policy: PassPolicy | null = null,
   organizationId: string = ORG,
 ) {
@@ -164,6 +164,63 @@ export async function studentApis(
   );
   await page.route('**/api/v1/me/scheduled-authorizations', (route) =>
     route.fulfill({ json: { authorizations: scheduled } }),
+  );
+}
+
+export interface HomeDestination {
+  id: string;
+  displayName: string;
+  serviceType: string;
+  checkInMode: string;
+}
+
+export const HOME_CATALOG: HomeDestination[] = [
+  { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse', checkInMode: 'required' },
+  {
+    id: `${DESTINATION.slice(0, 24)}0021`,
+    displayName: 'First floor restroom',
+    serviceType: 'restroom',
+    checkInMode: 'none',
+  },
+  {
+    id: `${DESTINATION.slice(0, 24)}0022`,
+    displayName: 'Second floor restroom',
+    serviceType: 'restroom',
+    checkInMode: 'none',
+  },
+  {
+    id: `${DESTINATION.slice(0, 24)}0023`,
+    displayName: 'Counseling Center',
+    serviceType: 'counseling',
+    checkInMode: 'optional',
+  },
+  {
+    id: `${DESTINATION.slice(0, 24)}0024`,
+    displayName: 'Library Media Center',
+    serviceType: 'library',
+    checkInMode: 'optional',
+  },
+  {
+    id: `${DESTINATION.slice(0, 24)}0025`,
+    displayName: 'Planetarium',
+    serviceType: 'planetarium',
+    checkInMode: 'none',
+  },
+];
+
+export async function studentHomeApis(
+  page: Page,
+  active: { current: ReturnType<typeof mockPass> | null },
+  options: { destinations?: HomeDestination[]; scheduled?: unknown[] } = {},
+) {
+  await page.route('**/api/v1/me/passes/active', (route) =>
+    route.fulfill({ json: { pass: active.current }, headers: { ETag: '"pass:test:1"' } }),
+  );
+  await page.route(`**/api/v1/me/organizations/${ORG}/destinations`, (route) =>
+    route.fulfill({ json: { destinations: options.destinations ?? HOME_CATALOG } }),
+  );
+  await page.route('**/api/v1/me/scheduled-authorizations', (route) =>
+    route.fulfill({ json: { authorizations: options.scheduled ?? [] } }),
   );
 }
 
