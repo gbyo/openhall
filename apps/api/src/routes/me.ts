@@ -9,6 +9,7 @@ import {
   MyOrganizationsSchema,
   ProblemDetailsSchema,
   UuidSchema,
+  schemaRef,
 } from '@openhall/contracts';
 import { Type } from 'typebox';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -224,14 +225,14 @@ export function registerMeRoutes(
           'Schools the authenticated person may legitimately enter right now. Recovery sessions are rejected.',
         security: COOKIE_SECURITY,
         response: {
-          200: MyOrganizationsSchema,
+          200: schemaRef(MyOrganizationsSchema),
           401: {
             description: 'Unauthenticated',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           403: {
             description: 'Recovery session restricted',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },
@@ -277,18 +278,18 @@ export function registerMeRoutes(
         security: COOKIE_SECURITY,
         params: OrganizationIdParamsSchema,
         response: {
-          200: MyOrganizationContextSchema,
+          200: schemaRef(MyOrganizationContextSchema),
           401: {
             description: 'Unauthenticated',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           403: {
             description: 'Recovery session restricted',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
           404: {
             description: 'Unknown or inaccessible organization',
-            content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
+            content: { 'application/problem+json': { schema: schemaRef(ProblemDetailsSchema) } },
           },
         },
       },
