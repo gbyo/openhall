@@ -32,8 +32,8 @@ export function SetupAccessBanner({ deadlineLabel, compact = false }: SetupAcces
       <HugeiconsIcon icon={InformationCircleIcon} strokeWidth={2} aria-hidden="true" />
       <AlertTitle>Finish setting up school sign-in</AlertTitle>
       <AlertDescription>
-        You&apos;re using temporary setup access on this browser. Connect your school&apos;s sign-in so
-        you can get back into WayPass normally.
+        You&apos;re using temporary setup access on this browser. Connect your school&apos;s sign-in
+        so you can get back into WayPass normally.
         {deadlineLabel ? ` Temporary access ends ${deadlineLabel}.` : ''}
       </AlertDescription>
       <div className="col-start-2 mt-2">
