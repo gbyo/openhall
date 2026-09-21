@@ -86,6 +86,25 @@ function toTemplateRecord(row: TemplateRow): ScheduleTemplateRecord {
 
 /** PostgreSQL schedule administration persistence (tenant-scoped, aggregate-locked). */
 export class PostgresScheduleAdminRepository implements ScheduleAdminRepository {
+  async loadConfiguration(
+    context: TenantTransactionContext,
+    organizationId: string,
+  ): Promise<ScheduleConfigurationRecord | null> {
+    const connection = connectionFor(context);
+    const row = await connection
+      .selectFrom('school_schedule_configuration')
+      .select(['organization_id', 'revision', 'updated_at'])
+      .where('tenant_id', '=', context.tenantId)
+      .where('organization_id', '=', organizationId)
+      .executeTakeFirst();
+    if (row === undefined) return null;
+    return {
+      organizationId: row.organization_id,
+      revision: toBigInt(row.revision),
+      updatedAt: fromDatabaseInstant(row.updated_at),
+    };
+  }
+
   async loadConfigurationForUpdate(
     context: TenantTransactionContext,
     organizationId: string,
@@ -493,6 +512,50 @@ export class PostgresScheduleAdminRepository implements ScheduleAdminRepository 
       cycleCode: row.cycle_code,
       operationalNote: row.operational_note,
     };
+  }
+
+  async listDaysInRange(
+    context: TenantTransactionContext,
+    organizationId: string,
+    from: string,
+    through: string,
+  ): Promise<readonly CalendarDayRecord[]> {
+    const connection = connectionFor(context);
+    const rows = await connection
+      .selectFrom('calendar_day')
+      .leftJoin('schedule_template', (join) =>
+        join
+          .onRef('schedule_template.tenant_id', '=', 'calendar_day.tenant_id')
+          .onRef('schedule_template.id', '=', 'calendar_day.schedule_template_id'),
+      )
+      .select([
+        'calendar_day.id',
+        'calendar_day.tenant_id',
+        'calendar_day.organization_id',
+        'calendar_day.date',
+        'calendar_day.day_kind',
+        'calendar_day.schedule_template_id',
+        'calendar_day.cycle_code',
+        'calendar_day.operational_note',
+        'schedule_template.name as template_name',
+      ])
+      .where('calendar_day.tenant_id', '=', context.tenantId)
+      .where('calendar_day.organization_id', '=', organizationId)
+      .where('calendar_day.date', '>=', from)
+      .where('calendar_day.date', '<=', through)
+      .orderBy('calendar_day.date')
+      .execute();
+    return rows.map((row) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      organizationId: row.organization_id,
+      date: postgresDateToPlainDate(row.date),
+      dayKind: dayKind(row.day_kind),
+      templateId: row.schedule_template_id,
+      templateName: row.template_name,
+      cycleCode: row.cycle_code,
+      operationalNote: row.operational_note,
+    }));
   }
 
   async upsertDay(
