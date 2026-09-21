@@ -161,16 +161,23 @@ export interface Destination {
   max_duration_seconds: number | null;
   organization_id: string;
   queue_enabled: Generated<boolean>;
+  queue_timeout_seconds: Generated<number>;
+  ready_claim_timeout_seconds: Generated<number>;
   service_type: string;
   status: Generated<string>;
   tenant_id: string;
 }
 
 export interface DestinationReservation {
+  claimed_at: string | null;
   destination_id: string;
-  expires_at: string | null;
+  flow_expires_at: string;
   id: Generated<string>;
+  organization_id: string;
   pass_id: string;
+  policy_evaluation_id: string;
+  ready_expires_at: string;
+  release_reason: string | null;
   released_at: string | null;
   reserved_at: Generated<string>;
   tenant_id: string;
@@ -479,9 +486,13 @@ export interface PolicyRule {
 export interface QueueEntry {
   destination_id: string;
   entered_at: Generated<string>;
+  flow_expires_at: string;
   id: Generated<string>;
+  organization_id: string;
   pass_id: string;
+  policy_evaluation_id: string;
   priority: Generated<number>;
+  release_reason: string | null;
   released_at: string | null;
   tenant_id: string;
 }

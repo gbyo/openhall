@@ -44,6 +44,7 @@ const CancelHeadersSchema = Type.Object({
 export const TITLE_BY_CODE: Record<PassErrorCode, string> = {
   destination_not_found: 'Destination not found',
   destination_unavailable: 'Destination unavailable',
+  destination_capacity_full: 'Destination capacity full',
   student_not_found: 'Student not found',
   active_pass_exists: 'Active pass already exists',
   pass_not_found: 'Pass not found',
@@ -63,6 +64,10 @@ export const TITLE_BY_CODE: Record<PassErrorCode, string> = {
   invalid_override_state: 'Invalid override state',
   override_requires_independent_approver: 'Override requires independent approver',
   policy_configuration_error: 'Policy configuration error',
+  queue_status_unavailable: 'Queue status unavailable',
+  ready_offer_expired: 'Ready offer expired',
+  check_in_not_supported: 'Check-in not supported',
+  station_check_in_required: 'Station check-in required',
 };
 
 async function sendPassProblem(

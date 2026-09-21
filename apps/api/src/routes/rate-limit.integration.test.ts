@@ -15,6 +15,7 @@ const config: AppConfig = {
   nodeEnv: 'test',
   appBaseUrl: new URL('http://localhost:3000'),
   databaseUrl: 'postgresql://unused',
+  destinationFlowPollMs: 2000,
   appSecret: 'test-only-app-secret-32-characters!!',
   dataEncryptionKey: new Uint8Array(32).fill(7),
   dataEncryptionKeyId: 'test-key-1',

@@ -41,6 +41,22 @@ describe('capability vocabulary parity', () => {
     });
     accepts('pass.view.self', { kind: 'self' });
     accepts('pass.cancel.self', { kind: 'self' });
+    accepts('pass.progress.self', { kind: 'self' });
+    accepts('pass.depart.self', {
+      kind: 'student',
+      organizationId: 'org-1',
+      studentId: 'person-1',
+    });
+    accepts('pass.depart.student', {
+      kind: 'student',
+      organizationId: 'org-1',
+      studentId: 'person-1',
+    });
+    accepts('pass.depart.student', {
+      kind: 'student_in_section',
+      sectionId: 'sec-1',
+      studentId: 'person-1',
+    });
     accepts('pass.create.student', {
       kind: 'student',
       organizationId: 'org-1',
@@ -64,6 +80,14 @@ describe('capability vocabulary parity', () => {
     accepts('schedule.manage', { kind: 'self' });
     // @ts-expect-error pass.request.self requires a student resource.
     accepts('pass.request.self', { kind: 'organization', organizationId: 'org-1' });
+    // @ts-expect-error pass.depart.self requires a student resource.
+    accepts('pass.depart.self', { kind: 'self' });
+    accepts('pass.progress.self', {
+      // @ts-expect-error pass.progress.self requires a self resource.
+      kind: 'student',
+      organizationId: 'org-1',
+      studentId: 'person-1',
+    });
     accepts('pass.approve.section', {
       // @ts-expect-error pass.approve.section requires a student_in_section resource.
       kind: 'student',

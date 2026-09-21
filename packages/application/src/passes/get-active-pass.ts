@@ -1,13 +1,16 @@
 import type { Principal } from '../authentication/principal.js';
 import type { TenantTransactionRunner } from '../persistence.js';
+import type { DestinationFlowRepository } from '../destination-flow/ports.js';
+import { loadMovementForRow } from '../destination-flow/projections.js';
 import { buildPolicyProjection, type PolicyRepository } from '../policy/index.js';
 import { PassApplicationError } from './errors.js';
 import type { PassRepository } from './ports.js';
-import { etagForPass, placementKindFromRow, type PassRepresentation } from './representations.js';
+import { etagForPass, toPassRepresentation, type PassRepresentation } from './representations.js';
 
 export interface ActivePassDependencies {
   readonly runner: TenantTransactionRunner;
   readonly passes: PassRepository;
+  readonly flow: DestinationFlowRepository;
   readonly policy: PolicyRepository;
 }
 
@@ -41,6 +44,7 @@ export async function getActiveSelfPass(
       evaluation: await dependencies.policy.loadLatestEvaluation(context, row.id),
       approvals: await dependencies.policy.listApprovalsForPass(context, row.id),
       overrides: await dependencies.policy.listOverridesForPass(context, row.id),
+      movement: await loadMovementForRow(context, dependencies.passes, dependencies.flow, row),
     };
   });
   if (loaded === null) return { pass: null, etag: null };
@@ -48,29 +52,12 @@ export async function getActiveSelfPass(
   if (row.tenantId !== principal.tenantId || row.studentId !== principal.personId) {
     return { pass: null, etag: null };
   }
-  const pass: PassRepresentation = {
-    id: row.id,
-    organizationId: row.organizationId,
-    studentId: row.studentId,
-    destination: {
-      id: row.destinationId,
-      displayName: row.destinationDisplayName,
-      serviceType: row.destinationServiceType,
-    },
-    origin: {
-      placementKind: placementKindFromRow(row),
-      block: row.originBlock,
-      section: row.originSection,
-      location: row.originLocation,
-    },
-    requestSource: row.requestSource,
-    requestedAt: row.requestedAt.toString(),
-    lifecycleState: row.lifecycleState,
-    revision: row.revision.toString(10),
-    policy:
-      loaded.evaluation === null
-        ? null
-        : buildPolicyProjection(loaded.evaluation, loaded.approvals, loaded.overrides),
-  };
+  const pass: PassRepresentation = toPassRepresentation(
+    row,
+    loaded.evaluation === null
+      ? null
+      : buildPolicyProjection(loaded.evaluation, loaded.approvals, loaded.overrides),
+    loaded.movement,
+  );
   return { pass, etag: etagForPass(row.id, row.revision) };
 }

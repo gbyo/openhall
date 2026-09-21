@@ -4,6 +4,12 @@ export interface AppConfig {
   readonly nodeEnv: NodeEnvironment;
   readonly appBaseUrl: URL;
   readonly databaseUrl: string;
+  /**
+   * Destination-flow reconciler poll interval in milliseconds. The database
+   * stays the durable work source; this only sets how often the worker looks
+   * for pre-departure expiries and queue promotions.
+   */
+  readonly destinationFlowPollMs: number;
   readonly appSecret: string;
   /**
    * Long-lived data-encryption key: exactly 256 random bits. Configured as
@@ -176,6 +182,16 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     issues.push('PORT must be an integer from 1 through 65535');
   }
 
+  const destinationFlowPollValue = environment.DESTINATION_FLOW_POLL_MS?.trim() ?? '2000';
+  const destinationFlowPollMs = Number(destinationFlowPollValue);
+  if (
+    !Number.isInteger(destinationFlowPollMs) ||
+    destinationFlowPollMs < 250 ||
+    destinationFlowPollMs > 60_000
+  ) {
+    issues.push('DESTINATION_FLOW_POLL_MS must be an integer from 250 through 60000');
+  }
+
   if (issues.length > 0) {
     throw new ConfigError(issues);
   }
@@ -184,6 +200,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     nodeEnv,
     appBaseUrl,
     databaseUrl,
+    destinationFlowPollMs,
     appSecret,
     dataEncryptionKey,
     dataEncryptionKeyId,

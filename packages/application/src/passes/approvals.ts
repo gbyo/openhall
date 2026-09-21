@@ -21,11 +21,13 @@ import {
   requireIdempotencyKey,
 } from './idempotency.js';
 import type { PassRepository } from './ports.js';
+import type { DestinationFlowRepository } from '../destination-flow/ports.js';
+import { loadMovementForRow } from '../destination-flow/projections.js';
 import type { PendingApprovalView, PolicyRepository } from '../policy/index.js';
 import {
   etagForPass,
   parseAnyIfMatch,
-  placementKindFromRow,
+  toPassRepresentation,
   type PassRepresentation,
 } from './representations.js';
 import { reevaluatePersistAndApply } from './workflow.js';
@@ -37,6 +39,7 @@ export interface ApprovalCommandDependencies {
   readonly facts: AuthorizationFactsRepository;
   readonly placement: ExpectedPlacementResolver;
   readonly passes: PassRepository;
+  readonly flow: DestinationFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -237,7 +240,7 @@ export async function resolvePassApproval(
       });
       const tail = await reevaluatePersistAndApply(
         context,
-        { passes, policy, outbox },
+        { passes, flow: dependencies.flow, policy, outbox },
         {
           passId: row.id,
           schoolId: row.organizationId,
@@ -250,27 +253,11 @@ export async function resolvePassApproval(
           requestSource: row.requestSource,
         },
       );
-      const representation: PassRepresentation = {
-        id: tail.row.id,
-        organizationId: tail.row.organizationId,
-        studentId: tail.row.studentId,
-        destination: {
-          id: tail.row.destinationId,
-          displayName: tail.row.destinationDisplayName,
-          serviceType: tail.row.destinationServiceType,
-        },
-        origin: {
-          placementKind: placementKindFromRow(tail.row),
-          block: tail.row.originBlock,
-          section: tail.row.originSection,
-          location: tail.row.originLocation,
-        },
-        requestSource: tail.row.requestSource,
-        requestedAt: tail.row.requestedAt.toString(),
-        lifecycleState: tail.row.lifecycleState,
-        revision: tail.row.revision.toString(10),
-        policy: tail.projection,
-      };
+      const representation = toPassRepresentation(
+        tail.row,
+        tail.projection,
+        await loadMovementForRow(context, passes, dependencies.flow, tail.row),
+      );
       return {
         representation,
         etag: etagForPass(tail.row.id, tail.row.revision),

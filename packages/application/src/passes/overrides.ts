@@ -14,6 +14,7 @@ import type {
   TenantTransactionRunner,
 } from '../persistence.js';
 import type { ExpectedPlacementResolver } from '../scheduling/index.js';
+import type { DestinationFlowRepository } from '../destination-flow/ports.js';
 import {
   buildPolicyProjection,
   evaluateAndPersistPolicy,
@@ -32,8 +33,14 @@ import {
   requireIdempotencyKey,
 } from './idempotency.js';
 import type { PassRepository } from './ports.js';
+import { loadMovementForRow } from '../destination-flow/projections.js';
 import type { PendingOverrideView } from '../policy/index.js';
-import { etagForPass, parseAnyIfMatch, type PassRepresentation } from './representations.js';
+import {
+  etagForPass,
+  parseAnyIfMatch,
+  toPassRepresentation,
+  type PassRepresentation,
+} from './representations.js';
 import { reevaluatePersistAndApply } from './workflow.js';
 
 export interface OverrideCommandDependencies {
@@ -43,6 +50,7 @@ export interface OverrideCommandDependencies {
   readonly facts: AuthorizationFactsRepository;
   readonly placement: ExpectedPlacementResolver;
   readonly passes: PassRepository;
+  readonly flow: DestinationFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -385,7 +393,11 @@ export async function requestPassOverride(
         // no revision bump and no event noise. Project current truth.
         const tail = await reevaluateTailOnly(context, policy, row.id);
         return {
-          representation: toRepresentation(row, tail.projection),
+          representation: toPassRepresentation(
+            row,
+            tail.projection,
+            await loadMovementForRow(context, passes, dependencies.flow, row),
+          ),
           etag: etagForPass(row.id, row.revision),
         };
       }
@@ -448,11 +460,15 @@ export async function requestPassOverride(
       });
       const tail = await reevaluatePersistAndApply(
         context,
-        { passes, policy, outbox },
+        { passes, flow: dependencies.flow, policy, outbox },
         { ...tailInputBase, workflowRow: bumped },
       );
       return {
-        representation: toRepresentation(tail.row, tail.projection),
+        representation: toPassRepresentation(
+          tail.row,
+          tail.projection,
+          await loadMovementForRow(context, passes, dependencies.flow, tail.row),
+        ),
         etag: etagForPass(tail.row.id, tail.row.revision),
       };
     },
@@ -473,52 +489,6 @@ export async function requestPassOverride(
     etag: outcome.value.etag,
     status: 200,
     replayed: outcome.replayed,
-  };
-}
-
-function toRepresentation(
-  row: {
-    id: string;
-    organizationId: string;
-    studentId: string;
-    destinationId: string;
-    destinationDisplayName: string;
-    destinationServiceType: string;
-    originBlock: { id: string; code: string; displayName: string } | null;
-    originSection: { id: string; code: string | null; title: string } | null;
-    originLocation: { id: string; name: string } | null;
-    requestSource: string;
-    requestedAt: Temporal.Instant;
-    lifecycleState: string;
-    revision: bigint;
-  },
-  projection: PassRepresentation['policy'],
-): PassRepresentation {
-  return {
-    id: row.id,
-    organizationId: row.organizationId,
-    studentId: row.studentId,
-    destination: {
-      id: row.destinationId,
-      displayName: row.destinationDisplayName,
-      serviceType: row.destinationServiceType,
-    },
-    origin: {
-      placementKind:
-        row.originSection !== null
-          ? 'resolved'
-          : row.originBlock !== null
-            ? 'block_only'
-            : 'unresolved',
-      block: row.originBlock,
-      section: row.originSection,
-      location: row.originLocation,
-    },
-    requestSource: row.requestSource,
-    requestedAt: row.requestedAt.toString(),
-    lifecycleState: row.lifecycleState,
-    revision: row.revision.toString(10),
-    policy: projection,
   };
 }
 
@@ -772,7 +742,7 @@ export async function resolvePassOverride(
       });
       const tail = await reevaluatePersistAndApply(
         context,
-        { passes, policy, outbox },
+        { passes, flow: dependencies.flow, policy, outbox },
         {
           passId: row.id,
           schoolId: row.organizationId,
@@ -786,7 +756,11 @@ export async function resolvePassOverride(
         },
       );
       return {
-        representation: toRepresentation(tail.row, tail.projection),
+        representation: toPassRepresentation(
+          tail.row,
+          tail.projection,
+          await loadMovementForRow(context, passes, dependencies.flow, tail.row),
+        ),
         etag: etagForPass(tail.row.id, tail.row.revision),
       };
     },

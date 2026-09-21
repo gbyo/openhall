@@ -1,9 +1,16 @@
 import { SystemClock } from '@openhall/domain';
 import {
+  DestinationFlowReconciler,
   ExpectedPlacementResolver,
   RelationshipAuthorizationService,
   cancelSelfPass,
+  completeSelfPass,
+  departSelfPass,
+  departStudentPass,
   getActiveSelfPass,
+  getOwnQueueStatus,
+  getStationView,
+  arriveSelfPass,
   listPendingApprovals,
   listPendingOverrides,
   requestSelfPass,
@@ -11,15 +18,23 @@ import {
   resolvePassApproval,
   requestPassOverride,
   resolvePassOverride,
+  returnSelfPass,
+  stationBeginReturnPass,
+  stationCheckInPass,
+  stationCompletePass,
   type ActivePassDependencies,
   type ApprovalCommandDependencies,
   type CancelPassDependencies,
+  type DepartPassDependencies,
+  type FlowReadDependencies,
   type OverrideCommandDependencies,
+  type ProgressPassDependencies,
   type RequestPassDependencies,
 } from '@openhall/application';
 import {
   PostgresAuditWriter,
   PostgresAuthorizationRepository,
+  PostgresDestinationFlowRepository,
   PostgresExpectedPlacementRepository,
   PostgresIdempotencyRepository,
   PostgresOutboxWriter,
@@ -36,6 +51,10 @@ export interface PassDependencies {
   readonly active: ActivePassDependencies;
   readonly approvals: ApprovalCommandDependencies;
   readonly overrides: OverrideCommandDependencies;
+  readonly depart: DepartPassDependencies;
+  readonly progress: ProgressPassDependencies;
+  readonly reads: FlowReadDependencies;
+  readonly reconciler: DestinationFlowReconciler;
 }
 
 /**
@@ -51,6 +70,7 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
     new PostgresExpectedPlacementRepository(database),
   );
   const passes = new PostgresPassRepository();
+  const flow = new PostgresDestinationFlowRepository(database);
   const policy = new PostgresPolicyRepository();
   const idempotency = new PostgresIdempotencyRepository();
   const audit = new PostgresAuditWriter();
@@ -62,6 +82,7 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
     facts,
     placement,
     passes,
+    flow,
     policy,
     idempotency,
     audit,
@@ -69,8 +90,8 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
   };
   return {
     request,
-    cancel: { clock, runner, passes, policy, idempotency, audit, outbox },
-    active: { runner, passes, policy },
+    cancel: { clock, runner, passes, flow, policy, idempotency, audit, outbox },
+    active: { runner, passes, flow, policy },
     approvals: {
       clock,
       runner,
@@ -78,6 +99,7 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
       facts,
       placement,
       passes,
+      flow,
       policy,
       idempotency,
       audit,
@@ -90,17 +112,57 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
       facts,
       placement,
       passes,
+      flow,
       policy,
       idempotency,
       audit,
       outbox,
     },
+    depart: {
+      clock,
+      runner,
+      authorization,
+      placement,
+      passes,
+      flow,
+      policy,
+      idempotency,
+      audit,
+      outbox,
+    },
+    progress: {
+      clock,
+      runner,
+      authorization,
+      passes,
+      flow,
+      policy,
+      idempotency,
+      audit,
+      outbox,
+    },
+    reads: { clock, runner, passes, flow, authorization },
+    reconciler: new DestinationFlowReconciler({
+      clock,
+      runner,
+      passes,
+      flow,
+      policy,
+      placement,
+      outbox,
+    }),
   };
 }
 
 export {
+  arriveSelfPass,
   cancelSelfPass,
+  completeSelfPass,
+  departSelfPass,
+  departStudentPass,
   getActiveSelfPass,
+  getOwnQueueStatus,
+  getStationView,
   listPendingApprovals,
   listPendingOverrides,
   requestPassOverride,
@@ -108,4 +170,8 @@ export {
   requestStudentPass,
   resolvePassApproval,
   resolvePassOverride,
+  returnSelfPass,
+  stationBeginReturnPass,
+  stationCheckInPass,
+  stationCompletePass,
 };

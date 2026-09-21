@@ -14,10 +14,12 @@ import type { Kysely } from 'kysely';
 import { createAuthDependencies } from './auth/dependencies.js';
 import { createAuthorizationDependencies } from './authorization/dependencies.js';
 import { registerSessionContext } from './auth/session-context.js';
+import { startDestinationFlowWorker } from './destination-flow/reconciler-runner.js';
 import { carriedStatus, safeRequestPath, scrubForLog } from './http-privacy.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerBootstrapRoutes } from './routes/bootstrap.js';
 import { registerMeRoutes } from './routes/me.js';
+import { registerMovementRoutes } from './routes/movement.js';
 import { registerPassesRoutes } from './routes/passes.js';
 import { registerPolicyRoutes } from './routes/policy.js';
 import { createPassDependencies } from './passes/dependencies.js';
@@ -39,6 +41,13 @@ export interface CreateAppOptions {
    * suite with limits enabled.
    */
   readonly rateLimitDisabled?: boolean;
+  /**
+   * Destination-flow worker control. Defaults to enabled outside tests so
+   * production and development run the reconciler; integration suites pass
+   * false explicitly (or rely on the test default) and drive runOne/runBatch
+   * directly for deterministic wall-clock control.
+   */
+  readonly destinationFlowWorkerEnabled?: boolean;
 }
 
 /**
@@ -252,6 +261,27 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   registerPolicyRoutes(typedApp, {
     passes: passDependencies,
     auth: dependencies,
+  });
+  registerMovementRoutes(typedApp, {
+    passes: passDependencies,
+    auth: dependencies,
+  });
+
+  // The reconciler worker is a poll loop over durable database state. It
+  // starts with the app and stops cleanly on shutdown; tests drive the
+  // reconciler directly instead of sleeping for wall-clock ticks.
+  const workerEnabled = options.destinationFlowWorkerEnabled ?? options.config.nodeEnv !== 'test';
+  const destinationFlowWorker = workerEnabled
+    ? startDestinationFlowWorker(
+        passDependencies.reconciler,
+        options.config.destinationFlowPollMs,
+        (error) => {
+          app.log.error({ err: error }, 'Destination flow reconciler tick failed');
+        },
+      )
+    : null;
+  typedApp.addHook('onClose', () => {
+    destinationFlowWorker?.stop();
   });
 
   typedApp.get(

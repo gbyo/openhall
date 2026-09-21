@@ -58,6 +58,13 @@ export class PostgresPassRepository implements PassRepository {
         'service_type',
         'display_name',
         'status',
+        'check_in_mode',
+        'capacity',
+        'queue_enabled',
+        'ready_claim_timeout_seconds',
+        'queue_timeout_seconds',
+        'default_duration_seconds',
+        'max_duration_seconds',
       ])
       .where('tenant_id', '=', context.tenantId)
       .where('id', '=', destinationId)
@@ -65,6 +72,12 @@ export class PostgresPassRepository implements PassRepository {
     if (row === undefined) return null;
     const status =
       row.status === 'active' ? 'active' : row.status === 'closed' ? 'closed' : 'archived';
+    const checkInMode =
+      row.check_in_mode === 'optional'
+        ? 'optional'
+        : row.check_in_mode === 'required'
+          ? 'required'
+          : 'none';
     return {
       id: row.id,
       tenantId: row.tenant_id,
@@ -73,6 +86,13 @@ export class PostgresPassRepository implements PassRepository {
       serviceType: row.service_type,
       displayName: row.display_name ?? row.service_type,
       status,
+      checkInMode,
+      capacity: row.capacity,
+      queueEnabled: row.queue_enabled,
+      readyClaimTimeoutSeconds: row.ready_claim_timeout_seconds,
+      queueTimeoutSeconds: row.queue_timeout_seconds,
+      defaultDurationSeconds: row.default_duration_seconds,
+      maxDurationSeconds: row.max_duration_seconds,
     };
   }
 
@@ -164,6 +184,18 @@ export class PostgresPassRepository implements PassRepository {
     return this.toPassRow(connection, row);
   }
 
+  async loadPass(context: TenantTransactionContext, passId: PassId): Promise<PassRow | null> {
+    const connection = connectionFor(context);
+    const row = await connection
+      .selectFrom('pass')
+      .selectAll('pass')
+      .where('pass.tenant_id', '=', context.tenantId)
+      .where('pass.id', '=', passId)
+      .executeTakeFirst();
+    if (row === undefined) return null;
+    return this.toPassRow(connection, row);
+  }
+
   async loadPassForUpdate(
     context: TenantTransactionContext,
     passId: PassId,
@@ -228,13 +260,103 @@ export class PostgresPassRepository implements PassRepository {
     expectedRevision: bigint,
     at: Temporal.Instant,
   ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'denied', {});
+  }
+
+  async updatePassToRequested(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'requested', {});
+  }
+
+  async updatePassToQueued(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'queued', {});
+  }
+
+  async updatePassToReady(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'ready', {});
+  }
+
+  async updatePassToOutbound(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+    expectedReturnAt: Temporal.Instant | null,
+  ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'outbound', {
+      expected_return_at: expectedReturnAt === null ? null : toDatabaseInstant(expectedReturnAt),
+    });
+  }
+
+  async updatePassToAtDestination(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'at_destination', {});
+  }
+
+  async updatePassToReturning(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+    returnLocationId: string | null,
+  ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'returning', {
+      return_location_id: returnLocationId,
+    });
+  }
+
+  async updatePassToCompleted(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'completed', {});
+  }
+
+  async updatePassToExpired(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null> {
+    return this.transitionTo(context, passId, expectedRevision, at, 'expired', {});
+  }
+
+  private async transitionTo(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+    lifecycleState: string,
+    extra: { expected_return_at?: string | null; return_location_id?: string | null },
+  ): Promise<PassRow | null> {
     const connection = connectionFor(context);
     const updated = await connection
       .updateTable('pass')
       .set({
-        lifecycle_state: 'denied',
+        lifecycle_state: lifecycleState,
         revision: String(expectedRevision + 1n),
         updated_at: toDatabaseInstant(at),
+        ...extra,
       })
       .where('tenant_id', '=', context.tenantId)
       .where('id', '=', passId)
@@ -243,6 +365,23 @@ export class PostgresPassRepository implements PassRepository {
       .executeTakeFirst();
     if (updated === undefined) return null;
     return this.toPassRow(connection, updated);
+  }
+
+  async loadLatestPassEvent(
+    context: TenantTransactionContext,
+    passId: PassId,
+  ): Promise<{ readonly eventType: string; readonly metadata: Record<string, unknown> } | null> {
+    const connection = connectionFor(context);
+    const row = await connection
+      .selectFrom('pass_event')
+      .select(['event_type', 'metadata'])
+      .where('tenant_id', '=', context.tenantId)
+      .where('pass_id', '=', passId)
+      .orderBy('sequence', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+    if (row === undefined) return null;
+    return { eventType: row.event_type, metadata: row.metadata as Record<string, unknown> };
   }
 
   async appendPassEvent(context: TenantTransactionContext, input: PassEventInput): Promise<void> {
@@ -268,7 +407,7 @@ export class PostgresPassRepository implements PassRepository {
   ): Promise<PassRow> {
     const destination = await connection
       .selectFrom('destination')
-      .select(['display_name', 'service_type'])
+      .select(['display_name', 'service_type', 'check_in_mode'])
       .where('tenant_id', '=', row.tenant_id)
       .where('id', '=', row.destination_id)
       .executeTakeFirst();
@@ -319,6 +458,12 @@ export class PostgresPassRepository implements PassRepository {
       revision: toBigInt(row.revision),
       destinationDisplayName: destination?.display_name ?? '',
       destinationServiceType: destination?.service_type ?? '',
+      destinationCheckInMode:
+        destination?.check_in_mode === 'optional'
+          ? 'optional'
+          : destination?.check_in_mode === 'required'
+            ? 'required'
+            : 'none',
       originBlock:
         block === null || block === undefined
           ? null

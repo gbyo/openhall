@@ -11,6 +11,7 @@ export const ROLE_CAPABILITIES: Record<ExplicitRole, readonly Capability[]> = {
   destination_staff: ['destination.station.manage'],
   counselor: [
     'pass.create.student',
+    'pass.depart.student',
     'pass.view.school_live',
     'scheduled_authorization.manage',
     'pass.override.request.student',
@@ -18,6 +19,7 @@ export const ROLE_CAPABILITIES: Record<ExplicitRole, readonly Capability[]> = {
   ],
   office_staff: [
     'pass.create.student',
+    'pass.depart.student',
     'pass.view.school_live',
     'scheduled_authorization.manage',
     'pass.override.request.student',
@@ -25,6 +27,7 @@ export const ROLE_CAPABILITIES: Record<ExplicitRole, readonly Capability[]> = {
   ],
   school_admin: [
     'pass.create.student',
+    'pass.depart.student',
     'pass.approve.section',
     'pass.override.request.student',
     'pass.override.resolve.school',
@@ -55,6 +58,7 @@ export const ROLE_CAPABILITIES: Record<ExplicitRole, readonly Capability[]> = {
 export const SYSTEM_ADMIN_CAPABILITIES: readonly Capability[] = [
   'organization.context.read',
   'pass.create.student',
+  'pass.depart.student',
   'pass.approve.section',
   'pass.override.request.student',
   'pass.override.resolve.section',

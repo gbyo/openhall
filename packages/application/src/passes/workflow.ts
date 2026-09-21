@@ -2,6 +2,8 @@ import type { Temporal } from '@js-temporal/polyfill';
 import { transitionPass } from '@openhall/domain';
 import type { OutboxWriter, TenantTransactionContext } from '../persistence.js';
 import type { ExpectedPlacementResult } from '../scheduling/index.js';
+import { allocateDestinationFlow } from '../destination-flow/allocator.js';
+import type { DestinationFlowRepository } from '../destination-flow/ports.js';
 import {
   buildPolicyProjection,
   evaluateAndPersistPolicy,
@@ -15,6 +17,7 @@ import type { PassPolicyProjection } from './representations.js';
 
 export interface WorkflowTailDependencies {
   readonly passes: PassRepository;
+  readonly flow: DestinationFlowRepository;
   readonly policy: PolicyRepository;
   readonly outbox: OutboxWriter;
 }
@@ -40,16 +43,17 @@ export interface WorkflowTailResult {
 /**
  * Shared tail for approval/override commands: reevaluates current movement
  * policy at the workflow revision, persists the immutable evaluation,
- * reconciles pending approvals, applies denial transitions, and builds the
- * safe projection. Never emits queued/ready: allow, approval_required, and
- * override_required all leave the lifecycle at requested.
+ * reconciles pending approvals, applies denial transitions, runs destination
+ * allocation when a requested pass becomes allowed, and builds the safe
+ * projection. Approval_required and override_required leave the lifecycle at
+ * requested.
  */
 export async function reevaluatePersistAndApply(
   context: TenantTransactionContext,
   dependencies: WorkflowTailDependencies,
   input: WorkflowTailInput,
 ): Promise<WorkflowTailResult> {
-  const { passes, policy, outbox } = dependencies;
+  const { passes, flow, policy, outbox } = dependencies;
   const { workflowRow, placement, at, stage } = input;
   const decided = await evaluateAndPersistPolicy(context, policy, {
     pass: {
@@ -192,6 +196,25 @@ export async function reevaluatePersistAndApply(
     await policy.cancelAllPendingWorkflows(context, workflowRow.id, at);
     finalRow = denied;
     liveApprovals = [];
+  }
+  // An approval or override that clears the pass to allow immediately enters
+  // destination flow inside the same command transaction: ready, queued, or
+  // operationally denied. Only requested passes allocate; passes already in
+  // flow keep their existing reservation or queue position.
+  if (decided.outcome.decision === 'allow' && finalRow.lifecycleState === 'requested') {
+    const allocation = await allocateDestinationFlow(
+      context,
+      { passes, flow, policy, outbox },
+      {
+        pass: finalRow,
+        evaluationId: decided.evaluationId,
+        decision: 'allow',
+        placement,
+        at,
+        requestSource: input.requestSource,
+      },
+    );
+    finalRow = allocation.row;
   }
   const liveOverrides = await policy.listOverridesForPass(context, workflowRow.id);
   const projection = buildPolicyProjection(

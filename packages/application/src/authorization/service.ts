@@ -47,6 +47,7 @@ const RECOVERY_ALLOWED: readonly Capability[] = ['self.read', 'identity.manage']
 
 const SECTION_SCOPED_TEACHER_CAPS: readonly Capability[] = [
   'pass.create.student',
+  'pass.depart.student',
   'pass.approve.section',
   'pass.view.section_live',
   'pass.override.request.student',
@@ -99,6 +100,7 @@ function capabilityAllowsResourceKind(capability: Capability, kind: string): boo
     case 'self.read':
     case 'pass.view.self':
     case 'pass.cancel.self':
+    case 'pass.progress.self':
       return kind === 'self';
     case 'organization.context.read':
     case 'pass.view.school_live':
@@ -117,8 +119,10 @@ function capabilityAllowsResourceKind(capability: Capability, kind: string): boo
       return kind === 'organization';
     case 'pass.request.self':
     case 'pass.override.request.self':
+    case 'pass.depart.self':
       return kind === 'student';
     case 'pass.create.student':
+    case 'pass.depart.student':
     case 'pass.override.request.student':
       return kind === 'student' || kind === 'student_in_section';
     case 'pass.approve.section':
@@ -266,10 +270,13 @@ export class RelationshipAuthorizationService {
     // their own pass data; the pass command verifies exact pass ownership.
     // pass.request.self is intentionally absent here: requesting still
     // requires active student affiliation through Phase 4 below.
+    // pass.progress.self is ownership-scoped the same way: finishing an
+    // already-active movement never requires fresh school membership.
     if (
       capability === 'self.read' ||
       capability === 'pass.view.self' ||
-      capability === 'pass.cancel.self'
+      capability === 'pass.cancel.self' ||
+      capability === 'pass.progress.self'
     ) {
       return { allowed: true, basis: { kind: 'self' } };
     }
@@ -371,6 +378,15 @@ export class RelationshipAuthorizationService {
         at,
       });
       if (selfDecision.allowed) orgCapabilities.push('pass.request.self');
+      // pass.depart.self is a presentation hint only: it never implies a
+      // currently ready pass, and departure reauthorizes current membership.
+      const departDecision = await this.decideWithContext(context, {
+        principal,
+        capability: 'pass.depart.self',
+        resource: { kind: 'student', organizationId, studentId: principal.personId },
+        at,
+      });
+      if (departDecision.allowed) orgCapabilities.push('pass.depart.self');
     }
 
     // Candidate actual-teaching relationships (status-filtered); the local
@@ -664,10 +680,16 @@ export class RelationshipAuthorizationService {
     const date = schoolDateFor(at, organization.timeZone);
     if (date === null) return deny('invalid_school_time_zone');
 
-    if (capability === 'pass.request.self' || capability === 'pass.override.request.self') {
+    if (
+      capability === 'pass.request.self' ||
+      capability === 'pass.override.request.self' ||
+      capability === 'pass.depart.self'
+    ) {
       // Self semantics: target must be the principal; admin grants never fabricate it.
       // Override self-requests additionally require the current student
       // relationship; recovery sessions never reach here (restricted above).
+      // Departure additionally requires active student membership in the
+      // exact pass school at departure time.
       if (resource.studentId !== principal.personId) return deny('target_not_active_student');
       const affiliations = activeAffiliations(actor, organization.id, date);
       if (affiliations.includes('student')) {
@@ -805,8 +827,13 @@ export class RelationshipAuthorizationService {
     }
 
     // Counselor/office may create for students in the school (section target),
-    // and may request overrides there; override resolution stays school-tier.
-    if (capability === 'pass.create.student' || capability === 'pass.override.request.student') {
+    // may depart them, and may request overrides there; override resolution
+    // stays school-tier.
+    if (
+      capability === 'pass.create.student' ||
+      capability === 'pass.depart.student' ||
+      capability === 'pass.override.request.student'
+    ) {
       for (const role of ['counselor', 'office_staff'] as const) {
         const grant = hasStaffBackedGrant(actor, role, organization.id, date);
         if (grant !== null) {
@@ -844,6 +871,7 @@ export class RelationshipAuthorizationService {
       return deny(
         capability === 'pass.approve.section' ||
           capability === 'pass.create.student' ||
+          capability === 'pass.depart.student' ||
           capability === 'pass.override.request.student' ||
           capability === 'pass.override.resolve.section'
           ? 'teacher_not_assigned'

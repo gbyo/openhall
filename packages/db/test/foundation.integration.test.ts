@@ -398,24 +398,53 @@ describe('foundation migration on PostgreSQL 18', () => {
   it('enforces active reservation, active queue, and pass-event sequence uniqueness', async () => {
     const fixture = await seed();
     const passId = await insertPass(fixture);
+    const evaluationId = (
+      await pool.query<{ id: string }>(
+        "INSERT INTO policy_evaluation (tenant_id, pass_id, pass_revision, stage, decision) VALUES ($1, $2, 1, 'request', 'allow') RETURNING id",
+        [fixture.tenantA, passId],
+      )
+    ).rows[0]?.id;
+    if (!evaluationId) throw new Error('Evaluation fixture insert failed');
+    const reservationValues: [string, string, string, string, string] = [
+      fixture.tenantA,
+      fixture.organizationA,
+      fixture.destination,
+      passId,
+      evaluationId,
+    ];
     await pool.query(
-      'INSERT INTO destination_reservation (tenant_id, destination_id, pass_id) VALUES ($1, $2, $3)',
-      [fixture.tenantA, fixture.destination, passId],
+      `INSERT INTO destination_reservation
+         (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
+       VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '1 minute', statement_timestamp() + interval '10 minutes')`,
+      reservationValues,
     );
     await expect(
       pool.query(
-        'INSERT INTO destination_reservation (tenant_id, destination_id, pass_id) VALUES ($1, $2, $3)',
-        [fixture.tenantA, fixture.destination, passId],
+        `INSERT INTO destination_reservation
+           (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
+         VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '1 minute', statement_timestamp() + interval '10 minutes')`,
+        reservationValues,
       ),
     ).rejects.toMatchObject({ code: '23505' });
+    const queueValues: [string, string, string, string, string] = [
+      fixture.tenantA,
+      fixture.organizationA,
+      fixture.destination,
+      passId,
+      evaluationId,
+    ];
     await pool.query(
-      'INSERT INTO queue_entry (tenant_id, destination_id, pass_id) VALUES ($1, $2, $3)',
-      [fixture.tenantA, fixture.destination, passId],
+      `INSERT INTO queue_entry
+         (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, flow_expires_at)
+       VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '10 minutes')`,
+      queueValues,
     );
     await expect(
       pool.query(
-        'INSERT INTO queue_entry (tenant_id, destination_id, pass_id) VALUES ($1, $2, $3)',
-        [fixture.tenantA, fixture.destination, passId],
+        `INSERT INTO queue_entry
+           (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, flow_expires_at)
+         VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '10 minutes')`,
+        queueValues,
       ),
     ).rejects.toMatchObject({ code: '23505' });
     await pool.query(
@@ -468,7 +497,7 @@ describe('foundation migration on PostgreSQL 18', () => {
     const handle = createDatabase(databaseUrl, { max: 1 });
     const probe = new PostgresReadinessProbe(handle.database);
     await expect(probe.check()).resolves.toEqual({
-      migration: '006_movement_policy_approvals_overrides',
+      migration: '007_destination_flow_and_movement',
     });
     await handle.destroy();
     await expect(probe.check()).rejects.toBeDefined();
