@@ -18,6 +18,11 @@ import {
 
 const ACTIVE_STATES = ['requested', 'queued', 'ready', 'outbound', 'at_destination', 'returning'];
 
+function parseCheckInMode(value: string | null): 'none' | 'optional' | 'required' | null {
+  if (value === null) return null;
+  return value === 'optional' ? 'optional' : value === 'required' ? 'required' : 'none';
+}
+
 interface PassCore {
   id: string;
   tenant_id: string;
@@ -35,6 +40,8 @@ interface PassCore {
   expected_return_at: string | null;
   scheduled_authorization_id: string | null;
   revision: string | bigint | number;
+  departure_check_in_mode: string | null;
+  departure_destination_revision: string | bigint | number | null;
 }
 
 /**
@@ -65,6 +72,7 @@ export class PostgresPassRepository implements PassRepository {
         'queue_timeout_seconds',
         'default_duration_seconds',
         'max_duration_seconds',
+        'revision',
       ])
       .where('tenant_id', '=', context.tenantId)
       .where('id', '=', destinationId)
@@ -86,6 +94,7 @@ export class PostgresPassRepository implements PassRepository {
       serviceType: row.service_type,
       displayName: row.display_name ?? row.service_type,
       status,
+      revision: toBigInt(row.revision),
       checkInMode,
       capacity: row.capacity,
       queueEnabled: row.queue_enabled,
@@ -170,6 +179,7 @@ export class PostgresPassRepository implements PassRepository {
         origin_schedule_block_id: input.originScheduleBlockId,
         destination_id: input.destinationId,
         request_source: input.requestSource,
+        scheduled_authorization_id: input.scheduledAuthorizationId,
         requested_by_person_id: input.requestedByPersonId,
         requested_at: toDatabaseInstant(input.requestedAt),
         lifecycle_state: 'requested',
@@ -296,9 +306,12 @@ export class PostgresPassRepository implements PassRepository {
     expectedRevision: bigint,
     at: Temporal.Instant,
     expectedReturnAt: Temporal.Instant | null,
+    departure: { readonly checkInMode: string; readonly destinationRevision: bigint },
   ): Promise<PassRow | null> {
     return this.transitionTo(context, passId, expectedRevision, at, 'outbound', {
       expected_return_at: expectedReturnAt === null ? null : toDatabaseInstant(expectedReturnAt),
+      departure_check_in_mode: departure.checkInMode,
+      departure_destination_revision: String(departure.destinationRevision),
     });
   }
 
@@ -347,7 +360,12 @@ export class PostgresPassRepository implements PassRepository {
     expectedRevision: bigint,
     at: Temporal.Instant,
     lifecycleState: string,
-    extra: { expected_return_at?: string | null; return_location_id?: string | null },
+    extra: {
+      expected_return_at?: string | null;
+      return_location_id?: string | null;
+      departure_check_in_mode?: string;
+      departure_destination_revision?: string;
+    },
   ): Promise<PassRow | null> {
     const connection = connectionFor(context);
     const updated = await connection
@@ -456,6 +474,11 @@ export class PostgresPassRepository implements PassRepository {
         row.expected_return_at === null ? null : fromDatabaseInstant(row.expected_return_at),
       scheduledAuthorizationId: row.scheduled_authorization_id,
       revision: toBigInt(row.revision),
+      departureCheckInMode: parseCheckInMode(row.departure_check_in_mode),
+      departureDestinationRevision:
+        row.departure_destination_revision === null
+          ? null
+          : toBigInt(row.departure_destination_revision),
       destinationDisplayName: destination?.display_name ?? '',
       destinationServiceType: destination?.service_type ?? '',
       destinationCheckInMode:

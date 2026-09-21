@@ -133,6 +133,7 @@ function mapTransaction(row: {
   tenant_id: string | null;
   identity_provider_id: string | null;
   bootstrap_setup_id: string | null;
+  identity_enrollment_grant_id: string | null;
   purpose: string;
   provider_revision: number | null;
   state_hash: Buffer;
@@ -151,7 +152,13 @@ function mapTransaction(row: {
     tenantId: row.tenant_id,
     identityProviderId: row.identity_provider_id,
     bootstrapSetupId: row.bootstrap_setup_id,
-    purpose: row.purpose === 'bootstrap' ? 'bootstrap' : 'login',
+    identityEnrollmentGrantId: row.identity_enrollment_grant_id,
+    purpose:
+      row.purpose === 'bootstrap'
+        ? 'bootstrap'
+        : row.purpose === 'enrollment'
+          ? 'enrollment'
+          : 'login',
     providerRevision: row.provider_revision,
     stateDigest: bytes(row.state_hash),
     browserBindingDigest: bytes(row.browser_binding_hash),
@@ -619,7 +626,8 @@ export class PostgresOidcTransactionStore implements OidcTransactionStore {
       readonly tenantId: string | null;
       readonly identityProviderId: string | null;
       readonly bootstrapSetupId: string | null;
-      readonly purpose: 'login' | 'bootstrap';
+      readonly identityEnrollmentGrantId: string | null;
+      readonly purpose: 'login' | 'bootstrap' | 'enrollment';
       readonly providerRevision: number | null;
       readonly stateDigest: Uint8Array;
       readonly browserBindingDigest: Uint8Array;
@@ -635,6 +643,7 @@ export class PostgresOidcTransactionStore implements OidcTransactionStore {
         tenant_id: input.tenantId,
         identity_provider_id: input.identityProviderId,
         bootstrap_setup_id: input.bootstrapSetupId,
+        identity_enrollment_grant_id: input.identityEnrollmentGrantId,
         purpose: input.purpose,
         provider_revision: input.providerRevision,
         state_hash: toDatabaseBytes(input.stateDigest),
@@ -667,7 +676,8 @@ export class PostgresOidcTransactionStore implements OidcTransactionStore {
         FOR UPDATE SKIP LOCKED
       )
       RETURNING
-        id, tenant_id, identity_provider_id, bootstrap_setup_id, purpose,
+        id, tenant_id, identity_provider_id, bootstrap_setup_id,
+        identity_enrollment_grant_id, purpose,
         provider_revision, state_hash, browser_binding_hash,
         transaction_secret_ciphertext, transaction_secret_nonce,
         transaction_secret_tag, transaction_secret_key_id,
@@ -712,6 +722,7 @@ interface OidcTransactionStoreRow {
   tenant_id: string | null;
   identity_provider_id: string | null;
   bootstrap_setup_id: string | null;
+  identity_enrollment_grant_id: string | null;
   purpose: string;
   provider_revision: number | null;
   state_hash: Buffer;
