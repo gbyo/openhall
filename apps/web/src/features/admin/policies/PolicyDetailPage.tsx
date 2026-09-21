@@ -170,6 +170,7 @@ export function Component() {
 
   if (!detail.data || !draft) return <p role="status">Loading policy…</p>;
   const rule = detail.data.rule;
+  const etag = detail.data.etag;
   const toggle = (field: 'blockKinds' | 'requestSources', value: string, checked: boolean) => {
     setDraft({
       ...draft,
@@ -216,14 +217,14 @@ export function Component() {
       )
     )
       return;
-    mutate.mutate({ kind, key: crypto.randomUUID(), etag: detail.data.etag });
+    mutate.mutate({ kind, key: crypto.randomUUID(), etag });
   };
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     mutate.mutate({
       kind: 'save',
       key: crypto.randomUUID(),
-      etag: detail.data.etag,
+      etag,
       body: body(),
     });
   }
