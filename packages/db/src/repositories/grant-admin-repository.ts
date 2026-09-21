@@ -219,21 +219,18 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
     personId: string,
   ): Promise<{ readonly id: string }> {
     const connection = connectionFor(context);
-    try {
-      const row = await connection
-        .insertInto('account')
-        .values({ tenant_id: context.tenantId, person_id: personId })
-        .returning('id')
-        .executeTakeFirstOrThrow();
-      return { id: row.id };
-    } catch (error) {
-      // A concurrent issue created the account first; reuse it instead of
-      // failing the duty that both administrators intended.
-      if (!isUniqueViolation(error)) throw error;
-      const existing = await this.loadAccountForPerson(context, personId);
-      if (existing === null) throw error;
-      return existing;
+    const row = await connection
+      .insertInto('account')
+      .values({ tenant_id: context.tenantId, person_id: personId })
+      .onConflict((conflict) => conflict.doNothing())
+      .returning('id')
+      .executeTakeFirst();
+    if (row !== undefined) return { id: row.id };
+    const existing = await this.loadAccountForPerson(context, personId);
+    if (existing === null) {
+      throw new Error('Account conflict did not resolve to an existing person account.');
     }
+    return existing;
   }
 
   async insertActive(
