@@ -1,7 +1,20 @@
-import { Type } from 'typebox';
+import { Type, type Static, type TSchema, type TUnsafe } from 'typebox';
 
 export const UuidSchema = Type.String({ format: 'uuid' });
 export const InstantSchema = Type.String({ format: 'date-time' });
+
+/**
+ * Preserve the target's static TypeBox type while emitting a JSON Schema
+ * reference. Shared schemas are registered once with Fastify, so route
+ * contracts and composite public contracts can reuse them without inlining.
+ */
+export function schemaRef<T extends TSchema>(schema: T): TUnsafe<Static<T>> {
+  const id = (schema as { $id?: unknown }).$id;
+  if (typeof id !== 'string' || id.length === 0) {
+    throw new Error('Shared API schemas must have a non-empty $id');
+  }
+  return Type.Unsafe<Static<T>>(Type.Ref(id));
+}
 
 export const ProblemDetailsSchema = Type.Object(
   {
@@ -214,7 +227,7 @@ export const MyOrganizationEntrySchema = Type.Object(
 );
 
 export const MyOrganizationsSchema = Type.Object(
-  { organizations: Type.Array(MyOrganizationEntrySchema) },
+  { organizations: Type.Array(schemaRef(MyOrganizationEntrySchema)) },
   { $id: 'MyOrganizations', additionalProperties: false },
 );
 
@@ -348,9 +361,9 @@ export const MyOrganizationContextSchema = Type.Object(
     ),
     affiliations: Type.Array(AffiliationSchema),
     capabilities: Type.Array(CapabilitySchema),
-    expectedPlacement: Type.Union([ExpectedPlacementContextSchema, Type.Null()]),
-    teachingSections: Type.Array(TeachingSectionContextSchema),
-    staffedDestinations: Type.Array(StaffedDestinationContextSchema),
+    expectedPlacement: Type.Union([schemaRef(ExpectedPlacementContextSchema), Type.Null()]),
+    teachingSections: Type.Array(schemaRef(TeachingSectionContextSchema)),
+    staffedDestinations: Type.Array(schemaRef(StaffedDestinationContextSchema)),
   },
   { $id: 'MyOrganizationContext', additionalProperties: false },
 );
@@ -422,12 +435,12 @@ export const PassSchema = Type.Object(
 );
 
 export const ActiveSelfPassSchema = Type.Object(
-  { pass: Type.Union([PassSchema, Type.Null()]) },
+  { pass: Type.Union([schemaRef(PassSchema), Type.Null()]) },
   { $id: 'ActiveSelfPass', additionalProperties: false },
 );
 
 export const PassResponseSchema = Type.Object(
-  { pass: PassSchema },
+  { pass: schemaRef(PassSchema) },
   { $id: 'PassResponse', additionalProperties: false },
 );
 
@@ -440,3 +453,32 @@ export const IdempotencyKeyHeaderSchema = Type.String({ minLength: 1, maxLength:
 
 /** Exact OpenHall strong ETag required for If-Match on cancellation. */
 export const IfMatchHeaderSchema = Type.String({ minLength: 1 });
+
+/**
+ * Canonical reusable schemas for Fastify validation/serialization and OpenAPI.
+ * Keep dependencies before schemas that reference them.
+ */
+export const PublicApiSchemas = [
+  ProblemDetailsSchema,
+  LivenessSchema,
+  ReadinessSchema,
+  SystemInfoSchema,
+  AuthSessionSchema,
+  MeSchema,
+  AuthDiscoverySchema,
+  BootstrapStatusSchema,
+  BootstrapPrepareSchema,
+  BootstrapPrepareResponseSchema,
+  RecoveryResponseSchema,
+  OkSchema,
+  MyOrganizationEntrySchema,
+  ExpectedPlacementContextSchema,
+  TeachingSectionContextSchema,
+  StaffedDestinationContextSchema,
+  MyOrganizationsSchema,
+  MyOrganizationContextSchema,
+  PassRequestBodySchema,
+  PassSchema,
+  ActiveSelfPassSchema,
+  PassResponseSchema,
+] as const;
