@@ -217,10 +217,6 @@
   padding-block: clamp(var(--wf-space-7), 5vw, var(--wf-space-9));
 }
 
-.app-frame__notice {
-  border-bottom: var(--wf-border-width) solid var(--wf-border-default);
-}
-
 .product-notice {
   border-bottom: var(--wf-border-width) solid var(--wf-border-default);
 }
