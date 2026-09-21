@@ -569,9 +569,7 @@ export async function listCalendarRange(
       start.toString(),
       end.toString(),
     );
-    const days = rows
-      .filter((row) => row.tenantId === principal.tenantId)
-      .map(toCalendarDayView);
+    const days = rows.filter((row) => row.tenantId === principal.tenantId).map(toCalendarDayView);
     return {
       days,
       revision: aggregate.revision.toString(10),
