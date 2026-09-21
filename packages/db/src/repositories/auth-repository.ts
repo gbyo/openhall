@@ -1087,6 +1087,10 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
         })
         .returningAll()
         .executeTakeFirstOrThrow();
+      await connection
+        .insertInto('school_schedule_configuration')
+        .values({ tenant_id: tenant.id, organization_id: school.id })
+        .execute();
       const person = await connection
         .insertInto('person')
         .values({
