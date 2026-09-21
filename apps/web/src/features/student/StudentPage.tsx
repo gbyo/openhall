@@ -134,10 +134,7 @@ export function StudentPage() {
       .filter((item) => item.organizationId === organizationId && item.status === 'active')
       .flatMap((item) => [Date.parse(item.validFrom), Date.parse(item.validUntil)])
       .filter((boundary) => Number.isFinite(boundary) && boundary > nowMs)
-      .reduce(
-        (earliest, boundary) => Math.min(earliest, boundary),
-        Number.POSITIVE_INFINITY,
-      );
+      .reduce((earliest, boundary) => Math.min(earliest, boundary), Number.POSITIVE_INFINITY);
     if (!Number.isFinite(nextBoundary)) return;
 
     const timer = window.setTimeout(
