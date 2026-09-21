@@ -1,6 +1,7 @@
 export type PassErrorCode =
   | 'destination_not_found'
   | 'destination_unavailable'
+  | 'destination_capacity_full'
   | 'student_not_found'
   | 'active_pass_exists'
   | 'pass_not_found'
@@ -19,7 +20,11 @@ export type PassErrorCode =
   | 'override_not_available'
   | 'invalid_override_state'
   | 'override_requires_independent_approver'
-  | 'policy_configuration_error';
+  | 'policy_configuration_error'
+  | 'queue_status_unavailable'
+  | 'ready_offer_expired'
+  | 'check_in_not_supported'
+  | 'station_check_in_required';
 
 export class PassApplicationError extends Error {
   constructor(
@@ -46,10 +51,15 @@ export function passHttpStatus(code: PassErrorCode): number {
     case 'idempotency_key_reused':
     case 'invalid_pass_transition':
     case 'destination_unavailable':
+    case 'destination_capacity_full':
     case 'invalid_approval_state':
     case 'override_not_available':
     case 'invalid_override_state':
     case 'override_requires_independent_approver':
+    case 'queue_status_unavailable':
+    case 'ready_offer_expired':
+    case 'check_in_not_supported':
+    case 'station_check_in_required':
       return 409;
     case 'stale_pass_revision':
       return 412;

@@ -2,6 +2,8 @@ import type { Temporal } from '@js-temporal/polyfill';
 import type { DestinationId, OrganizationId, PassId, PersonId, TenantId } from '@openhall/domain';
 import type { TenantTransactionContext } from '../persistence.js';
 
+export type DestinationCheckInMode = 'none' | 'optional' | 'required';
+
 export interface PassDestinationRecord {
   readonly id: DestinationId;
   readonly tenantId: TenantId;
@@ -10,6 +12,13 @@ export interface PassDestinationRecord {
   readonly serviceType: string;
   readonly displayName: string;
   readonly status: 'active' | 'closed' | 'archived';
+  readonly checkInMode: DestinationCheckInMode;
+  readonly capacity: number | null;
+  readonly queueEnabled: boolean;
+  readonly readyClaimTimeoutSeconds: number;
+  readonly queueTimeoutSeconds: number;
+  readonly defaultDurationSeconds: number | null;
+  readonly maxDurationSeconds: number | null;
 }
 
 export interface ActiveStudentRecord {
@@ -36,6 +45,7 @@ export interface PassRow {
   readonly revision: bigint;
   readonly destinationDisplayName: string;
   readonly destinationServiceType: string;
+  readonly destinationCheckInMode: DestinationCheckInMode;
   readonly originBlock: { id: string; code: string; displayName: string } | null;
   readonly originSection: { id: string; code: string | null; title: string } | null;
   readonly originLocation: { id: string; name: string } | null;
@@ -93,6 +103,8 @@ export interface PassRepository {
     studentId: PersonId,
   ): Promise<PassRow | null>;
   insertRequestedPass(context: TenantTransactionContext, input: NewPassRow): Promise<PassRow>;
+  /** Non-locking read for status views; mutations use loadPassForUpdate. */
+  loadPass(context: TenantTransactionContext, passId: PassId): Promise<PassRow | null>;
   loadPassForUpdate(context: TenantTransactionContext, passId: PassId): Promise<PassRow | null>;
   /**
    * Transitions a locked pass to cancelled, incrementing revision once.
@@ -125,5 +137,71 @@ export interface PassRepository {
     expectedRevision: bigint,
     at: Temporal.Instant,
   ): Promise<PassRow | null>;
+  /**
+   * Phase 7 semantic lifecycle persistence. Each method transitions a locked
+   * pass to exactly one state, incrementing revision once, and returns null
+   * when the row no longer matches the expected revision. Callers validate
+   * against the central domain lifecycle matrix first; there is no generic
+   * set-state method.
+   */
+  updatePassToRequested(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null>;
+  updatePassToQueued(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null>;
+  updatePassToReady(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null>;
+  updatePassToOutbound(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+    expectedReturnAt: Temporal.Instant | null,
+  ): Promise<PassRow | null>;
+  updatePassToAtDestination(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null>;
+  updatePassToReturning(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+    returnLocationId: string | null,
+  ): Promise<PassRow | null>;
+  updatePassToCompleted(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null>;
+  updatePassToExpired(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null>;
   appendPassEvent(context: TenantTransactionContext, input: PassEventInput): Promise<void>;
+  /**
+   * Latest immutable pass event (highest sequence), or null when the pass
+   * has no recorded events. Used to derive the current operational reason
+   * for terminal flow transitions without a second lifecycle column.
+   */
+  loadLatestPassEvent(
+    context: TenantTransactionContext,
+    passId: PassId,
+  ): Promise<{ readonly eventType: string; readonly metadata: Record<string, unknown> } | null>;
 }

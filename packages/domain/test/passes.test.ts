@@ -27,9 +27,9 @@ const ALL_STATES: readonly PassLifecycleState[] = [
 
 const EXPECTED_EDGES: Readonly<Record<PassLifecycleState, readonly PassLifecycleState[]>> = {
   requested: ['queued', 'ready', 'denied', 'cancelled', 'expired'],
-  queued: ['ready', 'denied', 'cancelled', 'expired'],
-  ready: ['outbound', 'cancelled', 'expired'],
-  outbound: ['at_destination'],
+  queued: ['requested', 'ready', 'denied', 'cancelled', 'expired'],
+  ready: ['queued', 'outbound', 'denied', 'cancelled', 'expired'],
+  outbound: ['at_destination', 'completed'],
   at_destination: ['returning', 'completed'],
   returning: ['completed'],
   completed: [],

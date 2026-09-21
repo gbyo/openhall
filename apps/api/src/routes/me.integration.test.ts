@@ -13,6 +13,7 @@ const config: AppConfig = {
   nodeEnv: 'test',
   appBaseUrl: new URL('http://localhost:3000'),
   databaseUrl: 'postgresql://unused',
+  destinationFlowPollMs: 2000,
   appSecret: APP_SECRET,
   dataEncryptionKey: TEST_KEY,
   dataEncryptionKeyId: 'test-key-1',
@@ -315,7 +316,11 @@ describe('GET /api/v1/me/organizations/:organizationId/context', () => {
       staffedDestinations: unknown[];
     }>();
     expect(body.affiliations).toEqual(['student']);
-    expect(body.capabilities).toEqual(['organization.context.read', 'pass.request.self']);
+    expect(body.capabilities).toEqual([
+      'organization.context.read',
+      'pass.request.self',
+      'pass.depart.self',
+    ]);
     expect(body.teachingSections).toEqual([]);
     expect(body.expectedPlacement?.kind).toBe('calendar_not_configured');
     const raw = JSON.stringify(body);
@@ -347,6 +352,7 @@ describe('GET /api/v1/me/organizations/:organizationId/context', () => {
     expect(body.teachingSections).not.toContainEqual(expect.objectContaining({ id: sectionA2 }));
     expect(body.teachingSections[0]?.capabilities).toEqual([
       'pass.create.student',
+      'pass.depart.student',
       'pass.approve.section',
       'pass.view.section_live',
       'pass.override.request.student',

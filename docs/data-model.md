@@ -94,5 +94,19 @@ tenant-bound. Preflight fails loudly on existing cross-school
 references instead of rewriting history. `pass_event.sequence` mirrors
 the resulting `pass.revision`; idempotency rows are unique on
 `(tenant_id, actor_account_id, command, idempotency_key)` with
-`expires_at > created_at`. No `policy_evaluation`, reservation, or
-queue rows are written in this phase.
+`expires_at > created_at`. Phase 5 itself writes no `policy_evaluation`,
+reservation, or queue rows.
+
+Phase 7 activates `destination_reservation` and `queue_entry` as
+operational flow state (migration 007; 001-006 untouched). Reservations
+carry `organization_id`, `policy_evaluation_id`,
+`ready_expires_at`, `claimed_at`, `flow_expires_at`, and a closed
+`release_reason` vocabulary; queue entries carry `organization_id`,
+`policy_evaluation_id`, `flow_expires_at`, and their own closed
+release vocabulary. Same-school composite foreign keys bind each flow
+row's organization to its destination, pass, and policy evaluation,
+and coherence CHECKs enforce the offer/claim/release ordering
+described in ADR 0016. `destination` gains
+`ready_claim_timeout_seconds` (default 60) and `queue_timeout_seconds`
+(default 600) with range CHECKs. Queue position is derived, never
+stored.

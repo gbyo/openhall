@@ -14,6 +14,7 @@ const config: AppConfig = {
   nodeEnv: 'test',
   appBaseUrl: new URL(ORIGIN),
   databaseUrl: 'postgresql://unused',
+  destinationFlowPollMs: 2000,
   appSecret: APP_SECRET,
   dataEncryptionKey: TEST_KEY,
   dataEncryptionKeyId: 'test-key-1',
@@ -389,7 +390,7 @@ describe('POST /api/v1/me/passes', () => {
     expect(response.statusCode).toBe(400);
   });
 
-  it('creates a requested pass at revision 1 with ETag and no-store', async () => {
+  it('creates a ready pass at revision 2 with ETag and no-store', async () => {
     const student = await makeStudent(tenantA, schoolA, 'Requester');
     await pool.query(
       `INSERT INTO section_membership (tenant_id, section_id, person_id, role) VALUES ($1, $2, $3, 'student')`,
@@ -404,10 +405,10 @@ describe('POST /api/v1/me/passes', () => {
     expect(response.statusCode).toBe(201);
     expect(response.headers['cache-control']).toBe('no-store');
     const etag = response.headers.etag;
-    expect(etag).toMatch(/^"pass:[0-9a-f-]{36}:1"$/);
+    expect(etag).toMatch(/^"pass:[0-9a-f-]{36}:2"$/);
     const body = response.json<{ pass: PassBody }>();
-    expect(body.pass.lifecycleState).toBe('requested');
-    expect(body.pass.revision).toBe('1');
+    expect(body.pass.lifecycleState).toBe('ready');
+    expect(body.pass.revision).toBe('2');
     expect(body.pass.requestSource).toBe('student_web');
     expect(body.pass.studentId).toBe(student.personId);
     expect(body.pass.organizationId).toBe(schoolA);
@@ -419,7 +420,8 @@ describe('POST /api/v1/me/passes', () => {
     for (const leaked of ['teacher', 'authorization_grant', 'accountId', 'email', 'session']) {
       expect(raw).not.toContain(leaked);
     }
-    expect(await tableCount('pass_event')).toBe(before + 1);
+    // pass.requested (rev 1) plus the immediate ready offer (rev 2).
+    expect(await tableCount('pass_event')).toBe(before + 2);
   });
 
   it('replays the stored result for the same key without new side effects', async () => {
@@ -537,7 +539,7 @@ describe('POST /api/v1/me/passes', () => {
     expect(left.statusCode).toBe(201);
     expect(right.statusCode).toBe(201);
     expect(left.json<{ pass: PassBody }>().pass.id).toBe(right.json<{ pass: PassBody }>().pass.id);
-    expect(await tableCount('pass_event')).toBe(eventsBefore + 1);
+    expect(await tableCount('pass_event')).toBe(eventsBefore + 2);
   });
 
   it('lets exactly one of two concurrent keys win with active_pass_exists', async () => {
@@ -585,8 +587,8 @@ describe('POST /api/v1/students/:studentId/passes', () => {
     const body = response.json<{ pass: PassBody }>();
     expect(body.pass.requestSource).toBe('staff_web');
     expect(body.pass.studentId).toBe(student.personId);
-    expect(body.pass.lifecycleState).toBe('requested');
-    expect(body.pass.revision).toBe('1');
+    expect(body.pass.lifecycleState).toBe('ready');
+    expect(body.pass.revision).toBe('2');
   });
 
   it('lets the current-section teacher create a pass', async () => {
@@ -738,7 +740,7 @@ describe('POST /api/v1/me/passes/:passId/cancel', () => {
     expect(response.json<{ code: string }>().code).toBe('precondition_required');
   });
 
-  it('cancels at revision 2 with a new ETag', async () => {
+  it('cancels a ready pass at revision 3 with a new ETag', async () => {
     const student = await makeStudent(tenantA, schoolA, 'Canceller');
     const session = { cookie: student.cookie, csrf: student.csrf };
     const created = await postSelfPass(session, destinationA, randomUUID());
@@ -751,8 +753,8 @@ describe('POST /api/v1/me/passes/:passId/cancel', () => {
     expect(response.headers['cache-control']).toBe('no-store');
     const body = response.json<{ pass: PassBody }>();
     expect(body.pass.lifecycleState).toBe('cancelled');
-    expect(body.pass.revision).toBe('2');
-    expect(response.headers.etag).toBe(`"pass:${passId}:2"`);
+    expect(body.pass.revision).toBe('3');
+    expect(response.headers.etag).toBe(`"pass:${passId}:3"`);
     expect(await tableCount('pass_event')).toBe(events + 1);
     const active = await app.inject({
       method: 'GET',
@@ -774,7 +776,7 @@ describe('POST /api/v1/me/passes/:passId/cancel', () => {
     const events = await tableCount('pass_event');
     const retry = await cancel(session, passId, key, etag);
     expect(retry.statusCode).toBe(200);
-    expect(retry.json<{ pass: PassBody }>().pass.revision).toBe('2');
+    expect(retry.json<{ pass: PassBody }>().pass.revision).toBe('3');
     expect(await tableCount('pass_event')).toBe(events);
   });
 
@@ -865,7 +867,7 @@ describe('pass command durability', () => {
     const idempotency = await tableCount('idempotency_record');
     const retry = await postSelfPass(session, destinationA, key);
     expect(retry.statusCode).toBe(201);
-    expect(retry.json<{ pass: PassBody }>().pass.lifecycleState).toBe('requested');
+    expect(retry.json<{ pass: PassBody }>().pass.lifecycleState).toBe('ready');
     expect(await tableCount('idempotency_record')).toBe(idempotency + 1);
   });
 
@@ -1000,10 +1002,10 @@ describe('pass command durability', () => {
         [passId],
       )
     ).rows;
-    expect(event).toHaveLength(1);
-    expect(event[0]?.event_type).toBe('pass.requested');
+    expect(event.map((entry) => entry.event_type)).toEqual(['pass.requested', 'pass.ready']);
     const metadata = JSON.stringify(event[0]?.metadata);
     expect(metadata).toContain('"state":"requested"');
+    expect(JSON.stringify(event[1]?.metadata)).toContain('"state":"ready"');
     for (const leaked of [
       'teacher',
       'authorization_grant',
@@ -1021,7 +1023,7 @@ describe('pass command durability', () => {
       )
     ).rows;
     expect(outbox.map((entry) => entry.event_type).sort()).toEqual(
-      ['pass.policy_evaluated', 'pass.requested'].sort(),
+      ['pass.policy_evaluated', 'pass.requested', 'pass.ready'].sort(),
     );
     const evaluated = outbox.find((entry) => entry.event_type === 'pass.policy_evaluated');
     expect((evaluated?.payload as { decision?: string }).decision).toBe('allow');

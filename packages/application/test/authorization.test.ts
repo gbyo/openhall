@@ -1041,7 +1041,11 @@ describe('phase 4 authorization matrix', () => {
       'school-a',
       AT,
     );
-    expect(student?.capabilities).toEqual(['organization.context.read', 'pass.request.self']);
+    expect(student?.capabilities).toEqual([
+      'organization.context.read',
+      'pass.request.self',
+      'pass.depart.self',
+    ]);
     expect(student?.teachingSections).toEqual([]);
     expect(student?.isActiveStudent).toBe(true);
 
@@ -1060,6 +1064,7 @@ describe('phase 4 authorization matrix', () => {
         title: 'Title sec-a1',
         capabilities: [
           'pass.create.student',
+          'pass.depart.student',
           'pass.approve.section',
           'pass.view.section_live',
           'pass.override.request.student',
@@ -1162,5 +1167,107 @@ describe('phase 4 authorization matrix', () => {
     );
     expect(sys.map((entry) => entry.id)).toEqual(['school-a', 'school-b']);
     expect(sys[0]?.affiliations).toEqual([]);
+  });
+});
+
+describe('phase 7 movement capabilities', () => {
+  it('depart.self requires the principal with active student membership', async () => {
+    const { service } = seeded();
+    const me = principal('acct-s1', 's1');
+    expect(
+      await decide(service, {
+        principal: me,
+        capability: 'pass.depart.self',
+        resource: { kind: 'student', organizationId: 'school-a', studentId: 's1' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: true, basis: { kind: 'student_membership' } });
+    // Another student: deny without fabricating self semantics.
+    expect(
+      await decide(service, {
+        principal: me,
+        capability: 'pass.depart.self',
+        resource: { kind: 'student', organizationId: 'school-a', studentId: 's2' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'target_not_active_student' });
+    // Expired school membership: deny.
+    expect(
+      await decide(service, {
+        principal: me,
+        capability: 'pass.depart.self',
+        resource: { kind: 'student', organizationId: 'school-b', studentId: 's1' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'target_not_active_student' });
+    // System admin cannot fabricate student self.
+    expect(
+      await decide(service, {
+        principal: principal('acct-sys', 'sys'),
+        capability: 'pass.depart.self',
+        resource: { kind: 'student', organizationId: 'school-a', studentId: 'sys' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false });
+  });
+
+  it('progress.self is ownership-scoped for normal sessions only', async () => {
+    const { service } = seeded();
+    expect(
+      await decide(service, {
+        principal: principal('acct-s1', 's1'),
+        capability: 'pass.progress.self',
+        resource: { kind: 'self' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: true, basis: { kind: 'self' } });
+    expect(
+      await decide(service, {
+        principal: principal('acct-s1', 's1', { authenticationMethod: 'recovery' }),
+        capability: 'pass.progress.self',
+        resource: { kind: 'self' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'recovery_session_restricted' });
+  });
+
+  it('depart.student follows staff creation authority with teacher fallback', async () => {
+    const { service } = seeded();
+    // Counselor at the organization level.
+    expect(
+      await decide(service, {
+        principal: principal('acct-c1', 'c1'),
+        capability: 'pass.depart.student',
+        resource: { kind: 'student', organizationId: 'school-a', studentId: 's2' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: true });
+    // Teacher against the current section.
+    expect(
+      await decide(service, {
+        principal: principal('acct-t1', 't1'),
+        capability: 'pass.depart.student',
+        resource: { kind: 'student_in_section', sectionId: 'sec-a1', studentId: 's2' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: true, basis: { kind: 'teacher_section_relationship' } });
+    // Teacher outside the current section: denied as not assigned.
+    expect(
+      await decide(service, {
+        principal: principal('acct-t1', 't1'),
+        capability: 'pass.depart.student',
+        resource: { kind: 'student_in_section', sectionId: 'sec-a2', studentId: 's3' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'teacher_not_assigned' });
+    // Staff alone cannot depart students.
+    expect(
+      await decide(service, {
+        principal: principal('acct-staff1', 'staff1'),
+        capability: 'pass.depart.student',
+        resource: { kind: 'student', organizationId: 'school-a', studentId: 's2' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
   });
 });

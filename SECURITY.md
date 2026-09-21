@@ -4,8 +4,13 @@ OpenHall is not yet production-ready. Do not deploy it with real student data un
 authorization enforcement, workflow policy, and security review milestones are complete.
 OIDC login, opaque session management, CSRF/origin protection, operator bootstrap,
 break-glass recovery, deny-by-default relationship/capability authorization with
-concealed user school context, and exactly-once pass commands with transactional outbox
-rows are implemented (see ADR 0012, ADR 0013, ADR 0014, and ADR 0015).
+concealed user school context, exactly-once pass commands with transactional outbox
+rows, and destination flow with capacity leases, FIFO queues, explicit movement commands,
+and station authorization are implemented (see ADR 0012, ADR 0013, ADR 0014, ADR 0015,
+and ADR 0016). Movement and station endpoints keep the same envelope: cookie auth, CSRF,
+namespaced idempotency keys, `If-Match` revisions, cross-tenant and cross-student access
+concealed as 404, and queue positions visible only to the owning student or authorized
+station staff.
 
 Report suspected vulnerabilities privately to the maintainers rather than opening a public issue.
 Include affected versions, impact, reproduction steps, and any known mitigations. Do not include

@@ -8,6 +8,9 @@ import type {
   AuthorizationFactsRepository,
   RelationshipAuthorizationService,
 } from '../authorization/index.js';
+import { allocateDestinationFlow } from '../destination-flow/allocator.js';
+import type { DestinationFlowRepository } from '../destination-flow/ports.js';
+import { loadMovementForRow } from '../destination-flow/projections.js';
 import type { IdempotencyTransactionStore } from '../idempotency/coordinator.js';
 import { runIdempotentCommand } from '../idempotency/coordinator.js';
 import type {
@@ -30,7 +33,7 @@ import {
   requireIdempotencyKey,
 } from './idempotency.js';
 import type { PassRepository, PassRow } from './ports.js';
-import { etagForPass, placementKindFromRow, type PassRepresentation } from './representations.js';
+import { etagForPass, toPassRepresentation, type PassRepresentation } from './representations.js';
 
 export interface RequestPassDependencies {
   readonly clock: Clock;
@@ -39,6 +42,7 @@ export interface RequestPassDependencies {
   readonly facts: AuthorizationFactsRepository;
   readonly placement: ExpectedPlacementResolver;
   readonly passes: PassRepository;
+  readonly flow: DestinationFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -63,34 +67,6 @@ export interface RequestPassResult {
   readonly etag: string;
   readonly status: 201;
   readonly replayed: boolean;
-}
-
-function toRepresentation(
-  row: PassRow,
-  placementKind: string,
-  policy: PassRepresentation['policy'],
-): PassRepresentation {
-  return {
-    id: row.id,
-    organizationId: row.organizationId,
-    studentId: row.studentId,
-    destination: {
-      id: row.destinationId,
-      displayName: row.destinationDisplayName,
-      serviceType: row.destinationServiceType,
-    },
-    origin: {
-      placementKind,
-      block: row.originBlock,
-      section: row.originSection,
-      location: row.originLocation,
-    },
-    requestSource: row.requestSource,
-    requestedAt: row.requestedAt.toString(),
-    lifecycleState: row.lifecycleState,
-    revision: row.revision.toString(10),
-    policy,
-  };
 }
 
 interface OriginSnapshot {
@@ -454,6 +430,26 @@ async function executeRequest(
       }
       let finalRow = row;
       let liveApprovals = [...reconciled.kept];
+      // Phase 7 consumes the policy-allow boundary: a cleared pass is
+      // immediately offered destination capacity (ready), parked in the
+      // destination queue (queued), or operationally denied, all inside the
+      // original request transaction. Approval/override decisions stay
+      // requested; only allow enters destination flow.
+      if (decided.outcome.decision === 'allow') {
+        const allocation = await allocateDestinationFlow(
+          context,
+          { passes, flow: dependencies.flow, policy: dependencies.policy, outbox },
+          {
+            pass: finalRow,
+            evaluationId: decided.evaluationId,
+            decision: 'allow',
+            placement,
+            at: now,
+            requestSource,
+          },
+        );
+        finalRow = allocation.row;
+      }
       if (decided.outcome.decision === 'deny') {
         try {
           transitionPass(
@@ -542,10 +538,8 @@ async function executeRequest(
         liveApprovals,
         [],
       );
-      // Derive the placement kind from the stored row, exactly as later
-      // reads do, so the create response matches subsequent GETs. The
-      // detailed snapshot stays in the pass.requested event metadata.
-      const representation = toRepresentation(finalRow, placementKindFromRow(finalRow), projection);
+      const movement = await loadMovementForRow(context, passes, dependencies.flow, finalRow);
+      const representation = toPassRepresentation(finalRow, projection, movement);
       return {
         representation,
         etag: etagForPass(finalRow.id, finalRow.revision),

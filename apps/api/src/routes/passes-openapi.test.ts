@@ -113,22 +113,28 @@ describe('Phase 5 pass OpenAPI surface', () => {
     expect(request.description).toMatch(/not a finalized IETF RFC/);
   });
 
-  it('exposes no future depart/queue HTTP commands', async () => {
+  it('exposes no undeclared movement side channels', async () => {
     const doc = await loadDocument();
     const passPaths = Object.keys(doc.paths).filter((key) => key.includes('/passes'));
     expect(passPaths.sort()).toEqual(
       [
         '/api/v1/me/passes',
         '/api/v1/me/passes/active',
+        '/api/v1/me/passes/{passId}/arrive',
         '/api/v1/me/passes/{passId}/cancel',
+        '/api/v1/me/passes/{passId}/complete',
+        '/api/v1/me/passes/{passId}/depart',
         '/api/v1/me/passes/{passId}/overrides',
+        '/api/v1/me/passes/{passId}/queue-status',
+        '/api/v1/me/passes/{passId}/return',
+        '/api/v1/passes/{passId}/depart',
         '/api/v1/passes/{passId}/overrides',
         '/api/v1/students/{studentId}/passes',
+        '/api/v1/destinations/{destinationId}/passes/{passId}/check-in',
+        '/api/v1/destinations/{destinationId}/passes/{passId}/begin-return',
+        '/api/v1/destinations/{destinationId}/passes/{passId}/complete',
       ].sort(),
     );
-    for (const key of passPaths) {
-      expect(key).not.toMatch(/depart|queue|ready|complete/);
-    }
   });
 });
 
@@ -169,6 +175,88 @@ describe('Phase 6 policy workflow OpenAPI surface', () => {
       expect(headers).toContain('idempotency-key');
       expect(headers).toContain('if-match');
       expect(op.description).toMatch(/ETag/);
+    }
+  });
+});
+
+describe('Phase 7 destination flow and movement OpenAPI surface', () => {
+  const movementPosts = [
+    '/api/v1/me/passes/{passId}/depart',
+    '/api/v1/passes/{passId}/depart',
+    '/api/v1/me/passes/{passId}/arrive',
+    '/api/v1/me/passes/{passId}/return',
+    '/api/v1/me/passes/{passId}/complete',
+    '/api/v1/destinations/{destinationId}/passes/{passId}/check-in',
+    '/api/v1/destinations/{destinationId}/passes/{passId}/begin-return',
+    '/api/v1/destinations/{destinationId}/passes/{passId}/complete',
+  ] as const;
+
+  it('exposes stable movement operation IDs', async () => {
+    const doc = await loadDocument();
+    expect(operation(doc, '/api/v1/me/passes/{passId}/depart', 'post').operationId).toBe(
+      'departMyPass',
+    );
+    expect(operation(doc, '/api/v1/passes/{passId}/depart', 'post').operationId).toBe(
+      'departStudentPass',
+    );
+    expect(operation(doc, '/api/v1/me/passes/{passId}/arrive', 'post').operationId).toBe(
+      'arriveMyPass',
+    );
+    expect(operation(doc, '/api/v1/me/passes/{passId}/return', 'post').operationId).toBe(
+      'returnMyPass',
+    );
+    expect(operation(doc, '/api/v1/me/passes/{passId}/complete', 'post').operationId).toBe(
+      'completeMyPass',
+    );
+    expect(
+      operation(doc, '/api/v1/destinations/{destinationId}/passes/{passId}/check-in', 'post')
+        .operationId,
+    ).toBe('stationCheckInPass');
+    expect(
+      operation(doc, '/api/v1/destinations/{destinationId}/passes/{passId}/begin-return', 'post')
+        .operationId,
+    ).toBe('stationBeginReturnPass');
+    expect(
+      operation(doc, '/api/v1/destinations/{destinationId}/passes/{passId}/complete', 'post')
+        .operationId,
+    ).toBe('stationCompletePass');
+    expect(operation(doc, '/api/v1/me/passes/{passId}/queue-status', 'get').operationId).toBe(
+      'getMyPassQueueStatus',
+    );
+    expect(operation(doc, '/api/v1/destinations/{destinationId}/station', 'get').operationId).toBe(
+      'getDestinationStation',
+    );
+  });
+
+  it('requires CSRF, Idempotency-Key, and If-Match on movement POST commands', async () => {
+    const doc = await loadDocument();
+    for (const path of movementPosts) {
+      const op = operation(doc, path, 'post');
+      const schemes = (op.security ?? []).flatMap((entry) => Object.keys(entry));
+      expect(schemes).toContain('cookieAuth');
+      expect(schemes).toContain('csrfHeader');
+      const headers = parameterNames(op, 'header');
+      expect(headers).toContain('idempotency-key');
+      expect(headers).toContain('if-match');
+      expect(op.description).toMatch(/ETag/);
+      expect(op.description).toMatch(/no-store/);
+      expect(Object.keys(op.responses ?? {})).toEqual(
+        expect.arrayContaining(['200', '409', '412', '428']),
+      );
+    }
+  });
+
+  it('keeps queue-status and station reads on cookie auth without CSRF', async () => {
+    const doc = await loadDocument();
+    for (const [path, method] of [
+      ['/api/v1/me/passes/{passId}/queue-status', 'get'],
+      ['/api/v1/destinations/{destinationId}/station', 'get'],
+    ] as const) {
+      const op = operation(doc, path, method);
+      const schemes = (op.security ?? []).flatMap((entry) => Object.keys(entry));
+      expect(schemes).toContain('cookieAuth');
+      expect(schemes).not.toContain('csrfHeader');
+      expect(op.description).toMatch(/no-store/);
     }
   });
 });

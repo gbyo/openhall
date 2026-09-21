@@ -14,6 +14,7 @@ const config: AppConfig = {
   nodeEnv: 'test',
   appBaseUrl: new URL(ORIGIN),
   databaseUrl: 'postgresql://unused',
+  destinationFlowPollMs: 2000,
   appSecret: APP_SECRET,
   dataEncryptionKey: TEST_KEY,
   dataEncryptionKeyId: 'test-key-1',
@@ -173,6 +174,13 @@ interface PassBody {
   lifecycleState: string;
   revision: string;
   policy: PolicyProjection | null;
+  movement: {
+    readyUntil: string | null;
+    queueEnteredAt: string | null;
+    queueExpiresAt: string | null;
+    expectedReturnAt: string | null;
+    reasonCode: string | null;
+  };
 }
 
 async function seedRule(input: {
@@ -224,6 +232,10 @@ const APPROVAL_CONFIG = {
 async function clearRules(): Promise<void> {
   await pool.query(`DELETE FROM pass_override`);
   await pool.query(`DELETE FROM pass_approval`);
+  // Destination-flow rows bind exact policy evaluations; delete them before
+  // the evaluations they reference.
+  await pool.query(`DELETE FROM queue_entry`);
+  await pool.query(`DELETE FROM destination_reservation`);
   await pool.query(`DELETE FROM policy_evaluation_result`);
   await pool.query(`DELETE FROM policy_evaluation`);
   await pool.query(`DELETE FROM policy_rule`);
@@ -397,11 +409,24 @@ describe('initial request policy integration', () => {
     const created = await requestPass(student);
     expect(created.statusCode).toBe(201);
     const pass = created.json<{ pass: PassBody }>().pass;
-    expect(pass.lifecycleState).toBe('requested');
-    expect(pass.revision).toBe('1');
+    // Phase 7 consumes the policy-allow boundary: a cleared pass is offered
+    // destination capacity inside the request transaction.
+    expect(pass.lifecycleState).toBe('ready');
+    expect(pass.revision).toBe('2');
     expect(pass.policy?.decision).toBe('allow');
-    expect(requiredEtag(created)).toContain(':1"');
+    expect(pass.movement.readyUntil).not.toBeNull();
+    expect(requiredEtag(created)).toContain(':2"');
     expect(await tableCount('policy_evaluation')).toBe(1);
+    expect(
+      await tableCount(
+        'destination_reservation',
+        `WHERE pass_id = '${pass.id}' AND released_at IS NULL`,
+      ),
+    ).toBe(1);
+    expect((await passEvents(pass.id)).map((entry) => entry.event_type)).toEqual([
+      'pass.requested',
+      'pass.ready',
+    ]);
   });
 
   it('denies immediately on a nonoverrideable blackout with truthful history', async () => {
@@ -505,7 +530,7 @@ describe('standard approval workflow', () => {
       .approvals;
   }
 
-  it('grants approval and leaves the pass requested', async () => {
+  it('grants approval and allocates the pass into destination flow', async () => {
     if (teacher === null) throw new Error('teacher fixture missing');
     const { pass, etag } = await approvalScenario('Grant');
     const approvals = await pendingFor(teacher);
@@ -517,10 +542,19 @@ describe('standard approval workflow', () => {
     });
     expect(resolved.statusCode).toBe(200);
     const body = resolved.json<{ pass: PassBody }>().pass;
-    expect(body.lifecycleState).toBe('requested');
-    expect(body.revision).toBe('2');
+    // Approval clears the pass to allow, so the same command transaction
+    // allocates it: approval grant (rev 2) then ready offer (rev 3).
+    expect(body.lifecycleState).toBe('ready');
+    expect(body.revision).toBe('3');
     expect(body.policy?.decision).toBe('allow');
-    expect(requiredEtag(resolved)).toContain(':2"');
+    expect(body.movement.readyUntil).not.toBeNull();
+    expect(requiredEtag(resolved)).toContain(':3"');
+    expect(
+      await tableCount(
+        'destination_reservation',
+        `WHERE pass_id = '${pass.id}' AND released_at IS NULL`,
+      ),
+    ).toBe(1);
     // A resolved approval cannot be resolved again.
     const retry = await app.inject({
       method: 'POST',
@@ -755,9 +789,12 @@ describe('override workflow', () => {
     });
     expect(approved.statusCode).toBe(200);
     body = approved.json<{ pass: PassBody }>().pass;
-    expect(body.lifecycleState).toBe('requested');
-    expect(body.revision).toBe('3');
+    // Override approval clears to allow, so the same command allocates:
+    // override request (rev 2), approval (rev 3), ready offer (rev 4).
+    expect(body.lifecycleState).toBe('ready');
+    expect(body.revision).toBe('4');
     expect(body.policy?.decision).toBe('allow');
+    expect(body.movement.readyUntil).not.toBeNull();
   });
 
   it('lets authorized teachers resolve directly through the staff surface', async () => {
@@ -771,8 +808,10 @@ describe('override workflow', () => {
     });
     expect(requested.statusCode).toBe(200);
     const body = requested.json<{ pass: PassBody }>().pass;
-    expect(body.lifecycleState).toBe('requested');
+    // Direct staff resolution clears to allow and allocates immediately.
+    expect(body.lifecycleState).toBe('ready');
     expect(body.policy?.decision).toBe('allow');
+    expect(body.movement.readyUntil).not.toBeNull();
     const row = (
       await pool.query<{ decision: string; category: string }>(
         `SELECT decision, category FROM pass_override WHERE pass_id = $1`,

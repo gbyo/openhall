@@ -171,6 +171,9 @@ export const CapabilitySchema = Type.Union(
     Type.Literal('pass.request.self'),
     Type.Literal('pass.view.self'),
     Type.Literal('pass.cancel.self'),
+    Type.Literal('pass.depart.self'),
+    Type.Literal('pass.depart.student'),
+    Type.Literal('pass.progress.self'),
     Type.Literal('pass.create.student'),
     Type.Literal('pass.approve.section'),
     Type.Literal('pass.override.request.self'),
@@ -408,6 +411,22 @@ export const PassPolicySchema = Type.Object(
 );
 
 /**
+ * Non-dynamic destination-flow facts tied to the pass revision. Live queue
+ * position, live capacity, and wall-clock overdue flags are excluded: they
+ * change without a revision bump and must never sit under the strong ETag.
+ */
+export const PassMovementProjectionSchema = Type.Object(
+  {
+    readyUntil: Type.Union([InstantSchema, Type.Null()]),
+    queueEnteredAt: Type.Union([InstantSchema, Type.Null()]),
+    queueExpiresAt: Type.Union([InstantSchema, Type.Null()]),
+    expectedReturnAt: Type.Union([InstantSchema, Type.Null()]),
+    reasonCode: Type.Union([Type.String(), Type.Null()]),
+  },
+  { $id: 'PassMovementProjection', additionalProperties: false },
+);
+
+/**
  * Small safe pass representation. Revision is a decimal string because the
  * underlying value is PostgreSQL bigint, never a JSON number.
  */
@@ -422,6 +441,11 @@ export const PassSchema = Type.Object(
         id: UuidSchema,
         displayName: Type.String(),
         serviceType: Type.String(),
+        checkInMode: Type.Union([
+          Type.Literal('none'),
+          Type.Literal('optional'),
+          Type.Literal('required'),
+        ]),
       },
       { additionalProperties: false },
     ),
@@ -438,6 +462,7 @@ export const PassSchema = Type.Object(
     requestedAt: InstantSchema,
     lifecycleState: Type.String(),
     revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+    movement: PassMovementProjectionSchema,
   },
   { $id: 'Pass', additionalProperties: false },
 );
@@ -561,3 +586,98 @@ export const IdempotencyKeyHeaderSchema = Type.String({ minLength: 1, maxLength:
 
 /** Exact OpenHall strong ETag required for If-Match on cancellation. */
 export const IfMatchHeaderSchema = Type.String({ minLength: 1 });
+
+/**
+ * Derived queue position for one owned queued pass. Computed on every read
+ * from active entries; never stored. No other student's data is included.
+ */
+export const QueueStatusSchema = Type.Object(
+  {
+    position: Type.Integer({ minimum: 1 }),
+    ahead: Type.Integer({ minimum: 0 }),
+    enteredAt: InstantSchema,
+    expiresAt: InstantSchema,
+  },
+  { $id: 'QueueStatus', additionalProperties: false },
+);
+
+const StationPersonSchema = Type.Object(
+  {
+    id: UuidSchema,
+    displayName: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+/**
+ * Minimized operational station view. No grants, rule JSON, override
+ * categories, OIDC data, or schedule history.
+ */
+export const DestinationStationViewSchema = Type.Object(
+  {
+    destination: Type.Object(
+      {
+        id: UuidSchema,
+        displayName: Type.String(),
+        serviceType: Type.String(),
+        checkInMode: Type.Union([
+          Type.Literal('none'),
+          Type.Literal('optional'),
+          Type.Literal('required'),
+        ]),
+        capacity: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
+    occupancy: Type.Object(
+      {
+        consumingReservations: Type.Integer({ minimum: 0 }),
+        availableCapacity: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
+    queueCount: Type.Integer({ minimum: 0 }),
+    ready: Type.Array(
+      Type.Object(
+        {
+          passId: UuidSchema,
+          student: StationPersonSchema,
+          readyUntil: InstantSchema,
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    outbound: Type.Array(
+      Type.Object(
+        {
+          passId: UuidSchema,
+          student: StationPersonSchema,
+          departedAt: InstantSchema,
+          expectedReturnAt: Type.Union([InstantSchema, Type.Null()]),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    atDestination: Type.Array(
+      Type.Object(
+        {
+          passId: UuidSchema,
+          student: StationPersonSchema,
+          expectedReturnAt: Type.Union([InstantSchema, Type.Null()]),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    queued: Type.Array(
+      Type.Object(
+        {
+          passId: UuidSchema,
+          student: StationPersonSchema,
+          enteredAt: InstantSchema,
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { $id: 'DestinationStationView', additionalProperties: false },
+);

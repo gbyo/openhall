@@ -1,10 +1,34 @@
 import { PassApplicationError } from './errors.js';
+import type { DestinationCheckInMode, PassRow } from './ports.js';
 
 export interface PassDestinationView {
   readonly id: string;
   readonly displayName: string;
   readonly serviceType: string;
+  readonly checkInMode: DestinationCheckInMode;
 }
+
+/**
+ * Safe non-dynamic movement projection. Every value is tied to the pass
+ * revision: ready/queue leases only change when the pass revision changes,
+ * so this stays inside the strong ETag. Live queue position, live capacity,
+ * and wall-clock overdue booleans are excluded by design.
+ */
+export interface MovementProjection {
+  readonly readyUntil: string | null;
+  readonly queueEnteredAt: string | null;
+  readonly queueExpiresAt: string | null;
+  readonly expectedReturnAt: string | null;
+  readonly reasonCode: string | null;
+}
+
+export const EMPTY_MOVEMENT: MovementProjection = {
+  readyUntil: null,
+  queueEnteredAt: null,
+  queueExpiresAt: null,
+  expectedReturnAt: null,
+  reasonCode: null,
+};
 
 export interface PassOriginView {
   readonly placementKind: string;
@@ -29,6 +53,8 @@ export interface PassRepresentation {
    * predate Phase 6 evaluation: reads never fabricate a historical decision.
    */
   readonly policy: PassPolicyProjection | null;
+  /** Non-dynamic destination-flow facts tied to this pass revision. */
+  readonly movement: MovementProjection;
 }
 
 /** Safe client projection of the latest persisted policy evaluation. */
@@ -97,6 +123,40 @@ export function placementKindFromRow(row: {
   if (row.originSection !== null) return 'resolved';
   if (row.originBlock !== null) return 'block_only';
   return 'unresolved';
+}
+
+/**
+ * Canonical pass representation builder. Every mutation and read uses this
+ * so destination/check-in/movement fields cannot drift between endpoints.
+ */
+export function toPassRepresentation(
+  row: PassRow,
+  policy: PassPolicyProjection | null,
+  movement: MovementProjection,
+): PassRepresentation {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    studentId: row.studentId,
+    destination: {
+      id: row.destinationId,
+      displayName: row.destinationDisplayName,
+      serviceType: row.destinationServiceType,
+      checkInMode: row.destinationCheckInMode,
+    },
+    origin: {
+      placementKind: placementKindFromRow(row),
+      block: row.originBlock,
+      section: row.originSection,
+      location: row.originLocation,
+    },
+    requestSource: row.requestSource,
+    requestedAt: row.requestedAt.toString(),
+    lifecycleState: row.lifecycleState,
+    revision: row.revision.toString(10),
+    policy,
+    movement,
+  };
 }
 
 export function requireIfMatch(header: unknown, passId: string): ParsedIfMatch {

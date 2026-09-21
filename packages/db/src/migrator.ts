@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Kysely } from 'kysely';
 import { FileMigrationProvider, Migrator } from 'kysely/migration';
 
-export const EXPECTED_MIGRATION = '006_movement_policy_approvals_overrides';
+export const EXPECTED_MIGRATION = '007_destination_flow_and_movement';
 
 export function createMigrator<Database>(database: Kysely<Database>) {
   return new Migrator({

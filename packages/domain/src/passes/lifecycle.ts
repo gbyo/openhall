@@ -51,9 +51,9 @@ export const CANCELLABLE_PASS_STATES = [
  */
 const NORMAL_TRANSITIONS: Record<PassLifecycleState, readonly PassLifecycleState[]> = {
   requested: ['queued', 'ready', 'denied', 'cancelled', 'expired'],
-  queued: ['ready', 'denied', 'cancelled', 'expired'],
-  ready: ['outbound', 'cancelled', 'expired'],
-  outbound: ['at_destination'],
+  queued: ['requested', 'ready', 'denied', 'cancelled', 'expired'],
+  ready: ['queued', 'outbound', 'denied', 'cancelled', 'expired'],
+  outbound: ['at_destination', 'completed'],
   at_destination: ['returning', 'completed'],
   returning: ['completed'],
   completed: [],

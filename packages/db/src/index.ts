@@ -4,6 +4,7 @@ export * from './migrator.js';
 export * from './readiness.js';
 export * from './repositories/auth-repository.js';
 export * from './repositories/authorization-repository.js';
+export * from './repositories/destination-flow-repository.js';
 export * from './repositories/idempotency-repository.js';
 export * from './repositories/outbox-repository.js';
 export * from './repositories/pass-repository.js';

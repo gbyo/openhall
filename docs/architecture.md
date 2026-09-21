@@ -116,5 +116,35 @@ contract (stable command namespaces, SHA-256 semantic fingerprints,
 24-hour retention, transaction advisory locks); strong ETags
 (`"pass:<id>:<revision>"`) with `If-Match` prevent lost updates, and the
 partial unique index keeps one active pass per student. Outbox rows stay
-pending; no publisher, policy, queue, or capacity work exists yet. See
-ADR 0015. OpenHall remains not production-ready.
+pending; no publisher exists yet. See ADR 0015.
+
+## Destination flow, queues, and movement execution (Phase 7)
+
+Phase 6 policy clearance leaves a pass in `requested`; Phase 7 decides
+whether the destination can accept it now. `allocateDestinationFlow`
+runs inside the request and approval/override transactions right after
+a fresh allow and yields `ready` (reservation created), `queued`
+(queue entry created), or an operational denial
+(`destination_capacity_full`, `destination_unavailable`) while policy
+history keeps saying allow. Capacity is derived from
+`destination_reservation` rows, never a counter, and destination
+decisions serialize on a `destination-flow:v1` advisory lock taken
+after the pass row lock. `DestinationFlowReconciler` (polled from the
+API composition root, one candidate per transaction) expires stale
+queue attempts and ready offers, requeues missed claims behind the
+queue with the original flow deadline, and promotes the head only
+after a fresh persisted policy evaluation bound to the new
+reservation. Active movement is never timer-mutated.
+
+Explicit commands record physical facts: self/staff departure
+(`ready -> outbound`, reservation claimed, `expected_return_at`
+snapshotted), self arrival/return/completion gated by
+`destination.check_in_mode` (`none` gives the lightweight restroom
+path with no fabricated checkpoints; `required` keeps nurse/office
+flows station-owned), station check-in/begin-return/completion under
+`destination.station.manage` on the exact destination, and a
+minimized station view plus a per-student derived queue-status
+endpoint kept outside the strong-ETag pass representation. New
+capabilities `pass.depart.self`, `pass.depart.student`, and
+`pass.progress.self` keep compile-time resource mapping and parity
+coverage. See ADR 0016. OpenHall remains not production-ready.

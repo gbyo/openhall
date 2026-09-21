@@ -15,6 +15,14 @@ export const PASS_IDEMPOTENCY_COMMANDS = [
   'pass.override.request.student:v1',
   'pass.override.approve:v1',
   'pass.override.deny:v1',
+  'pass.depart.self:v1',
+  'pass.depart.student:v1',
+  'pass.arrive.self:v1',
+  'pass.return.self:v1',
+  'pass.complete.self:v1',
+  'pass.station.check_in:v1',
+  'pass.station.begin_return:v1',
+  'pass.station.complete:v1',
 ] as const;
 
 export type PassIdempotencyCommand = (typeof PASS_IDEMPOTENCY_COMMANDS)[number];
@@ -61,6 +69,55 @@ export function fingerprintStaffRequest(studentId: string, destinationId: string
 
 export function fingerprintSelfCancel(passId: string, expectedRevision: bigint): string {
   return hex(['pass.cancel.self:v1', passId, expectedRevision.toString(10)]);
+}
+
+export function fingerprintDepartSelf(passId: string, expectedRevision: bigint): string {
+  return hex(['pass.depart.self:v1', passId, expectedRevision.toString(10)]);
+}
+
+export function fingerprintDepartStudent(passId: string, expectedRevision: bigint): string {
+  return hex(['pass.depart.student:v1', passId, expectedRevision.toString(10)]);
+}
+
+export function fingerprintArriveSelf(passId: string, expectedRevision: bigint): string {
+  return hex(['pass.arrive.self:v1', passId, expectedRevision.toString(10)]);
+}
+
+export function fingerprintReturnSelf(passId: string, expectedRevision: bigint): string {
+  return hex(['pass.return.self:v1', passId, expectedRevision.toString(10)]);
+}
+
+export function fingerprintCompleteSelf(passId: string, expectedRevision: bigint): string {
+  return hex(['pass.complete.self:v1', passId, expectedRevision.toString(10)]);
+}
+
+export function fingerprintStationCheckIn(
+  destinationId: string,
+  passId: string,
+  expectedRevision: bigint,
+): string {
+  return hex(['pass.station.check_in:v1', destinationId, passId, expectedRevision.toString(10)]);
+}
+
+export function fingerprintStationBeginReturn(
+  destinationId: string,
+  passId: string,
+  expectedRevision: bigint,
+): string {
+  return hex([
+    'pass.station.begin_return:v1',
+    destinationId,
+    passId,
+    expectedRevision.toString(10),
+  ]);
+}
+
+export function fingerprintStationComplete(
+  destinationId: string,
+  passId: string,
+  expectedRevision: bigint,
+): string {
+  return hex(['pass.station.complete:v1', destinationId, passId, expectedRevision.toString(10)]);
 }
 
 export function fingerprintApprovalResolve(

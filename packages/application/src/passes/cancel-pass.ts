@@ -3,6 +3,9 @@ import { transitionPass } from '@openhall/domain';
 import type { Clock } from '@openhall/domain';
 import type { Principal } from '../authentication/principal.js';
 import type { AuditWriter } from '../auditing/audit.js';
+import type { DestinationFlowRepository } from '../destination-flow/ports.js';
+import { destinationFlowLockKey } from '../destination-flow/locks.js';
+import { loadMovementForRow } from '../destination-flow/projections.js';
 import type { IdempotencyTransactionStore } from '../idempotency/coordinator.js';
 import { runIdempotentCommand } from '../idempotency/coordinator.js';
 import { buildPolicyProjection, type PolicyRepository } from '../policy/index.js';
@@ -16,8 +19,8 @@ import { advisoryLockKey, fingerprintSelfCancel, requireIdempotencyKey } from '.
 import type { PassRepository } from './ports.js';
 import {
   etagForPass,
-  placementKindFromRow,
   requireIfMatch,
+  toPassRepresentation,
   type PassRepresentation,
 } from './representations.js';
 
@@ -25,6 +28,7 @@ export interface CancelPassDependencies {
   readonly clock: Clock;
   readonly runner: TenantTransactionRunner;
   readonly passes: PassRepository;
+  readonly flow: DestinationFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -135,6 +139,27 @@ export async function cancelSelfPass(
           'The pass has changed since this client last read it.',
         );
       }
+      // Flow-aware cancellation: no active queue or reservation row may
+      // survive on a cancelled pass. Promotion of the next queued student is
+      // left to the reconciler so this transaction stays small.
+      if (row.lifecycleState === 'queued' || row.lifecycleState === 'ready') {
+        const { flow } = dependencies;
+        await flow.acquireDestinationLock(
+          context,
+          destinationFlowLockKey(row.tenantId, row.destinationId),
+        );
+        if (row.lifecycleState === 'queued') {
+          const entry = await flow.loadActiveQueueEntryForPass(context, row.id);
+          if (entry !== null) {
+            await flow.releaseQueueEntry(context, entry.id, 'cancelled', now);
+          }
+        } else {
+          const reservation = await flow.loadActiveReservationForPass(context, row.id);
+          if (reservation !== null) {
+            await flow.releaseReservation(context, reservation.id, 'cancelled', now);
+          }
+        }
+      }
       const at: Temporal.Instant = now;
       // Terminal cleanup: no actionable pending approval/override may survive
       // on a cancelled pass. System provenance; no extra pass revision.
@@ -191,28 +216,11 @@ export async function cancelSelfPass(
       const latest = await dependencies.policy.loadLatestEvaluation(context, row.id);
       const liveApprovals = await dependencies.policy.listApprovalsForPass(context, row.id);
       const liveOverrides = await dependencies.policy.listOverridesForPass(context, row.id);
-      const representation: PassRepresentation = {
-        id: updated.id,
-        organizationId: updated.organizationId,
-        studentId: updated.studentId,
-        destination: {
-          id: updated.destinationId,
-          displayName: updated.destinationDisplayName,
-          serviceType: updated.destinationServiceType,
-        },
-        origin: {
-          placementKind: placementKindFromRow(updated),
-          block: updated.originBlock,
-          section: updated.originSection,
-          location: updated.originLocation,
-        },
-        requestSource: updated.requestSource,
-        requestedAt: updated.requestedAt.toString(),
-        lifecycleState: updated.lifecycleState,
-        revision: updated.revision.toString(10),
-        policy:
-          latest === null ? null : buildPolicyProjection(latest, liveApprovals, liveOverrides),
-      };
+      const representation = toPassRepresentation(
+        updated,
+        latest === null ? null : buildPolicyProjection(latest, liveApprovals, liveOverrides),
+        await loadMovementForRow(context, passes, dependencies.flow, updated),
+      );
       return {
         representation,
         etag: etagForPass(updated.id, updated.revision),
