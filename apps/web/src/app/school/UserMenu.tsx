@@ -81,7 +81,7 @@ export function UserMenu() {
             <DropdownMenuGroup>
               <DropdownMenuItem
                 disabled={signingOut}
-                onSelect={() => {
+                onClick={() => {
                   handleSignOut(false);
                 }}
               >
@@ -90,7 +90,7 @@ export function UserMenu() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={signingOut}
-                onSelect={() => {
+                onClick={() => {
                   handleSignOut(true);
                 }}
               >
