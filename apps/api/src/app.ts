@@ -32,6 +32,7 @@ import { registerHealthRoutes } from './routes/health.js';
 import { registerSystemRoutes } from './routes/system.js';
 import { registerRealtimeRoutes } from './routes/realtime.js';
 import { RealtimeHub } from './realtime/hub.js';
+import { registerDemoRoutes } from './routes/demo.js';
 
 export interface CreateAppOptions {
   readonly config: AppConfig;
@@ -78,6 +79,9 @@ const NO_STORE_PREFIXES = [
 
 export async function createApp(options: CreateAppOptions): Promise<FastifyInstance> {
   const isProduction = options.config.nodeEnv === 'production';
+  if (isProduction && options.config.demoMode === true) {
+    throw new Error('Demo mode cannot run in production');
+  }
   const app = Fastify({
     trustProxy: options.config.trustProxy,
     genReqId: () => randomUUID(),
@@ -248,6 +252,8 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     if (
       options.webRoot &&
       existsSync(options.webRoot) &&
+      (options.config.demoMode === true ||
+        (pathname !== '/demo' && !pathname.startsWith('/demo/'))) &&
       (request.method === 'GET' || request.method === 'HEAD') &&
       !pathname.startsWith('/api/') &&
       acceptsHtml &&
@@ -282,6 +288,7 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
   registerHealthRoutes(typedApp, options.readinessProbe);
   registerSystemRoutes(typedApp);
   registerAuthRoutes(typedApp, dependencies);
+  if (options.config.demoMode === true) registerDemoRoutes(typedApp, dependencies);
   registerBootstrapRoutes(typedApp, dependencies);
   registerSetupRoutes(typedApp, dependencies);
   registerMeRoutes(typedApp, authorizationDependencies);

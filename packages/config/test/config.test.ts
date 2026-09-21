@@ -20,6 +20,18 @@ describe('loadConfig', () => {
     expect(config.trustProxy).toBe(false);
   });
 
+  it('requires an explicit boolean demo switch and rejects it in production', () => {
+    expect(
+      loadConfig({ ...validEnvironment, NODE_ENV: 'development', OPENHALL_DEMO: 'true' }).demoMode,
+    ).toBe(true);
+    expect(() => loadConfig({ ...validEnvironment, OPENHALL_DEMO: 'true' })).toThrow(
+      /OPENHALL_DEMO cannot be enabled in production/,
+    );
+    expect(() => loadConfig({ ...validEnvironment, OPENHALL_DEMO: 'yes' })).toThrow(
+      /OPENHALL_DEMO must be true or false/,
+    );
+  });
+
   it('rejects weak production secrets and insecure base URLs', () => {
     expect(() =>
       loadConfig({ ...validEnvironment, APP_SECRET: 'short', APP_BASE_URL: 'http://example.edu' }),

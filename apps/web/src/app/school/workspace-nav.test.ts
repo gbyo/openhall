@@ -29,6 +29,56 @@ function labels(groups: WorkspaceNavGroup[], id: string): string[] {
 }
 
 describe('buildWorkspaceNav', () => {
+  it('maps the seeded demo personas through production capability navigation', () => {
+    const administrator = context({
+      affiliations: ['staff'],
+      capabilities: [
+        'pass.view.school_live',
+        'scheduled_authorization.manage',
+        'destination.manage',
+        'schedule.manage',
+        'policy.manage',
+        'authorization.manage',
+        'people.view',
+        'audit.view',
+      ],
+    });
+    expect(labels(buildWorkspaceNav(administrator), 'operations')).toEqual([
+      'Live movement',
+      'Scheduled passes',
+    ]);
+    expect(labels(buildWorkspaceNav(administrator), 'administration')).toEqual([
+      'Destinations',
+      'Locations',
+      'Schedules',
+      'Policies',
+      'Staff access',
+      'People',
+      'Audit',
+    ]);
+
+    const teacher = context({
+      affiliations: ['staff'],
+      capabilities: ['pass.approve.section'],
+      teachingSections: [
+        { id: 'science', code: 'SCI-8A', title: 'Physical Science', capabilities: [] },
+      ],
+      staffedDestinations: [
+        { id: 'health', displayName: 'Health Office', serviceType: 'health', capabilities: [] },
+      ],
+    });
+    expect(labels(buildWorkspaceNav(teacher), 'teaching')).toEqual(['Requests', 'Classes']);
+    expect(labels(buildWorkspaceNav(teacher), 'operations')).toEqual(['Station']);
+    expect(labels(buildWorkspaceNav(teacher), 'administration')).toEqual([]);
+
+    const student = context({
+      affiliations: ['student'],
+      capabilities: ['pass.request.self', 'pass.view.self', 'pass.cancel.self'],
+    });
+    expect(isStudentOnly(student)).toBe(true);
+    expect(buildWorkspaceNav(student).every((group) => group.items.length === 0)).toBe(true);
+  });
+
   it('keeps student-only users out of the staff workspace', () => {
     const ctx = context({ affiliations: ['student'], capabilities: ['pass.request.self'] });
     expect(isStudentOnly(ctx)).toBe(true);

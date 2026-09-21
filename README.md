@@ -41,6 +41,34 @@ pnpm dev
 The API listens on port 3000 and Vite on port 5173. Vite proxies `/api` and `/health` to Fastify.
 The production image serves the built web shell from the API origin.
 
+### Product demo
+
+For UI and product development, start the first-class local demo:
+
+```sh
+docker compose up -d postgres
+pnpm demo
+```
+
+Open [http://localhost:5173/demo](http://localhost:5173/demo) and choose Administrator, Teacher,
+or Student. The chooser creates an ordinary server-side session for a seeded account; the app then
+uses the same memberships, grants, authorization checks, route loaders, navigation, and APIs as a
+production login. The deterministic `openhall_demo` database is separate from the normal
+`openhall` development database and includes a school, staff, a class roster, students,
+destinations, pending and active/queued passes, scheduled passes, policies, and audit/history data.
+
+`pnpm demo` restores the seed before starting. To restore it without starting the servers, run:
+
+```sh
+pnpm demo:reset
+```
+
+Demo mode is opt-in through `OPENHALL_DEMO=true`; ordinary `pnpm dev` does not expose its API or
+serve its `/demo` entry point. Configuration validation rejects demo mode when
+`NODE_ENV=production`. Never point the demo command at a database server where the fixed
+`openhall_demo` database name contains data you need to keep, because reset drops and recreates
+that database.
+
 For the containerized evaluation path, run `docker compose up --build`. Compose runs migrations as
 an explicit one-shot job before it starts the application. Advanced deployments can run
 `node node_modules/@openhall/db/dist/cli.js` from the application image as a separate release step.

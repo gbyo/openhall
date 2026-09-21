@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from 'react-router';
+import { createBrowserRouter, Navigate, Outlet, useLoaderData } from 'react-router';
 import { ErrorPage } from './ErrorPage';
 import {
   connectSignInLoader,
@@ -36,6 +36,11 @@ import { StationPage } from '../features/station/StationPage';
 import { AdminIndex, AdminLayout } from '../features/admin/AdminLayout';
 import { DestinationsPage } from '../features/admin/destinations/DestinationsPage';
 import { DestinationDetailPage } from '../features/admin/destinations/DestinationDetailPage';
+import { DemoPage, demoLoader, type DemoInfo } from '../features/demo/DemoPage';
+
+function DemoRoute() {
+  return <DemoPage info={useLoaderData<DemoInfo>()} />;
+}
 
 async function protectedSchoolLoader(args: Parameters<typeof schoolLoader>[0]) {
   await protectedLoader(args);
@@ -43,6 +48,7 @@ async function protectedSchoolLoader(args: Parameters<typeof schoolLoader>[0]) {
 }
 
 export const router = createBrowserRouter([
+  { path: '/demo', loader: demoLoader, element: <DemoRoute />, errorElement: <ErrorPage /> },
   {
     path: '/',
     loader: indexLoader,

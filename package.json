@@ -13,6 +13,8 @@
     "build": "pnpm clean && tsc -b && pnpm --filter @openhall/web build",
     "clean": "find apps packages -type d -name dist -prune -exec rm -rf {} +",
     "dev": "concurrently -n api,web -c blue,green \"pnpm --filter @openhall/api dev\" \"pnpm --filter @openhall/web dev\"",
+    "demo": "pnpm --filter @openhall/db exec tsx src/demo.ts --serve",
+    "demo:reset": "pnpm --filter @openhall/db exec tsx src/demo.ts",
     "start": "node apps/api/dist/server.js",
     "typecheck": "tsc -b && tsc -p tsconfig.tests.json",
     "lint": "eslint . --max-warnings 0 && prettier --check .",
