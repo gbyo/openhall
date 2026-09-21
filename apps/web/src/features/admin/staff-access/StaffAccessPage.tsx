@@ -170,7 +170,7 @@ export function Component() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  issue.mutate(issue.variables);
+                  if (issue.variables) issue.mutate(issue.variables);
                 }}
               >
                 Check again
@@ -183,7 +183,7 @@ export function Component() {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  revoke.mutate(revoke.variables);
+                  if (revoke.variables) revoke.mutate(revoke.variables);
                 }}
               >
                 Check again
