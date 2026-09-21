@@ -21,6 +21,8 @@ export interface AppConfig {
   readonly dataEncryptionKeyId: string;
   readonly trustProxy: boolean;
   readonly port: number;
+  /** Explicit local-only product demo switch. Never inferred from NODE_ENV. */
+  readonly demoMode?: boolean;
 }
 
 export class ConfigError extends Error {
@@ -192,6 +194,15 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     issues.push('DESTINATION_FLOW_POLL_MS must be an integer from 250 through 60000');
   }
 
+  const demoModeValue = environment.OPENHALL_DEMO?.trim() ?? 'false';
+  if (demoModeValue !== 'true' && demoModeValue !== 'false') {
+    issues.push('OPENHALL_DEMO must be true or false');
+  }
+  const demoMode = demoModeValue === 'true';
+  if (demoMode && nodeEnv === 'production') {
+    issues.push('OPENHALL_DEMO cannot be enabled in production');
+  }
+
   if (issues.length > 0) {
     throw new ConfigError(issues);
   }
@@ -206,5 +217,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AppCon
     dataEncryptionKeyId,
     trustProxy: trustProxyValue === 'true',
     port,
+    demoMode,
   };
 }

@@ -16,6 +16,36 @@ const config: AppConfig = {
 };
 
 describe('foundation HTTP API', () => {
+  it('does not register or document demo functionality unless explicitly enabled', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
+    const app = await createApp({
+      config,
+      database: database.database,
+      logger: false,
+      readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
+    });
+    const response = await app.inject({ method: 'GET', url: '/api/v1/demo' });
+    expect(response.statusCode).toBe(404);
+    await app.ready();
+    expect(app.swagger().paths?.['/api/v1/demo']).toBeUndefined();
+    expect(app.swagger().paths?.['/api/v1/demo/session']).toBeUndefined();
+    await app.close();
+    await database.destroy();
+  });
+
+  it('refuses a production app when demo mode is enabled', async () => {
+    const database = createDatabase('postgresql://unused:5432/unused');
+    await expect(
+      createApp({
+        config: { ...config, nodeEnv: 'production', demoMode: true },
+        database: database.database,
+        logger: false,
+        readinessProbe: { check: () => Promise.resolve({ migration: '001_foundation' }) },
+      }),
+    ).rejects.toThrow(/Demo mode cannot run in production/);
+    await database.destroy();
+  });
+
   it('reports liveness and readiness without exposing configuration', async () => {
     const database = createDatabase('postgresql://unused:5432/unused');
     const app = await createApp({
