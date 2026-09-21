@@ -26,7 +26,1603 @@
         "description": "One-time operator credential: `Bootstrap <token>` on bootstrap prepare, `Recovery <token>` on recovery consume. Never sent in query or cookies."
       }
     },
-    "schemas": {}
+    "schemas": {
+      "ProblemDetails": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "requestId"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Liveness": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Readiness": {
+        "type": "object",
+        "required": [
+          "status",
+          "database",
+          "migration"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready"
+            ]
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "ready"
+            ]
+          },
+          "migration": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SystemInfo": {
+        "type": "object",
+        "required": [
+          "name",
+          "version",
+          "apiVersion",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "OpenHall"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "apiVersion": {
+            "type": "string",
+            "enum": [
+              "v1"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "foundation"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuthSession": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "authenticated"
+            ],
+            "properties": {
+              "authenticated": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "authenticated",
+              "csrfToken",
+              "absoluteExpiresAt",
+              "authenticationMethod"
+            ],
+            "properties": {
+              "authenticated": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              },
+              "csrfToken": {
+                "type": "string",
+                "minLength": 1
+              },
+              "absoluteExpiresAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "authenticationMethod": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "oidc"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "recovery"
+                    ]
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "Me": {
+        "type": "object",
+        "required": [
+          "person",
+          "tenant"
+        ],
+        "properties": {
+          "person": {
+            "type": "object",
+            "required": [
+              "id",
+              "givenName",
+              "familyName",
+              "displayName"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "givenName": {
+                "type": "string"
+              },
+              "familyName": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "tenant": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "slug"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "maxLength": 63
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "AuthDiscovery": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "tenantSelectionRequired"
+            ],
+            "properties": {
+              "tenantSelectionRequired": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "tenantSelectionRequired",
+              "tenant",
+              "providers"
+            ],
+            "properties": {
+              "tenantSelectionRequired": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              },
+              "tenant": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name",
+                  "slug"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                    "maxLength": 63
+                  }
+                },
+                "additionalProperties": false
+              },
+              "providers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "key",
+                    "displayName"
+                  ],
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                      "maxLength": 63
+                    },
+                    "displayName": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "BootstrapStatus": {
+        "type": "object",
+        "required": [
+          "initialized"
+        ],
+        "properties": {
+          "initialized": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BootstrapPrepareResponse": {
+        "type": "object",
+        "required": [
+          "authorizationUrl"
+        ],
+        "properties": {
+          "authorizationUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RecoveryResponse": {
+        "type": "object",
+        "required": [
+          "authenticated",
+          "authenticationMethod"
+        ],
+        "properties": {
+          "authenticated": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "authenticationMethod": {
+            "type": "string",
+            "enum": [
+              "recovery"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "Ok": {
+        "type": "object",
+        "required": [
+          "ok"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "MyOrganizationEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "timeZone",
+          "affiliations"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "maxLength": 63
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "affiliations": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "student"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "staff"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "other"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ExpectedPlacementContext": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "block",
+              "section",
+              "expectedLocation",
+              "beginsAt",
+              "endsAt",
+              "elapsedSeconds",
+              "remainingSeconds"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "resolved"
+                ]
+              },
+              "block": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "code",
+                  "displayName",
+                  "kind"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "section": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "code",
+                  "title"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "code": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "expectedLocation": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "name",
+                      "code",
+                      "kind"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "code": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "beginsAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "endsAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "elapsedSeconds": {
+                "type": "number"
+              },
+              "remainingSeconds": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "block",
+              "beginsAt",
+              "endsAt",
+              "elapsedSeconds",
+              "remainingSeconds"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "block_only"
+                ]
+              },
+              "block": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "code",
+                  "displayName",
+                  "kind"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "beginsAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "endsAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "elapsedSeconds": {
+                "type": "number"
+              },
+              "remainingSeconds": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "outside_schedule"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "dayKind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "non_instructional_day"
+                ]
+              },
+              "dayKind": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "non_instructional"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "closed"
+                    ]
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "calendar_not_configured"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "not_member"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "reason"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ambiguous"
+                ]
+              },
+              "reason": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "multiple_placements"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "overlapping_unassigned_slots"
+                    ]
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "kind",
+              "code"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "configuration_error"
+                ]
+              },
+              "code": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "school_not_found"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "organization_not_school"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "invalid_school_time_zone"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "instructional_day_missing_template"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "invalid_slot_wall_time"
+                    ]
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "TeachingSectionContext": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "title",
+          "capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "self.read"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "organization.context.read"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.request.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.cancel.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.create.student"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.approve.section"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.section_live"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.school_live"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.school_history"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "scheduled_authorization.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "destination.station.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "destination.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "schedule.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "schedule.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "people.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "people.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "policy.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "authorization.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "integration.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "incident.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "incident.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "audit.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "identity.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "system.manage"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "StaffedDestinationContext": {
+        "type": "object",
+        "required": [
+          "id",
+          "displayName",
+          "serviceType",
+          "capabilities"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "serviceType": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "self.read"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "organization.context.read"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.request.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.cancel.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.create.student"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.approve.section"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.section_live"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.school_live"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.school_history"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "scheduled_authorization.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "destination.station.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "destination.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "schedule.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "schedule.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "people.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "people.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "policy.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "authorization.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "integration.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "incident.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "incident.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "audit.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "identity.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "system.manage"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "MyOrganizations": {
+        "type": "object",
+        "required": [
+          "organizations"
+        ],
+        "properties": {
+          "organizations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyOrganizationEntry"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "MyOrganizationContext": {
+        "type": "object",
+        "required": [
+          "organization",
+          "affiliations",
+          "capabilities",
+          "expectedPlacement",
+          "teachingSections",
+          "staffedDestinations"
+        ],
+        "properties": {
+          "organization": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "slug",
+              "timeZone"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "maxLength": 63
+              },
+              "timeZone": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "affiliations": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "student"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "staff"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "other"
+                  ]
+                }
+              ]
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "self.read"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "organization.context.read"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.request.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.cancel.self"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.create.student"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.approve.section"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.section_live"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.school_live"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "pass.view.school_history"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "scheduled_authorization.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "destination.station.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "destination.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "schedule.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "schedule.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "people.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "people.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "policy.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "authorization.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "integration.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "incident.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "incident.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "audit.view"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "identity.manage"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "system.manage"
+                  ]
+                }
+              ]
+            }
+          },
+          "expectedPlacement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpectedPlacementContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "teachingSections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeachingSectionContext"
+            }
+          },
+          "staffedDestinations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffedDestinationContext"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Pass": {
+        "type": "object",
+        "required": [
+          "id",
+          "organizationId",
+          "studentId",
+          "destination",
+          "origin",
+          "requestSource",
+          "requestedAt",
+          "lifecycleState",
+          "revision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "studentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "destination": {
+            "type": "object",
+            "required": [
+              "id",
+              "displayName",
+              "serviceType"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "serviceType": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "origin": {
+            "type": "object",
+            "required": [
+              "placementKind",
+              "block",
+              "section",
+              "location"
+            ],
+            "properties": {
+              "placementKind": {
+                "type": "string"
+              },
+              "block": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "code",
+                      "displayName"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "code": {
+                        "type": "string"
+                      },
+                      "displayName": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "section": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "code",
+                      "title"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "code": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "title": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "location": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "requestSource": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lifecycleState": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ActiveSelfPass": {
+        "type": "object",
+        "required": [
+          "pass"
+        ],
+        "properties": {
+          "pass": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "PassResponse": {
+        "type": "object",
+        "required": [
+          "pass"
+        ],
+        "properties": {
+          "pass": {
+            "$ref": "#/components/schemas/Pass"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
   },
   "paths": {
     "/health/live": {
@@ -41,19 +1637,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "status"
-                  ],
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ok"
-                      ]
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/Liveness"
                 }
               }
             }
@@ -73,30 +1657,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "status",
-                    "database",
-                    "migration"
-                  ],
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ready"
-                      ]
-                    },
-                    "database": {
-                      "type": "string",
-                      "enum": [
-                        "ready"
-                      ]
-                    },
-                    "migration": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/Readiness"
                 }
               }
             }
@@ -106,43 +1667,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false,
-                  "title": "ProblemDetails"
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -162,37 +1687,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "name",
-                    "version",
-                    "apiVersion",
-                    "status"
-                  ],
-                  "properties": {
-                    "name": {
-                      "type": "string",
-                      "enum": [
-                        "OpenHall"
-                      ]
-                    },
-                    "version": {
-                      "type": "string"
-                    },
-                    "apiVersion": {
-                      "type": "string",
-                      "enum": [
-                        "v1"
-                      ]
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "foundation"
-                      ]
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/SystemInfo"
                 }
               }
             }
@@ -219,65 +1714,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "required": [
-                        "authenticated"
-                      ],
-                      "properties": {
-                        "authenticated": {
-                          "type": "boolean",
-                          "enum": [
-                            false
-                          ]
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "required": [
-                        "authenticated",
-                        "csrfToken",
-                        "absoluteExpiresAt",
-                        "authenticationMethod"
-                      ],
-                      "properties": {
-                        "authenticated": {
-                          "type": "boolean",
-                          "enum": [
-                            true
-                          ]
-                        },
-                        "csrfToken": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "absoluteExpiresAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "authenticationMethod": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": [
-                                "oidc"
-                              ]
-                            },
-                            {
-                              "type": "string",
-                              "enum": [
-                                "recovery"
-                              ]
-                            }
-                          ]
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  ]
+                  "$ref": "#/components/schemas/AuthSession"
                 }
               }
             }
@@ -303,61 +1740,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "person",
-                    "tenant"
-                  ],
-                  "properties": {
-                    "person": {
-                      "type": "object",
-                      "required": [
-                        "id",
-                        "givenName",
-                        "familyName",
-                        "displayName"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "givenName": {
-                          "type": "string"
-                        },
-                        "familyName": {
-                          "type": "string"
-                        },
-                        "displayName": {
-                          "type": "string"
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    "tenant": {
-                      "type": "object",
-                      "required": [
-                        "id",
-                        "name",
-                        "slug"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "slug": {
-                          "type": "string",
-                          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                          "maxLength": 63
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  }
+                  "$ref": "#/components/schemas/Me"
                 }
               }
             }
@@ -367,42 +1750,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -435,84 +1783,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "required": [
-                        "tenantSelectionRequired"
-                      ],
-                      "properties": {
-                        "tenantSelectionRequired": {
-                          "type": "boolean",
-                          "enum": [
-                            true
-                          ]
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "required": [
-                        "tenantSelectionRequired",
-                        "tenant",
-                        "providers"
-                      ],
-                      "properties": {
-                        "tenantSelectionRequired": {
-                          "type": "boolean",
-                          "enum": [
-                            false
-                          ]
-                        },
-                        "tenant": {
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "name",
-                            "slug"
-                          ],
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid"
-                            },
-                            "name": {
-                              "type": "string"
-                            },
-                            "slug": {
-                              "type": "string",
-                              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                              "maxLength": 63
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "providers": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "required": [
-                              "key",
-                              "displayName"
-                            ],
-                            "properties": {
-                              "key": {
-                                "type": "string",
-                                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                                "maxLength": 63
-                              },
-                              "displayName": {
-                                "type": "string"
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  ]
+                  "$ref": "#/components/schemas/AuthDiscovery"
                 }
               }
             }
@@ -588,42 +1859,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -633,42 +1869,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -768,18 +1969,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "ok"
-                  ],
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  }
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             }
@@ -789,42 +1979,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -834,42 +1989,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -896,18 +2016,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "ok"
-                  ],
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  }
+                  "$ref": "#/components/schemas/Ok"
                 }
               }
             }
@@ -917,42 +2026,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -962,42 +2036,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1023,26 +2062,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "authenticated",
-                    "authenticationMethod"
-                  ],
-                  "properties": {
-                    "authenticated": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "authenticationMethod": {
-                      "type": "string",
-                      "enum": [
-                        "recovery"
-                      ]
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/RecoveryResponse"
                 }
               }
             }
@@ -1052,42 +2072,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1097,42 +2082,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1153,15 +2103,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "initialized"
-                  ],
-                  "properties": {
-                    "initialized": {
-                      "type": "boolean"
-                    }
-                  }
+                  "$ref": "#/components/schemas/BootstrapStatus"
                 }
               }
             }
@@ -1324,17 +2266,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "authorizationUrl"
-                  ],
-                  "properties": {
-                    "authorizationUrl": {
-                      "type": "string",
-                      "format": "uri"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/BootstrapPrepareResponse"
                 }
               }
             }
@@ -1344,42 +2276,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1389,42 +2286,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1434,42 +2296,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1479,42 +2306,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1540,70 +2332,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "organizations"
-                  ],
-                  "properties": {
-                    "organizations": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "id",
-                          "name",
-                          "slug",
-                          "timeZone",
-                          "affiliations"
-                        ],
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "slug": {
-                            "type": "string",
-                            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                            "maxLength": 63
-                          },
-                          "timeZone": {
-                            "type": "string"
-                          },
-                          "affiliations": {
-                            "type": "array",
-                            "items": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "student"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "staff"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "other"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        },
-                        "additionalProperties": false,
-                        "title": "MyOrganizationEntry"
-                      }
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/MyOrganizations"
                 }
               }
             }
@@ -1613,42 +2342,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1658,42 +2352,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1730,958 +2389,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "organization",
-                    "affiliations",
-                    "capabilities",
-                    "expectedPlacement",
-                    "teachingSections",
-                    "staffedDestinations"
-                  ],
-                  "properties": {
-                    "organization": {
-                      "type": "object",
-                      "required": [
-                        "id",
-                        "name",
-                        "slug",
-                        "timeZone"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "slug": {
-                          "type": "string",
-                          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                          "maxLength": 63
-                        },
-                        "timeZone": {
-                          "type": "string"
-                        }
-                      },
-                      "additionalProperties": false
-                    },
-                    "affiliations": {
-                      "type": "array",
-                      "items": {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "enum": [
-                              "student"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "staff"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "other"
-                            ]
-                          }
-                        ]
-                      }
-                    },
-                    "capabilities": {
-                      "type": "array",
-                      "items": {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "enum": [
-                              "self.read"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "organization.context.read"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "pass.request.self"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "pass.view.self"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "pass.cancel.self"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "pass.create.student"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "pass.approve.section"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "pass.view.section_live"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "pass.view.school_live"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "pass.view.school_history"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "scheduled_authorization.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "destination.station.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "destination.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "schedule.view"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "schedule.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "people.view"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "people.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "policy.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "authorization.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "integration.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "incident.view"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "incident.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "audit.view"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "identity.manage"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "enum": [
-                              "system.manage"
-                            ]
-                          }
-                        ]
-                      }
-                    },
-                    "expectedPlacement": {
-                      "anyOf": [
-                        {
-                          "anyOf": [
-                            {
-                              "type": "object",
-                              "required": [
-                                "kind",
-                                "block",
-                                "section",
-                                "expectedLocation",
-                                "beginsAt",
-                                "endsAt",
-                                "elapsedSeconds",
-                                "remainingSeconds"
-                              ],
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "resolved"
-                                  ]
-                                },
-                                "block": {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "displayName",
-                                    "kind"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "type": "string"
-                                    },
-                                    "displayName": {
-                                      "type": "string"
-                                    },
-                                    "kind": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "section": {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "title"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
-                                    },
-                                    "title": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "expectedLocation": {
-                                  "anyOf": [
-                                    {
-                                      "type": "object",
-                                      "required": [
-                                        "id",
-                                        "name",
-                                        "code",
-                                        "kind"
-                                      ],
-                                      "properties": {
-                                        "id": {
-                                          "type": "string",
-                                          "format": "uuid"
-                                        },
-                                        "name": {
-                                          "type": "string"
-                                        },
-                                        "code": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ]
-                                        },
-                                        "kind": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "beginsAt": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                },
-                                "endsAt": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                },
-                                "elapsedSeconds": {
-                                  "type": "number"
-                                },
-                                "remainingSeconds": {
-                                  "type": "number"
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "kind",
-                                "block",
-                                "beginsAt",
-                                "endsAt",
-                                "elapsedSeconds",
-                                "remainingSeconds"
-                              ],
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "block_only"
-                                  ]
-                                },
-                                "block": {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "displayName",
-                                    "kind"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "type": "string"
-                                    },
-                                    "displayName": {
-                                      "type": "string"
-                                    },
-                                    "kind": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                "beginsAt": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                },
-                                "endsAt": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                },
-                                "elapsedSeconds": {
-                                  "type": "number"
-                                },
-                                "remainingSeconds": {
-                                  "type": "number"
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "kind"
-                              ],
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "outside_schedule"
-                                  ]
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "kind",
-                                "dayKind"
-                              ],
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "non_instructional_day"
-                                  ]
-                                },
-                                "dayKind": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "non_instructional"
-                                      ]
-                                    },
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "closed"
-                                      ]
-                                    }
-                                  ]
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "kind"
-                              ],
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "calendar_not_configured"
-                                  ]
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "kind"
-                              ],
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "not_member"
-                                  ]
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "kind",
-                                "reason"
-                              ],
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "ambiguous"
-                                  ]
-                                },
-                                "reason": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "multiple_placements"
-                                      ]
-                                    },
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "overlapping_unassigned_slots"
-                                      ]
-                                    }
-                                  ]
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "required": [
-                                "kind",
-                                "code"
-                              ],
-                              "properties": {
-                                "kind": {
-                                  "type": "string",
-                                  "enum": [
-                                    "configuration_error"
-                                  ]
-                                },
-                                "code": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "school_not_found"
-                                      ]
-                                    },
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "organization_not_school"
-                                      ]
-                                    },
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "invalid_school_time_zone"
-                                      ]
-                                    },
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "instructional_day_missing_template"
-                                      ]
-                                    },
-                                    {
-                                      "type": "string",
-                                      "enum": [
-                                        "invalid_slot_wall_time"
-                                      ]
-                                    }
-                                  ]
-                                }
-                              },
-                              "additionalProperties": false
-                            }
-                          ],
-                          "title": "ExpectedPlacementContext"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "teachingSections": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "id",
-                          "code",
-                          "title",
-                          "capabilities"
-                        ],
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "code": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "capabilities": {
-                            "type": "array",
-                            "items": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "self.read"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "organization.context.read"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.request.self"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.view.self"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.cancel.self"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.create.student"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.approve.section"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.view.section_live"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.view.school_live"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.view.school_history"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "scheduled_authorization.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "destination.station.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "destination.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "schedule.view"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "schedule.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "people.view"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "people.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "policy.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "authorization.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "integration.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "incident.view"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "incident.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "audit.view"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "identity.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "system.manage"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        },
-                        "additionalProperties": false,
-                        "title": "TeachingSectionContext"
-                      }
-                    },
-                    "staffedDestinations": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "id",
-                          "displayName",
-                          "serviceType",
-                          "capabilities"
-                        ],
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "displayName": {
-                            "type": "string"
-                          },
-                          "serviceType": {
-                            "type": "string"
-                          },
-                          "capabilities": {
-                            "type": "array",
-                            "items": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "self.read"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "organization.context.read"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.request.self"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.view.self"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.cancel.self"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.create.student"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.approve.section"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.view.section_live"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.view.school_live"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "pass.view.school_history"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "scheduled_authorization.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "destination.station.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "destination.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "schedule.view"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "schedule.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "people.view"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "people.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "policy.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "authorization.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "integration.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "incident.view"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "incident.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "audit.view"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "identity.manage"
-                                  ]
-                                },
-                                {
-                                  "type": "string",
-                                  "enum": [
-                                    "system.manage"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        },
-                        "additionalProperties": false,
-                        "title": "StaffedDestinationContext"
-                      }
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/MyOrganizationContext"
                 }
               }
             }
@@ -2691,42 +2399,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -2736,42 +2409,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -2781,42 +2419,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -2875,180 +2478,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "pass"
-                  ],
-                  "properties": {
-                    "pass": {
-                      "type": "object",
-                      "required": [
-                        "id",
-                        "organizationId",
-                        "studentId",
-                        "destination",
-                        "origin",
-                        "requestSource",
-                        "requestedAt",
-                        "lifecycleState",
-                        "revision"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "organizationId": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "studentId": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "destination": {
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "displayName",
-                            "serviceType"
-                          ],
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid"
-                            },
-                            "displayName": {
-                              "type": "string"
-                            },
-                            "serviceType": {
-                              "type": "string"
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "origin": {
-                          "type": "object",
-                          "required": [
-                            "placementKind",
-                            "block",
-                            "section",
-                            "location"
-                          ],
-                          "properties": {
-                            "placementKind": {
-                              "type": "string"
-                            },
-                            "block": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "displayName"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "type": "string"
-                                    },
-                                    "displayName": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "section": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "title"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
-                                    },
-                                    "title": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "location": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "name"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "name": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "requestSource": {
-                          "type": "string"
-                        },
-                        "requestedAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "lifecycleState": {
-                          "type": "string"
-                        },
-                        "revision": {
-                          "type": "string",
-                          "pattern": "^[1-9][0-9]*$"
-                        }
-                      },
-                      "additionalProperties": false,
-                      "title": "Pass"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/PassResponse"
                 }
               }
             }
@@ -3058,42 +2488,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3103,42 +2498,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3148,42 +2508,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3193,42 +2518,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3238,42 +2528,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3341,179 +2596,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "pass"
-                  ],
-                  "properties": {
-                    "pass": {
-                      "type": "object",
-                      "required": [
-                        "id",
-                        "organizationId",
-                        "studentId",
-                        "destination",
-                        "origin",
-                        "requestSource",
-                        "requestedAt",
-                        "lifecycleState",
-                        "revision"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "organizationId": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "studentId": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "destination": {
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "displayName",
-                            "serviceType"
-                          ],
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid"
-                            },
-                            "displayName": {
-                              "type": "string"
-                            },
-                            "serviceType": {
-                              "type": "string"
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "origin": {
-                          "type": "object",
-                          "required": [
-                            "placementKind",
-                            "block",
-                            "section",
-                            "location"
-                          ],
-                          "properties": {
-                            "placementKind": {
-                              "type": "string"
-                            },
-                            "block": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "displayName"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "type": "string"
-                                    },
-                                    "displayName": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "section": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "title"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
-                                    },
-                                    "title": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "location": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "name"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "name": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "requestSource": {
-                          "type": "string"
-                        },
-                        "requestedAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "lifecycleState": {
-                          "type": "string"
-                        },
-                        "revision": {
-                          "type": "string",
-                          "pattern": "^[1-9][0-9]*$"
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/PassResponse"
                 }
               }
             }
@@ -3523,42 +2606,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3568,42 +2616,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3613,42 +2626,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3658,42 +2636,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3703,42 +2646,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3764,186 +2672,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "pass"
-                  ],
-                  "properties": {
-                    "pass": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "organizationId",
-                            "studentId",
-                            "destination",
-                            "origin",
-                            "requestSource",
-                            "requestedAt",
-                            "lifecycleState",
-                            "revision"
-                          ],
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid"
-                            },
-                            "organizationId": {
-                              "type": "string",
-                              "format": "uuid"
-                            },
-                            "studentId": {
-                              "type": "string",
-                              "format": "uuid"
-                            },
-                            "destination": {
-                              "type": "object",
-                              "required": [
-                                "id",
-                                "displayName",
-                                "serviceType"
-                              ],
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "displayName": {
-                                  "type": "string"
-                                },
-                                "serviceType": {
-                                  "type": "string"
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            "origin": {
-                              "type": "object",
-                              "required": [
-                                "placementKind",
-                                "block",
-                                "section",
-                                "location"
-                              ],
-                              "properties": {
-                                "placementKind": {
-                                  "type": "string"
-                                },
-                                "block": {
-                                  "anyOf": [
-                                    {
-                                      "type": "object",
-                                      "required": [
-                                        "id",
-                                        "code",
-                                        "displayName"
-                                      ],
-                                      "properties": {
-                                        "id": {
-                                          "type": "string",
-                                          "format": "uuid"
-                                        },
-                                        "code": {
-                                          "type": "string"
-                                        },
-                                        "displayName": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "section": {
-                                  "anyOf": [
-                                    {
-                                      "type": "object",
-                                      "required": [
-                                        "id",
-                                        "code",
-                                        "title"
-                                      ],
-                                      "properties": {
-                                        "id": {
-                                          "type": "string",
-                                          "format": "uuid"
-                                        },
-                                        "code": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ]
-                                        },
-                                        "title": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                },
-                                "location": {
-                                  "anyOf": [
-                                    {
-                                      "type": "object",
-                                      "required": [
-                                        "id",
-                                        "name"
-                                      ],
-                                      "properties": {
-                                        "id": {
-                                          "type": "string",
-                                          "format": "uuid"
-                                        },
-                                        "name": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ]
-                                }
-                              },
-                              "additionalProperties": false
-                            },
-                            "requestSource": {
-                              "type": "string"
-                            },
-                            "requestedAt": {
-                              "type": "string",
-                              "format": "date-time"
-                            },
-                            "lifecycleState": {
-                              "type": "string"
-                            },
-                            "revision": {
-                              "type": "string",
-                              "pattern": "^[1-9][0-9]*$"
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ActiveSelfPass"
                 }
               }
             }
@@ -3953,42 +2682,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -3998,42 +2692,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4090,179 +2749,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "pass"
-                  ],
-                  "properties": {
-                    "pass": {
-                      "type": "object",
-                      "required": [
-                        "id",
-                        "organizationId",
-                        "studentId",
-                        "destination",
-                        "origin",
-                        "requestSource",
-                        "requestedAt",
-                        "lifecycleState",
-                        "revision"
-                      ],
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "organizationId": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "studentId": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "destination": {
-                          "type": "object",
-                          "required": [
-                            "id",
-                            "displayName",
-                            "serviceType"
-                          ],
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid"
-                            },
-                            "displayName": {
-                              "type": "string"
-                            },
-                            "serviceType": {
-                              "type": "string"
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "origin": {
-                          "type": "object",
-                          "required": [
-                            "placementKind",
-                            "block",
-                            "section",
-                            "location"
-                          ],
-                          "properties": {
-                            "placementKind": {
-                              "type": "string"
-                            },
-                            "block": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "displayName"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "type": "string"
-                                    },
-                                    "displayName": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "section": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "code",
-                                    "title"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "code": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string"
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
-                                    },
-                                    "title": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "location": {
-                              "anyOf": [
-                                {
-                                  "type": "object",
-                                  "required": [
-                                    "id",
-                                    "name"
-                                  ],
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "format": "uuid"
-                                    },
-                                    "name": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            }
-                          },
-                          "additionalProperties": false
-                        },
-                        "requestSource": {
-                          "type": "string"
-                        },
-                        "requestedAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
-                        "lifecycleState": {
-                          "type": "string"
-                        },
-                        "revision": {
-                          "type": "string",
-                          "pattern": "^[1-9][0-9]*$"
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/PassResponse"
                 }
               }
             }
@@ -4272,42 +2759,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4317,42 +2769,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4362,42 +2779,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4407,42 +2789,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4452,42 +2799,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4497,42 +2809,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -4542,42 +2819,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "type": "object",
-                  "required": [
-                    "type",
-                    "title",
-                    "status",
-                    "code",
-                    "requestId"
-                  ],
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "format": "uri-reference"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "integer",
-                      "minimum": 400,
-                      "maximum": 599
-                    },
-                    "detail": {
-                      "type": "string"
-                    },
-                    "instance": {
-                      "type": "string"
-                    },
-                    "code": {
-                      "type": "string",
-                      "pattern": "^[a-z][a-z0-9_]*$"
-                    },
-                    "requestId": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
