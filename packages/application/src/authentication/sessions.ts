@@ -30,16 +30,34 @@ export const SESSION_POLICY = {
   recoveryIdleTtlSeconds: 15 * 60,
   /** Absolute expiration for break-glass recovery sessions. */
   recoveryAbsoluteTtlSeconds: 30 * 60,
+  /** Idle expiration for temporary setup sessions (genuinely useful window). */
+  setupIdleTtlSeconds: 12 * 60 * 60,
+  /** Absolute expiration for temporary setup sessions. */
+  setupAbsoluteTtlSeconds: 24 * 60 * 60,
 } as const;
 
 export function sessionExpiry(
   authenticatedAt: Temporal.Instant,
-  recovery: boolean,
+  authenticationMethod: 'oidc' | 'recovery' | 'setup' | boolean,
 ): { readonly idleExpiresAt: Temporal.Instant; readonly absoluteExpiresAt: Temporal.Instant } {
-  const idle = recovery ? SESSION_POLICY.recoveryIdleTtlSeconds : SESSION_POLICY.idleTtlSeconds;
-  const absolute = recovery
-    ? SESSION_POLICY.recoveryAbsoluteTtlSeconds
-    : SESSION_POLICY.absoluteTtlSeconds;
+  const method =
+    typeof authenticationMethod === 'boolean'
+      ? authenticationMethod
+        ? 'recovery'
+        : 'oidc'
+      : authenticationMethod;
+  const idle =
+    method === 'recovery'
+      ? SESSION_POLICY.recoveryIdleTtlSeconds
+      : method === 'setup'
+        ? SESSION_POLICY.setupIdleTtlSeconds
+        : SESSION_POLICY.idleTtlSeconds;
+  const absolute =
+    method === 'recovery'
+      ? SESSION_POLICY.recoveryAbsoluteTtlSeconds
+      : method === 'setup'
+        ? SESSION_POLICY.setupAbsoluteTtlSeconds
+        : SESSION_POLICY.absoluteTtlSeconds;
   return {
     idleExpiresAt: authenticatedAt.add({ seconds: idle }),
     absoluteExpiresAt: authenticatedAt.add({ seconds: absolute }),

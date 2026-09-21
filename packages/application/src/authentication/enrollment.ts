@@ -132,6 +132,7 @@ export async function startIdentityEnrollment(
       identityProviderId: provider.id,
       bootstrapSetupId: null,
       identityEnrollmentGrantId: grant.id,
+      providerSetupAccountId: null,
       purpose: 'enrollment',
       providerRevision: provider.revision,
       stateDigest: dependencies.digester.digest(new TextEncoder().encode(state)),

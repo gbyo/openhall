@@ -8,6 +8,8 @@ import { AuthenticationError } from './errors.js';
 import { pkceChallenge } from './oidc.js';
 import type {
   AuditWriter,
+  BaseBootstrapFinalizer,
+  BaseBootstrapInput,
   BootstrapDraftInput,
   BootstrapFinalizer,
   BootstrapInstallation,
@@ -31,6 +33,8 @@ import {
   assertOidcScopes,
   assertTokenAuthMethod,
   assertValidSlug,
+  assertValidTimeZone,
+  deriveSlug,
   fromBase64Url,
   normalizeReturnPath,
   toBase64Url,
@@ -246,6 +250,7 @@ export async function prepareBootstrap(
       identityProviderId: null,
       bootstrapSetupId: setup.id,
       identityEnrollmentGrantId: null,
+      providerSetupAccountId: null,
       purpose: 'bootstrap',
       providerRevision: null,
       stateDigest: dependencies.digester.digest(new TextEncoder().encode(state)),
@@ -567,4 +572,172 @@ export async function issueRecoveryGrant(
     });
   });
   return { grantId: grant.id, rawToken: token.rawToken };
+}
+
+export interface ValidateBootstrapTokenDependencies extends OperatorTokenDependencies {
+  readonly tenants: TenantDirectory;
+  readonly runner: SystemTransactionRunner;
+}
+
+/**
+ * Verifies a one-time setup code without consuming it and without creating
+ * anything: token shape/digest, live and unexpired grant, and no canonical
+ * tenant yet. Never reveals why an arbitrary token failed.
+ */
+export async function validateBootstrapToken(
+  rawToken: string,
+  dependencies: ValidateBootstrapTokenDependencies,
+): Promise<{ readonly valid: true }> {
+  let digest: Uint8Array;
+  try {
+    if (rawToken.length === 0) throw new AuthenticationError('bootstrap_token_invalid');
+    digest = dependencies.digester.digest(fromBase64Url(rawToken));
+  } catch (error) {
+    if (error instanceof AuthenticationError && error.code === 'bootstrap_token_invalid')
+      throw error;
+    throw new AuthenticationError('bootstrap_token_invalid');
+  }
+  return dependencies.runner.run(async () => {
+    const now = dependencies.clock.now();
+    const grant = await dependencies.grants.findValidByTokenDigest(digest, now);
+    if (grant?.purpose !== 'bootstrap') {
+      throw new AuthenticationError('bootstrap_token_invalid');
+    }
+    if ((await dependencies.tenants.countCanonical()) > 0) {
+      throw new AuthenticationError('bootstrap_unavailable');
+    }
+    return { valid: true as const };
+  });
+}
+
+export interface InitializeBootstrapInput {
+  /** Raw operator token from the Authorization header. */
+  readonly operatorToken: string;
+  /** Blank defaults to the school name for a normal one-school installation. */
+  readonly tenantName: string;
+  readonly tenantSlug?: string | undefined;
+  readonly schoolName: string;
+  readonly schoolSlug?: string | undefined;
+  readonly schoolTimeZone: string;
+  readonly adminGivenName: string;
+  readonly adminFamilyName: string;
+  /** Blank defaults to "given family". */
+  readonly adminDisplayName?: string | undefined;
+  readonly requestId: string;
+}
+
+export interface InitializeBootstrapDependencies extends OperatorTokenDependencies {
+  readonly tenants: TenantDirectory;
+  readonly finalizer: BaseBootstrapFinalizer;
+  readonly runner: SystemTransactionRunner;
+}
+
+export interface InitializedBootstrap {
+  readonly installation: BootstrapInstallation;
+  readonly sessionToken: string;
+  readonly csrfToken: string;
+}
+
+function resolveBootstrapSlug(
+  explicit: string | undefined,
+  derivedFrom: string,
+  field: string,
+): string {
+  const trimmed = explicit?.trim() ?? '';
+  if (trimmed.length > 0) {
+    try {
+      return assertValidSlug(trimmed, field);
+    } catch (error) {
+      if (error instanceof AuthenticationError && error.code === 'auth_transaction_invalid') {
+        throw new AuthenticationError('invalid_bootstrap_draft', error.message);
+      }
+      throw error;
+    }
+  }
+  const derived = deriveSlug(derivedFrom);
+  if (derived === undefined) {
+    throw new AuthenticationError(
+      'invalid_bootstrap_draft',
+      `Cannot derive ${field}; provide an explicit ${field}`,
+    );
+  }
+  return derived;
+}
+
+/**
+ * Creates the canonical school installation without any OIDC provider:
+ * exactly one transaction consumes the bootstrap grant and creates tenant,
+ * school, schedule configuration, admin person/account, staff membership,
+ * system_admin grant, and a temporary setup session. No identity_provider
+ * and no auth_identity are created here. On any failure nothing canonical
+ * remains.
+ */
+export async function initializeBootstrapBase(
+  input: InitializeBootstrapInput,
+  dependencies: InitializeBootstrapDependencies,
+): Promise<InitializedBootstrap> {
+  let draft: BaseBootstrapInput;
+  try {
+    const schoolName = nonEmpty(input.schoolName, 'school name');
+    const tenantName =
+      input.tenantName.trim().length > 0
+        ? nonEmpty(input.tenantName, 'organization name')
+        : schoolName;
+    const adminGivenName = nonEmpty(input.adminGivenName, 'administrator given name');
+    const adminFamilyName = nonEmpty(input.adminFamilyName, 'administrator family name');
+    const displayTrimmed = input.adminDisplayName?.trim() ?? '';
+    const adminDisplayName =
+      displayTrimmed.length > 0
+        ? nonEmpty(input.adminDisplayName ?? '', 'administrator display name')
+        : `${adminGivenName} ${adminFamilyName}`;
+    draft = {
+      tenantName,
+      tenantSlug: resolveBootstrapSlug(input.tenantSlug, tenantName, 'organization slug'),
+      schoolName,
+      schoolSlug: resolveBootstrapSlug(input.schoolSlug, schoolName, 'school slug'),
+      schoolTimeZone: assertValidTimeZone(input.schoolTimeZone),
+      adminGivenName,
+      adminFamilyName,
+      adminDisplayName,
+    };
+  } catch (error) {
+    if (error instanceof AuthenticationError && error.code === 'auth_transaction_invalid') {
+      throw new AuthenticationError('invalid_bootstrap_draft', error.message);
+    }
+    throw error;
+  }
+  const sessionTokenBytes = dependencies.random.randomBytes(32);
+  const csrfTokenBytes = dependencies.digester.deriveCsrfToken(sessionTokenBytes);
+  return dependencies.runner.run(async (system) => {
+    let digest: Uint8Array;
+    try {
+      if (input.operatorToken.length === 0)
+        throw new AuthenticationError('bootstrap_token_invalid');
+      digest = dependencies.digester.digest(fromBase64Url(input.operatorToken));
+    } catch (error) {
+      if (error instanceof AuthenticationError && error.code === 'bootstrap_token_invalid') {
+        throw error;
+      }
+      throw new AuthenticationError('bootstrap_token_invalid');
+    }
+    if ((await dependencies.tenants.countCanonical()) > 0) {
+      throw new AuthenticationError('bootstrap_unavailable');
+    }
+    const grant = await dependencies.grants.consumeByTokenDigest(digest, dependencies.clock.now());
+    if (grant?.purpose !== 'bootstrap') {
+      throw new AuthenticationError('bootstrap_token_invalid');
+    }
+    const installation = await dependencies.finalizer.initializeBase(system, {
+      ...draft,
+      sessionTokenDigest: dependencies.digester.digestSessionToken(sessionTokenBytes),
+      csrfTokenDigest: dependencies.digester.digest(csrfTokenBytes),
+      now: dependencies.clock.now(),
+      requestId: input.requestId,
+    });
+    return {
+      installation,
+      sessionToken: toBase64Url(sessionTokenBytes),
+      csrfToken: toBase64Url(csrfTokenBytes),
+    };
+  });
 }

@@ -50,7 +50,11 @@ export const AuthSessionSchema = Type.Union(
         authenticated: Type.Literal(true),
         csrfToken: Type.String({ minLength: 1 }),
         absoluteExpiresAt: InstantSchema,
-        authenticationMethod: Type.Union([Type.Literal('oidc'), Type.Literal('recovery')]),
+        authenticationMethod: Type.Union([
+          Type.Literal('oidc'),
+          Type.Literal('recovery'),
+          Type.Literal('setup'),
+        ]),
       },
       { additionalProperties: false },
     ),
@@ -147,6 +151,57 @@ export const BootstrapPrepareSchema = Type.Object(
 export const BootstrapPrepareResponseSchema = Type.Object(
   { authorizationUrl: Type.String({ format: 'uri' }) },
   { $id: 'BootstrapPrepareResponse', additionalProperties: false },
+);
+
+export const BootstrapValidateResponseSchema = Type.Object(
+  { valid: Type.Literal(true) },
+  { $id: 'BootstrapValidateResponse', additionalProperties: false },
+);
+
+export const BootstrapInitializeSchema = Type.Object(
+  {
+    tenantName: Type.String({ maxLength: 200 }),
+    tenantSlug: Type.Optional(SlugSchema),
+    schoolName: Type.String({ minLength: 1, maxLength: 200 }),
+    schoolSlug: Type.Optional(SlugSchema),
+    schoolTimeZone: Type.String({ minLength: 1, maxLength: 100 }),
+    adminGivenName: Type.String({ minLength: 1, maxLength: 200 }),
+    adminFamilyName: Type.String({ minLength: 1, maxLength: 200 }),
+    adminDisplayName: Type.Optional(Type.String({ maxLength: 200 })),
+  },
+  { $id: 'BootstrapInitialize', additionalProperties: false },
+);
+
+export const BootstrapInitializeResponseSchema = Type.Object(
+  {
+    authenticated: Type.Literal(true),
+    authenticationMethod: Type.Literal('setup'),
+    absoluteExpiresAt: InstantSchema,
+  },
+  { $id: 'BootstrapInitializeResponse', additionalProperties: false },
+);
+
+export const SetupIdentityProviderPrepareSchema = Type.Object(
+  {
+    providerPreset: Type.Union([Type.Literal('google'), Type.Literal('generic')]),
+    clientId: Type.String({ minLength: 1, maxLength: 500 }),
+    clientSecret: Type.String({ minLength: 1, maxLength: 2000 }),
+    providerName: Type.Optional(Type.String({ maxLength: 200 })),
+    issuerUrl: Type.Optional(Type.String({ maxLength: 500 })),
+    providerKey: Type.Optional(SlugSchema),
+    authMethod: Type.Optional(
+      Type.Union([Type.Literal('client_secret_post'), Type.Literal('client_secret_basic')]),
+    ),
+    scopes: Type.Optional(
+      Type.Array(Type.String({ minLength: 1, maxLength: 100 }), { maxItems: 20 }),
+    ),
+  },
+  { $id: 'SetupIdentityProviderPrepare', additionalProperties: false },
+);
+
+export const SetupIdentityProviderPrepareResponseSchema = Type.Object(
+  { authorizationUrl: Type.String({ format: 'uri' }) },
+  { $id: 'SetupIdentityProviderPrepareResponse', additionalProperties: false },
 );
 
 export const RecoveryResponseSchema = Type.Object(

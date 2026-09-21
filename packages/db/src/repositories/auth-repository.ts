@@ -1,10 +1,13 @@
 import { Temporal } from '@js-temporal/polyfill';
 import {
   AuthenticationError,
+  SESSION_POLICY,
   type AccountRecord,
   type AuditEventInput,
   type AuditWriter,
   type AuthIdentityRecord,
+  type BaseBootstrapFinalizer,
+  type BaseBootstrapInput,
   type BootstrapDraftInput,
   type BootstrapFinalizer,
   type BootstrapInstallation,
@@ -19,7 +22,10 @@ import {
   type OperatorGrantStore,
   type PersonRecord,
   type ProtectedSecret,
+  type ProviderSetupCompletion,
+  type ProviderSetupFinalizer,
   type RecoveryEligibilityChecker,
+  type ResolvedProviderSetupConfig,
   type SecretProtector,
   type SessionCredentialLookup,
   type SessionRecord,
@@ -30,7 +36,7 @@ import {
   type SystemTransactionContext,
 } from '@openhall/application';
 import type { AccountId } from '@openhall/domain';
-import { sql, type Kysely } from 'kysely';
+import { sql, type Kysely, type Transaction } from 'kysely';
 import type { DB as Database } from '../database.generated.js';
 import {
   connectionFor,
@@ -78,7 +84,12 @@ function mapSession(row: {
     tokenDigest: bytes(row.token_hash),
     csrfTokenDigest: bytes(row.csrf_token_hash),
     accountSessionRevision: toBigInt(row.account_session_revision),
-    authenticationMethod: row.authentication_method === 'recovery' ? 'recovery' : 'oidc',
+    authenticationMethod:
+      row.authentication_method === 'recovery'
+        ? 'recovery'
+        : row.authentication_method === 'setup'
+          ? 'setup'
+          : 'oidc',
     createdAt: fromDatabaseInstant(row.created_at),
     authenticatedAt: fromDatabaseInstant(row.authenticated_at),
     lastSeenAt: fromDatabaseInstant(row.last_seen_at),
@@ -134,6 +145,7 @@ function mapTransaction(row: {
   identity_provider_id: string | null;
   bootstrap_setup_id: string | null;
   identity_enrollment_grant_id: string | null;
+  provider_setup_account_id: string | null;
   purpose: string;
   provider_revision: number | null;
   state_hash: Buffer;
@@ -153,12 +165,15 @@ function mapTransaction(row: {
     identityProviderId: row.identity_provider_id,
     bootstrapSetupId: row.bootstrap_setup_id,
     identityEnrollmentGrantId: row.identity_enrollment_grant_id,
+    providerSetupAccountId: row.provider_setup_account_id,
     purpose:
       row.purpose === 'bootstrap'
         ? 'bootstrap'
         : row.purpose === 'enrollment'
           ? 'enrollment'
-          : 'login',
+          : row.purpose === 'provider_setup'
+            ? 'provider_setup'
+            : 'login',
     providerRevision: row.provider_revision,
     stateDigest: bytes(row.state_hash),
     browserBindingDigest: bytes(row.browser_binding_hash),
@@ -627,7 +642,8 @@ export class PostgresOidcTransactionStore implements OidcTransactionStore {
       readonly identityProviderId: string | null;
       readonly bootstrapSetupId: string | null;
       readonly identityEnrollmentGrantId: string | null;
-      readonly purpose: 'login' | 'bootstrap' | 'enrollment';
+      readonly providerSetupAccountId: string | null;
+      readonly purpose: 'login' | 'bootstrap' | 'enrollment' | 'provider_setup';
       readonly providerRevision: number | null;
       readonly stateDigest: Uint8Array;
       readonly browserBindingDigest: Uint8Array;
@@ -644,6 +660,7 @@ export class PostgresOidcTransactionStore implements OidcTransactionStore {
         identity_provider_id: input.identityProviderId,
         bootstrap_setup_id: input.bootstrapSetupId,
         identity_enrollment_grant_id: input.identityEnrollmentGrantId,
+        provider_setup_account_id: input.providerSetupAccountId,
         purpose: input.purpose,
         provider_revision: input.providerRevision,
         state_hash: toDatabaseBytes(input.stateDigest),
@@ -677,7 +694,7 @@ export class PostgresOidcTransactionStore implements OidcTransactionStore {
       )
       RETURNING
         id, tenant_id, identity_provider_id, bootstrap_setup_id,
-        identity_enrollment_grant_id, purpose,
+        identity_enrollment_grant_id, provider_setup_account_id, purpose,
         provider_revision, state_hash, browser_binding_hash,
         transaction_secret_ciphertext, transaction_secret_nonce,
         transaction_secret_tag, transaction_secret_key_id,
@@ -723,6 +740,7 @@ interface OidcTransactionStoreRow {
   identity_provider_id: string | null;
   bootstrap_setup_id: string | null;
   identity_enrollment_grant_id: string | null;
+  provider_setup_account_id: string | null;
   purpose: string;
   provider_revision: number | null;
   state_hash: Buffer;
@@ -1002,8 +1020,186 @@ export class PostgresRecoveryEligibilityChecker implements RecoveryEligibilityCh
   }
 }
 
-export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
+export class PostgresBootstrapFinalizer implements BootstrapFinalizer, BaseBootstrapFinalizer {
   constructor(private readonly protector: SecretProtector) {}
+
+  /**
+   * Shared base-installation persistence: tenant, school organization,
+   * schedule configuration, admin person/account, staff membership, and
+   * tenant-scoped system_admin grant. Both the legacy OIDC bootstrap path
+   * and the guided base-initialization path build on this foundation so
+   * canonical installation semantics cannot drift between them.
+   */
+  private async createBaseInstallation(
+    connection: Kysely<Database> | Transaction<Database>,
+    input: BaseBootstrapInput,
+  ): Promise<{
+    readonly tenant: {
+      readonly id: string;
+      readonly slug: string;
+      readonly name: string;
+      readonly status: string;
+    };
+    readonly person: { readonly id: string };
+    readonly account: { readonly id: string; readonly session_revision: string | bigint | number };
+  }> {
+    const tenant = await connection
+      .insertInto('tenant')
+      .values({ name: input.tenantName, slug: input.tenantSlug, status: 'active' })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const school = await connection
+      .insertInto('organization')
+      .values({
+        tenant_id: tenant.id,
+        kind: 'school',
+        name: input.schoolName,
+        slug: input.schoolSlug,
+        time_zone: input.schoolTimeZone,
+        status: 'active',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await connection
+      .insertInto('school_schedule_configuration')
+      .values({ tenant_id: tenant.id, organization_id: school.id })
+      .execute();
+    const person = await connection
+      .insertInto('person')
+      .values({
+        tenant_id: tenant.id,
+        given_name: input.adminGivenName,
+        family_name: input.adminFamilyName,
+        display_name: input.adminDisplayName,
+        status: 'active',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const account = await connection
+      .insertInto('account')
+      .values({ tenant_id: tenant.id, person_id: person.id, status: 'active' })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await connection
+      .insertInto('organization_membership')
+      .values({
+        tenant_id: tenant.id,
+        organization_id: school.id,
+        person_id: person.id,
+        affiliation: 'staff',
+        status: 'active',
+      })
+      .execute();
+    await connection
+      .insertInto('authorization_grant')
+      .values({
+        tenant_id: tenant.id,
+        account_id: account.id,
+        role: 'system_admin',
+        scope_kind: 'tenant',
+        status: 'active',
+      })
+      .execute();
+    return { tenant, person, account };
+  }
+
+  async initializeBase(
+    context: SystemTransactionContext,
+    input: BaseBootstrapInput & {
+      readonly sessionTokenDigest: Uint8Array;
+      readonly csrfTokenDigest: Uint8Array;
+      readonly now: Temporal.Instant;
+      readonly requestId: string;
+    },
+  ): Promise<BootstrapInstallation> {
+    const connection = connectionFor(context);
+    const nowText = toDatabaseInstant(input.now);
+    try {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('openhall:bootstrap-finalize'))`.execute(
+        connection,
+      );
+      const existing = await connection
+        .selectFrom('tenant')
+        .select((builder) => builder.fn.countAll().as('count'))
+        .executeTakeFirstOrThrow();
+      if (Number(existing.count) > 0) {
+        throw new AuthenticationError('bootstrap_unavailable');
+      }
+      const base = await this.createBaseInstallation(connection, input);
+      const idleExpires = toDatabaseInstant(
+        input.now.add({ seconds: SESSION_POLICY.setupIdleTtlSeconds }),
+      );
+      const absoluteExpires = toDatabaseInstant(
+        input.now.add({ seconds: SESSION_POLICY.setupAbsoluteTtlSeconds }),
+      );
+      const session = await connection
+        .insertInto('auth_session')
+        .values({
+          tenant_id: base.tenant.id,
+          account_id: base.account.id,
+          identity_provider_id: null,
+          token_hash: toDatabaseBytes(input.sessionTokenDigest),
+          csrf_token_hash: toDatabaseBytes(input.csrfTokenDigest),
+          account_session_revision: toBigInt(base.account.session_revision),
+          authentication_method: 'setup',
+          authenticated_at: nowText,
+          idle_expires_at: idleExpires,
+          absolute_expires_at: absoluteExpires,
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await connection
+        .insertInto('audit_event')
+        .values({
+          tenant_id: base.tenant.id,
+          actor_kind: 'account',
+          actor_id: base.account.id,
+          action: 'auth.bootstrap_initialized',
+          target_kind: 'tenant',
+          target_id: base.tenant.id,
+          outcome: 'success',
+          occurred_at: nowText,
+          request_id: input.requestId,
+          metadata: {},
+        })
+        .execute();
+      await connection
+        .insertInto('audit_event')
+        .values({
+          tenant_id: base.tenant.id,
+          actor_kind: 'account',
+          actor_id: base.account.id,
+          action: 'auth.sign_in_succeeded',
+          target_kind: 'auth_session',
+          target_id: session.id,
+          outcome: 'success',
+          occurred_at: nowText,
+          request_id: input.requestId,
+          metadata: {},
+        })
+        .execute();
+      return {
+        tenant: mapTenant(base.tenant),
+        accountId: base.account.id,
+        personId: base.person.id,
+        session: mapSession(session),
+      };
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw error;
+      }
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        const code = error.code;
+        if (code === '23505') {
+          throw new AuthenticationError(
+            'invalid_bootstrap_draft',
+            'Bootstrap details conflict with an existing installation',
+          );
+        }
+      }
+      throw error;
+    }
+  }
 
   async finalize(
     context: SystemTransactionContext,
@@ -1070,63 +1266,18 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
       ) {
         throw new AuthenticationError('auth_transaction_invalid');
       }
-      const tenant = await connection
-        .insertInto('tenant')
-        .values({ name: setup.tenant_name, slug: setup.tenant_slug, status: 'active' })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-      const school = await connection
-        .insertInto('organization')
-        .values({
-          tenant_id: tenant.id,
-          kind: 'school',
-          name: setup.school_name,
-          slug: setup.school_slug,
-          time_zone: setup.school_time_zone,
-          status: 'active',
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-      await connection
-        .insertInto('school_schedule_configuration')
-        .values({ tenant_id: tenant.id, organization_id: school.id })
-        .execute();
-      const person = await connection
-        .insertInto('person')
-        .values({
-          tenant_id: tenant.id,
-          given_name: setup.admin_given_name,
-          family_name: setup.admin_family_name,
-          display_name: setup.admin_display_name,
-          status: 'active',
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-      const account = await connection
-        .insertInto('account')
-        .values({ tenant_id: tenant.id, person_id: person.id, status: 'active' })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-      await connection
-        .insertInto('organization_membership')
-        .values({
-          tenant_id: tenant.id,
-          organization_id: school.id,
-          person_id: person.id,
-          affiliation: 'staff',
-          status: 'active',
-        })
-        .execute();
-      await connection
-        .insertInto('authorization_grant')
-        .values({
-          tenant_id: tenant.id,
-          account_id: account.id,
-          role: 'system_admin',
-          scope_kind: 'tenant',
-          status: 'active',
-        })
-        .execute();
+      const base = await this.createBaseInstallation(connection, {
+        tenantName: setup.tenant_name,
+        tenantSlug: setup.tenant_slug,
+        schoolName: setup.school_name,
+        schoolSlug: setup.school_slug,
+        schoolTimeZone: setup.school_time_zone,
+        adminGivenName: setup.admin_given_name,
+        adminFamilyName: setup.admin_family_name,
+        adminDisplayName: setup.admin_display_name,
+      });
+      const tenant = base.tenant;
+      const account = base.account;
       const provider = await connection
         .insertInto('identity_provider')
         .values({
@@ -1233,7 +1384,7 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
       return {
         tenant: mapTenant(tenant),
         accountId: account.id,
-        personId: person.id,
+        personId: base.person.id,
         session: mapSession(session),
       };
     } catch (error) {
@@ -1246,6 +1397,241 @@ export class PostgresBootstrapFinalizer implements BootstrapFinalizer {
           throw new AuthenticationError(
             'invalid_bootstrap_draft',
             'Bootstrap details conflict with an existing installation',
+          );
+        }
+      }
+      throw error;
+    }
+  }
+}
+
+export class PostgresProviderSetupFinalizer implements ProviderSetupFinalizer {
+  constructor(private readonly protector: SecretProtector) {}
+
+  async completeProviderSetup(
+    context: TenantTransactionContext,
+    input: {
+      readonly transactionId: string;
+      readonly accountId: AccountId;
+      readonly config: ResolvedProviderSetupConfig;
+      readonly providerClientSecret: string;
+      readonly identitySubject: string;
+      readonly identityEmail: string | null;
+      readonly sessionTokenDigest: Uint8Array;
+      readonly csrfTokenDigest: Uint8Array;
+      readonly now: Temporal.Instant;
+      readonly requestId: string;
+    },
+  ): Promise<ProviderSetupCompletion> {
+    const connection = connectionFor(context);
+    const tenantId = context.tenantId;
+    const nowText = toDatabaseInstant(input.now);
+    try {
+      await sql`SELECT pg_advisory_xact_lock(hashtext('openhall:provider-setup'), hashtext(${tenantId}))`.execute(
+        connection,
+      );
+      const transaction = await connection
+        .selectFrom('oidc_login_transaction')
+        .selectAll()
+        .where('id', '=', input.transactionId)
+        .executeTakeFirst();
+      if (
+        transaction?.status !== 'processing' ||
+        transaction.purpose !== 'provider_setup' ||
+        transaction.tenant_id !== tenantId ||
+        transaction.provider_setup_account_id !== input.accountId
+      ) {
+        throw new AuthenticationError('auth_transaction_invalid');
+      }
+      const account = await connection
+        .selectFrom('account')
+        .selectAll()
+        .where('tenant_id', '=', tenantId)
+        .where('id', '=', input.accountId)
+        .executeTakeFirst();
+      const person =
+        account === undefined
+          ? undefined
+          : await connection
+              .selectFrom('person')
+              .selectAll()
+              .where('tenant_id', '=', tenantId)
+              .where('id', '=', account.person_id)
+              .executeTakeFirst();
+      const adminGrant = await connection
+        .selectFrom('authorization_grant')
+        .select('id')
+        .where('tenant_id', '=', tenantId)
+        .where('account_id', '=', input.accountId)
+        .where('role', '=', 'system_admin')
+        .where('scope_kind', '=', 'tenant')
+        .where('status', '=', 'active')
+        .where((eb) => eb.or([eb('valid_from', 'is', null), eb('valid_from', '<=', nowText)]))
+        .where((eb) => eb.or([eb('valid_until', 'is', null), eb('valid_until', '>', nowText)]))
+        .executeTakeFirst();
+      if (account?.status !== 'active' || person?.status !== 'active' || adminGrant === undefined) {
+        throw new AuthenticationError('auth_transaction_invalid');
+      }
+      const conflicting = await connection
+        .selectFrom('identity_provider')
+        .select((builder) => builder.fn.countAll().as('count'))
+        .where('tenant_id', '=', tenantId)
+        .where('status', '=', 'active')
+        .executeTakeFirstOrThrow();
+      if (Number(conflicting.count) > 0) {
+        throw new AuthenticationError('provider_setup_conflict');
+      }
+      const provider = await connection
+        .insertInto('identity_provider')
+        .values({
+          tenant_id: tenantId,
+          key: input.config.providerKey,
+          display_name: input.config.providerDisplayName,
+          issuer: input.config.providerIssuer,
+          client_id: input.config.providerClientId,
+          client_secret_ciphertext: toDatabaseBytes(new Uint8Array()),
+          client_secret_nonce: toDatabaseBytes(new Uint8Array()),
+          client_secret_tag: toDatabaseBytes(new Uint8Array()),
+          client_secret_key_id: this.protector.keyId,
+          token_endpoint_auth_method: input.config.providerAuthMethod,
+          scopes: [...input.config.providerScopes],
+          status: 'active',
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      const sealed = this.protector.protect(
+        input.providerClientSecret,
+        `provider-secret:v1:${tenantId}:${provider.id}`,
+      );
+      await connection
+        .updateTable('identity_provider')
+        .set({
+          client_secret_ciphertext: toDatabaseBytes(sealed.ciphertext),
+          client_secret_nonce: toDatabaseBytes(sealed.nonce),
+          client_secret_tag: toDatabaseBytes(sealed.tag),
+          client_secret_key_id: sealed.keyId,
+        })
+        .where('tenant_id', '=', tenantId)
+        .where('id', '=', provider.id)
+        .execute();
+      // Never email-match: the external identity is linked to the
+      // predetermined account bound by the transaction. An issuer+subject
+      // already linked elsewhere fails closed without disclosing ownership.
+      const existing = await connection
+        .selectFrom('auth_identity')
+        .selectAll()
+        .where('tenant_id', '=', tenantId)
+        .where('issuer', '=', input.config.providerIssuer)
+        .where('provider_subject', '=', input.identitySubject)
+        .executeTakeFirst();
+      if (existing !== undefined && existing.account_id !== input.accountId) {
+        throw new AuthenticationError('identity_link_conflict');
+      }
+      if (existing === undefined) {
+        await connection
+          .insertInto('auth_identity')
+          .values({
+            tenant_id: tenantId,
+            account_id: input.accountId,
+            issuer: input.config.providerIssuer,
+            provider_subject: input.identitySubject,
+            email_snapshot: input.identityEmail,
+          })
+          .execute();
+      } else if ((existing.email_snapshot ?? null) !== input.identityEmail) {
+        await connection
+          .updateTable('auth_identity')
+          .set({ email_snapshot: input.identityEmail })
+          .where('tenant_id', '=', tenantId)
+          .where('id', '=', existing.id)
+          .execute();
+      }
+      // Bump the revision first so every temporary setup/recovery session
+      // stops validating; the new OIDC session below is created afterwards
+      // at the post-revocation revision and stays valid.
+      const revised = await connection
+        .updateTable('account')
+        .set({ session_revision: sql`session_revision + 1` })
+        .where('tenant_id', '=', tenantId)
+        .where('id', '=', input.accountId)
+        .returning('session_revision')
+        .executeTakeFirstOrThrow();
+      await connection
+        .updateTable('auth_session')
+        .set({ revoked_at: nowText, revocation_reason: 'provider-setup-completed' })
+        .where('tenant_id', '=', tenantId)
+        .where('account_id', '=', input.accountId)
+        .where('revoked_at', 'is', null)
+        .execute();
+      const idleExpires = toDatabaseInstant(
+        input.now.add({ seconds: SESSION_POLICY.idleTtlSeconds }),
+      );
+      const absoluteExpires = toDatabaseInstant(
+        input.now.add({ seconds: SESSION_POLICY.absoluteTtlSeconds }),
+      );
+      const session = await connection
+        .insertInto('auth_session')
+        .values({
+          tenant_id: tenantId,
+          account_id: input.accountId,
+          identity_provider_id: provider.id,
+          token_hash: toDatabaseBytes(input.sessionTokenDigest),
+          csrf_token_hash: toDatabaseBytes(input.csrfTokenDigest),
+          account_session_revision: toBigInt(revised.session_revision),
+          authentication_method: 'oidc',
+          authenticated_at: nowText,
+          idle_expires_at: idleExpires,
+          absolute_expires_at: absoluteExpires,
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+      await connection
+        .insertInto('audit_event')
+        .values({
+          tenant_id: tenantId,
+          actor_kind: 'account',
+          actor_id: input.accountId,
+          action: 'auth.provider_setup_completed',
+          target_kind: 'identity_provider',
+          target_id: provider.id,
+          outcome: 'success',
+          occurred_at: nowText,
+          request_id: input.requestId,
+          metadata: {},
+        })
+        .execute();
+      await connection
+        .insertInto('audit_event')
+        .values({
+          tenant_id: tenantId,
+          actor_kind: 'account',
+          actor_id: input.accountId,
+          action: 'auth.sign_in_succeeded',
+          target_kind: 'auth_session',
+          target_id: session.id,
+          outcome: 'success',
+          occurred_at: nowText,
+          request_id: input.requestId,
+          metadata: {},
+        })
+        .execute();
+      await connection
+        .updateTable('oidc_login_transaction')
+        .set({ status: 'consumed', consumed_at: nowText })
+        .where('id', '=', input.transactionId)
+        .where('status', '=', 'processing')
+        .execute();
+      return { provider: mapProvider(provider), session: mapSession(session) };
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        throw error;
+      }
+      if (typeof error === 'object' && error !== null && 'code' in error) {
+        const code = error.code;
+        if (code === '23505') {
+          throw new AuthenticationError(
+            'provider_setup_conflict',
+            'School sign-in is already connected',
           );
         }
       }

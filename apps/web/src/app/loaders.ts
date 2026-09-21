@@ -36,6 +36,27 @@ export async function setupLoader() {
   return null;
 }
 
+export async function connectSignInLoader({ request }: LoaderFunctionArgs) {
+  const bootstrap = await queryClient.query(bootstrapQuery);
+  if (!bootstrap.initialized) throw redirect('/setup');
+  const session = await queryClient.query(sessionQuery);
+  if (!session.authenticated) {
+    throw redirect(`/login?return_path=${encodeURIComponent(safeReturnPath(request))}`);
+  }
+  if (session.authenticationMethod === 'oidc') throw redirect('/');
+  await queryClient.query(meQuery);
+  return null;
+}
+
+export async function recoveryAccessLoader() {
+  const bootstrap = await queryClient.query(bootstrapQuery);
+  if (!bootstrap.initialized) throw redirect('/setup');
+  const session = await queryClient.query(sessionQuery);
+  if (!session.authenticated) return null;
+  if (session.authenticationMethod === 'oidc') throw redirect('/');
+  throw redirect('/connect-sign-in');
+}
+
 export async function loginLoader() {
   const bootstrap = await queryClient.query(bootstrapQuery);
   if (!bootstrap.initialized) throw redirect('/setup');

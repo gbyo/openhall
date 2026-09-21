@@ -14,5 +14,5 @@ export interface Principal {
    * session was created. Kept as bigint end to end; never exposed in JSON.
    */
   readonly sessionRevision: bigint;
-  readonly authenticationMethod: 'oidc' | 'recovery';
+  readonly authenticationMethod: 'oidc' | 'recovery' | 'setup';
 }

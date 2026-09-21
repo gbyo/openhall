@@ -217,64 +217,12 @@
   padding-block: clamp(var(--wf-space-7), 5vw, var(--wf-space-9));
 }
 
-.setup-view__header {
-  max-width: 42rem;
-  margin-bottom: var(--wf-space-7);
+.app-frame__notice {
+  border-bottom: var(--wf-border-width) solid var(--wf-border-default);
 }
 
-.setup-view__header > p:last-child {
-  margin-block: var(--wf-space-4) 0;
-  color: var(--wf-color-text-muted);
-}
-
-.setup-form {
-  display: grid;
-  margin-top: var(--wf-space-7);
-  gap: var(--wf-space-6);
-}
-
-.setup-form__section {
-  min-width: 0;
-  margin: 0;
-  border: 0;
-  border-top: var(--wf-border-width) solid var(--wf-border-default);
-  padding: var(--wf-space-6) 0 0;
-}
-
-.setup-form__section legend {
-  float: left;
-  width: 14rem;
-  padding: 0 var(--wf-space-6) 0 0;
-  font-size: 1.25rem;
-  font-weight: 650;
-  line-height: 1.3;
-}
-
-.setup-form__section legend + * {
-  margin-left: 14rem;
-}
-
-.setup-form__section::after {
-  display: block;
-  clear: both;
-  content: '';
-}
-
-.setup-form__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--wf-space-5);
-}
-
-.setup-form__wide {
-  grid-column: 1 / -1;
-}
-
-.setup-form__actions {
-  display: flex;
-  justify-content: flex-end;
-  border-top: var(--wf-border-width) solid var(--wf-border-default);
-  padding-top: var(--wf-space-6);
+.product-notice {
+  border-bottom: var(--wf-border-width) solid var(--wf-border-default);
 }
 
 .account-view__content {
@@ -410,17 +358,6 @@
     border-bottom: var(--wf-border-width) solid var(--wf-border-default);
   }
 
-  .setup-form__section legend {
-    float: none;
-    width: auto;
-    margin-bottom: var(--wf-space-5);
-    padding: 0;
-  }
-
-  .setup-form__section legend + * {
-    margin-left: 0;
-  }
-
   .account-view__content {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -454,15 +391,6 @@
     margin-bottom: var(--wf-space-6);
   }
 
-  .setup-form__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .setup-form__wide {
-    grid-column: auto;
-  }
-
-  .setup-form__actions .wf-button,
   .account-view__actions .wf-button {
     width: 100%;
   }

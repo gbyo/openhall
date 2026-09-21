@@ -63,7 +63,7 @@ export interface SecretProtector {
   reveal(secret: ProtectedSecret, context: string): string;
 }
 
-export type AuthenticationMethod = 'oidc' | 'recovery';
+export type AuthenticationMethod = 'oidc' | 'recovery' | 'setup';
 
 export interface SessionRecord {
   readonly id: string;
@@ -241,7 +241,7 @@ export interface TenantDirectory {
   countCanonical(): Promise<number>;
 }
 
-export type OidcTransactionPurpose = 'login' | 'bootstrap' | 'enrollment';
+export type OidcTransactionPurpose = 'login' | 'bootstrap' | 'enrollment' | 'provider_setup';
 export type OidcTransactionStatus = 'pending' | 'processing' | 'consumed' | 'failed';
 
 export interface OidcTransactionRecord {
@@ -250,6 +250,7 @@ export interface OidcTransactionRecord {
   readonly identityProviderId: string | null;
   readonly bootstrapSetupId: string | null;
   readonly identityEnrollmentGrantId: string | null;
+  readonly providerSetupAccountId: AccountId | null;
   readonly purpose: OidcTransactionPurpose;
   readonly providerRevision: number | null;
   readonly stateDigest: Uint8Array;
@@ -269,6 +270,7 @@ export interface OidcTransactionStore {
       readonly identityProviderId: string | null;
       readonly bootstrapSetupId: string | null;
       readonly identityEnrollmentGrantId: string | null;
+      readonly providerSetupAccountId: AccountId | null;
       readonly purpose: OidcTransactionPurpose;
       readonly providerRevision: number | null;
       readonly stateDigest: Uint8Array;
@@ -477,6 +479,95 @@ export interface BootstrapFinalizer {
       readonly requestId: string;
     },
   ): Promise<BootstrapInstallation>;
+}
+
+/**
+ * Canonical school/admin bootstrap information. No provider configuration:
+ * the installation is created first and sign-in is connected afterwards.
+ * Slugs and display name may arrive unresolved; the application layer
+ * derives deterministic defaults and rejects what it cannot derive.
+ */
+export interface BaseBootstrapInput {
+  readonly tenantName: string;
+  readonly tenantSlug: string;
+  readonly schoolName: string;
+  readonly schoolSlug: string;
+  readonly schoolTimeZone: string;
+  readonly adminGivenName: string;
+  readonly adminFamilyName: string;
+  readonly adminDisplayName: string;
+}
+
+export interface BaseBootstrapFinalizer {
+  /**
+   * Atomically creates tenant, school organization, schedule
+   * configuration, initial admin person/account, staff membership,
+   * tenant-scoped system_admin grant, a temporary setup auth session, and
+   * audit evidence — or rolls back everything. Creates no
+   * identity_provider and no auth_identity. Takes the same canonical
+   * bootstrap advisory lock and re-checks that no canonical tenant exists
+   * after acquiring it. The caller consumes the bootstrap grant in the
+   * same transaction.
+   */
+  initializeBase(
+    context: SystemTransactionContext,
+    input: BaseBootstrapInput & {
+      readonly sessionTokenDigest: Uint8Array;
+      readonly csrfTokenDigest: Uint8Array;
+      readonly now: Temporal.Instant;
+      readonly requestId: string;
+    },
+  ): Promise<BootstrapInstallation>;
+}
+
+/**
+ * Resolved first-provider configuration for a provider_setup transaction.
+ * Google presets are fully server-owned: the browser submits only the
+ * client ID and secret, and the server enforces the canonical Google key,
+ * display name, issuer, scopes, and authentication method.
+ */
+export interface ResolvedProviderSetupConfig {
+  readonly providerKey: string;
+  readonly providerDisplayName: string;
+  readonly providerIssuer: string;
+  readonly providerClientId: string;
+  readonly providerAuthMethod: 'client_secret_post' | 'client_secret_basic';
+  readonly providerScopes: readonly string[];
+}
+
+export interface ProviderSetupCompletion {
+  readonly provider: IdentityProviderRecord;
+  readonly session: SessionRecord;
+}
+
+export interface ProviderSetupFinalizer {
+  /**
+   * Atomically connects the tenant's first school sign-in provider: verifies
+   * the claimed provider_setup transaction still binds the predetermined
+   * account, refuses when an active provider has appeared, creates the
+   * canonical identity_provider with its sealed secret, links the verified
+   * external identity to the predetermined account (never by email), bumps
+   * the account session revision, revokes prior setup/recovery sessions,
+   * creates a normal OIDC session at the new revision, consumes the
+   * transaction, and appends audit evidence — or rolls back everything.
+   * Takes a tenant-scoped advisory lock so racing completions serialize.
+   */
+  completeProviderSetup(
+    context: TenantTransactionContext,
+    input: {
+      readonly transactionId: string;
+      readonly accountId: AccountId;
+      readonly config: ResolvedProviderSetupConfig;
+      /** Revealed staged client secret, re-encrypted for the provider row. */
+      readonly providerClientSecret: string;
+      readonly identitySubject: string;
+      readonly identityEmail: string | null;
+      readonly sessionTokenDigest: Uint8Array;
+      readonly csrfTokenDigest: Uint8Array;
+      readonly now: Temporal.Instant;
+      readonly requestId: string;
+    },
+  ): Promise<ProviderSetupCompletion>;
 }
 
 /** Minimal account checks needed before a recovery grant may be issued. */

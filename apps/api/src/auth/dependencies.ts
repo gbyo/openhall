@@ -7,6 +7,7 @@ import {
   PostgresIdentityDirectory,
   PostgresOidcTransactionStore,
   PostgresOperatorGrantStore,
+  PostgresProviderSetupFinalizer,
   PostgresRecoveryEligibilityChecker,
   PostgresSessionCredentialLookup,
   PostgresSessionRepository,
@@ -43,6 +44,7 @@ export interface AuthDependencies {
   readonly audit: PostgresAuditWriter;
   readonly checker: PostgresRecoveryEligibilityChecker;
   readonly finalizer: PostgresBootstrapFinalizer;
+  readonly providerSetup: PostgresProviderSetupFinalizer;
   readonly adapter: OpenIdClientAdapter;
   readonly random: NodeSecureRandom;
   readonly digester: HmacCredentialDigester;
@@ -88,6 +90,7 @@ export function createAuthDependencies(
     audit: new PostgresAuditWriter(),
     checker: new PostgresRecoveryEligibilityChecker(),
     finalizer: new PostgresBootstrapFinalizer(protector),
+    providerSetup: new PostgresProviderSetupFinalizer(protector),
     adapter: new OpenIdClientAdapter(),
     random,
     digester,

@@ -145,8 +145,8 @@ async function seedProvider(tenantId: string, key: string): Promise<string> {
 }
 
 describe('migration 003 on PostgreSQL 18', () => {
-  it('migrates a blank database through 008', async () => {
-    expect(EXPECTED_MIGRATION).toBe('008_school_control_plane');
+  it('migrates a blank database through 009', async () => {
+    expect(EXPECTED_MIGRATION).toBe('009_guided_setup_authentication');
     const rows = await pool.query<{ name: string }>(
       'SELECT name FROM kysely_migration ORDER BY name',
     );
@@ -159,6 +159,7 @@ describe('migration 003 on PostgreSQL 18', () => {
       '006_movement_policy_approvals_overrides',
       '007_destination_flow_and_movement',
       '008_school_control_plane',
+      '009_guided_setup_authentication',
     ]);
   });
 
@@ -619,6 +620,7 @@ describe('authentication repositories', () => {
         identityProviderId: providerId,
         bootstrapSetupId: null,
         identityEnrollmentGrantId: null,
+        providerSetupAccountId: null,
         purpose: 'login',
         providerRevision: 1,
         stateDigest: state,
@@ -747,6 +749,7 @@ describe('authentication repositories', () => {
         identityProviderId: null,
         bootstrapSetupId: setup.id,
         identityEnrollmentGrantId: null,
+        providerSetupAccountId: null,
         purpose: 'bootstrap',
         providerRevision: null,
         stateDigest: state,

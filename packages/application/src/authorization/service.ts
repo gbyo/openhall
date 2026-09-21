@@ -251,6 +251,11 @@ export class RelationshipAuthorizationService {
     }
 
     // 2. Recovery-session hard restriction, evaluated before normal grants.
+    // Setup sessions are temporary normal-capability bootstrap sessions: the
+    // setup account already holds the canonical tenant-scoped system_admin
+    // grant, so a setup session configures WayPass with normal authority
+    // while deployment finishes. This is deliberate, not a fallthrough for
+    // unknown methods.
     if (principal.authenticationMethod === 'recovery') {
       if (!RECOVERY_ALLOWED.includes(capability)) return deny('recovery_session_restricted');
       if (capability === 'self.read') return { allowed: true, basis: { kind: 'self' } };

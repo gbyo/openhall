@@ -1,0 +1,150 @@
+/* Guided-setup page composition only. Component visuals (buttons, fields,
+ * radio cards, combobox, collapsible, alerts, items) come from the shadcn
+ * Maia theme and registry components; nothing here imitates them. */
+
+.setup-page {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100dvh;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+.setup-column {
+  margin-inline: auto;
+  max-width: 40rem;
+}
+
+.setup-brand {
+  margin: 0 0 1.5rem;
+  font-weight: 700;
+  font-size: 1.125rem;
+  letter-spacing: -0.01em;
+}
+
+.setup-brand a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.setup-kicker {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+
+.setup-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.setup-lede {
+  margin: 0 0 1.5rem;
+  color: var(--muted-foreground);
+  font-size: 1rem;
+}
+
+/*
+ * The legacy reset forces `color`/`font` inheritance on form controls, which
+ * would override shadcn utility styling inside the setup flow. Rolling those
+ * two declarations back to the layered (Tailwind) values keeps shadcn
+ * components authoritative here without touching the reset other screens
+ * rely on.
+ */
+.setup-page :is(button, input, select, textarea) {
+  color: revert-layer;
+  font: revert-layer;
+}
+
+/* Progress: ordered list, current step exposed via aria-current in markup. */
+.setup-progress {
+  margin: 0 0 2rem;
+}
+
+.setup-progress__status {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.setup-progress ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.setup-progress__step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.setup-progress__marker {
+  height: 0.375rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--background);
+}
+
+.setup-progress__step--completed {
+  color: var(--foreground);
+}
+
+.setup-progress__step--completed .setup-progress__marker {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.setup-progress__step--current {
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.setup-progress__step--current .setup-progress__marker {
+  border: 2px solid var(--primary);
+  background: var(--background);
+}
+
+.setup-progress__label {
+  line-height: 1.3;
+}
+
+@media (max-width: 26rem) {
+  .setup-page {
+    padding: 1.5rem 1rem 3rem;
+  }
+}
+
+@media (forced-colors: active) {
+  .setup-progress__marker {
+    border: 1px solid CanvasText;
+  }
+
+  .setup-progress__step--completed .setup-progress__marker {
+    background: Highlight;
+    border-color: Highlight;
+  }
+
+  .setup-progress__step--current .setup-progress__marker {
+    border: 3px double Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-page *,
+  .setup-page *::before,
+  .setup-page *::after {
+    transition: none;
+    animation: none;
+  }
+}

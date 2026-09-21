@@ -1,7 +1,16 @@
 import type { ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
+import {
+  SetupAccessBanner,
+  formatSetupDeadline,
+} from '../design-system/patterns/SetupAccessBanner';
+import { sessionQuery } from './queries';
 
 export function AppFrame({ children }: { children: ReactNode }) {
+  const { data: session } = useQuery(sessionQuery);
+  const setupSession =
+    session?.authenticated === true && session.authenticationMethod === 'setup' ? session : null;
   return (
     <main className="app-frame">
       <header className="app-frame__header">
@@ -14,6 +23,14 @@ export function AppFrame({ children }: { children: ReactNode }) {
         </Link>
         <span className="app-frame__descriptor">School movement, clearly understood</span>
       </header>
+      {setupSession ? (
+        <div className="app-frame__notice">
+          <SetupAccessBanner
+            compact
+            deadlineLabel={formatSetupDeadline(setupSession.absoluteExpiresAt)}
+          />
+        </div>
+      ) : null}
       <div className="app-frame__body">{children}</div>
       <footer className="app-frame__footer">
         <span>WayPass</span>

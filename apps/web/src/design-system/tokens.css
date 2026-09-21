@@ -23,6 +23,13 @@
   --wf-status-danger: #b23a36;
   --wf-status-danger-subtle: #f9e8e6;
   --wf-status-neutral: #52605c;
+  /*
+   * Informational product states (temporary setup access, neutral service
+   * notices). Aliased to the primary action palette so informational
+   * surfaces stay unmistakably WayPass without inventing a new blue.
+   */
+  --wf-status-info: var(--wf-action-primary);
+  --wf-status-info-subtle: var(--wf-surface-selected);
   --wf-accent-signal: #e5b84c;
 
   --wf-space-0: 0;

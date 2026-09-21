@@ -239,6 +239,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bootstrap/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Verifies the one-time setup code without consuming it and without creating anything. The token travels in the Authorization header, never query, body, or cookies. */
+        post: operations["validateBootstrap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bootstrap/initialize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Creates the canonical school installation without an external identity provider and returns a temporary setup session. Consumes the one-time setup code exactly once. The token travels in the Authorization header, never query, body, or cookies. */
+        post: operations["initializeBootstrap"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/identity-provider/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Starts the first school sign-in connection for an initialized school. Cookie-authenticated with CSRF and same-origin protection; the caller must hold tenant system-admin authority. Setup sessions may prepare; authorized recovery sessions may complete setup. Rejects with a 409 conflict when a provider is already connected. Never creates a canonical provider before OIDC succeeds. */
+        post: operations["prepareSetupIdentityProvider"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/organizations": {
         parameters: {
             query?: never;
@@ -1469,7 +1520,7 @@ export interface operations {
                         csrfToken: string;
                         /** Format: date-time */
                         absoluteExpiresAt: string;
-                        authenticationMethod: "oidc" | "recovery";
+                        authenticationMethod: "oidc" | "recovery" | "setup";
                     };
                 };
             };
@@ -2034,6 +2085,285 @@ export interface operations {
             };
             /** @description Operator-token endpoint rate limit exceeded */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    validateBootstrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        valid: true;
+                    };
+                };
+            };
+            /** @description Invalid setup code */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Installation already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Operator-token endpoint rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    initializeBootstrap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    tenantName: string;
+                    tenantSlug?: string;
+                    schoolName: string;
+                    schoolSlug?: string;
+                    schoolTimeZone: string;
+                    adminGivenName: string;
+                    adminFamilyName: string;
+                    adminDisplayName?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        authenticated: true;
+                        /** @enum {string} */
+                        authenticationMethod: "setup";
+                        /** Format: date-time */
+                        absoluteExpiresAt: string;
+                    };
+                };
+            };
+            /** @description Invalid school or administrator details */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Invalid setup code */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Installation already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Operator-token endpoint rate limit exceeded */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    prepareSetupIdentityProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    providerPreset: "google" | "generic";
+                    clientId: string;
+                    clientSecret: string;
+                    providerName?: string;
+                    issuerUrl?: string;
+                    providerKey?: string;
+                    authMethod?: "client_secret_post" | "client_secret_basic";
+                    scopes?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        authorizationUrl: string;
+                    };
+                };
+            };
+            /** @description Invalid provider configuration */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unauthenticated or ineligible account */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description School sign-in is already connected */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

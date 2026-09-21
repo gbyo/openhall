@@ -31,6 +31,9 @@
     --wf-status-ready: CanvasText;
     --wf-status-queued: CanvasText;
     --wf-status-danger: CanvasText;
+    --wf-status-neutral: CanvasText;
+    --wf-status-info: CanvasText;
+    --wf-status-info-subtle: Canvas;
     --wf-accent-signal: Highlight;
   }
 

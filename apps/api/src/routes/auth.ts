@@ -5,6 +5,7 @@ import {
   completeBootstrap,
   completeIdentityEnrollment,
   completeOidcLogin,
+  completeProviderSetup,
   consumeRecoveryGrant,
   logoutAllSessions,
   logoutSession,
@@ -405,10 +406,10 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
       }
       try {
         // The OIDC redirect URI is shared: peek at the transaction purpose
-        // (non-consuming) and dispatch to the bootstrap, enrollment, or
-        // login completion. The completing use case still enforces the
-        // atomic claim, so a raced or replayed callback fails closed either
-        // way.
+        // (non-consuming) and dispatch to the bootstrap, enrollment,
+        // provider-setup, or login completion. The completing use case still
+        // enforces the atomic claim, so a raced or replayed callback fails
+        // closed either way.
         const pending = await d.transactions.peekByStateDigest(
           d.digester.digest(new TextEncoder().encode(state)),
         );
@@ -481,6 +482,41 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
             ),
           );
           setSessionCookie(reply, d.isProduction, installed.sessionToken, bootstrapMaxAge);
+          return await reply.header('Cache-Control', 'no-store').redirect('/');
+        }
+        if (pending?.purpose === 'provider_setup') {
+          const connected = await completeProviderSetup(
+            {
+              state,
+              browserBinding: binding,
+              callbackUrl,
+              requestId: request.id,
+            },
+            {
+              directory: d.directory,
+              transactions: d.transactions,
+              audit: d.audit,
+              adapter: d.adapter,
+              random: d.random,
+              digester: d.digester,
+              hasher: d.hasher,
+              protector: d.protector,
+              clock: d.clock,
+              runner: d.tenantRunner,
+              redirectUri: d.redirectUri,
+              allowInsecureHttp: d.allowInsecureHttp,
+              finalizer: d.providerSetup,
+            },
+          );
+          const setupMaxAge = Math.max(
+            60,
+            Math.floor(
+              (connected.session.absoluteExpiresAt.epochMilliseconds -
+                d.clock.now().epochMilliseconds) /
+                1000,
+            ),
+          );
+          setSessionCookie(reply, d.isProduction, connected.sessionToken, setupMaxAge);
           return await reply.header('Cache-Control', 'no-store').redirect('/');
         }
         const completed = await completeOidcLogin(
