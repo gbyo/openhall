@@ -250,6 +250,31 @@ test('setup tolerates 200 percent text scaling without horizontal scrolling', as
   expect(overflow).toBe(0);
 });
 
+test('invalid steps block advancement until fixed', async ({ page }) => {
+  await guidedShell(page, { initialized: false, sessionMethod: null });
+  await unlock(page);
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Tell us about your school' })).toBeVisible();
+  await expect(page.getByText('Enter the school name.')).toBeVisible();
+  const schoolItem = page.locator('[data-slot="questionnaire-item"]', {
+    has: page.getByRole('heading', { name: 'Tell us about your school' }),
+  });
+  await expect(schoolItem.getByText('Fix the highlighted fields to continue.')).toBeVisible();
+  await page.getByLabel('School name').fill('Ninety Six High School');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Who will manage WayPass?' })).toBeVisible();
+  await page.getByLabel('First name').fill('Gibson');
+  await page.getByLabel('Last name').fill('Bell');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should people sign in?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'How should people sign in?' })).toBeVisible();
+  await expect(page.getByText('Choose how people will sign in.')).toBeVisible();
+  await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Ready to set up WayPass' })).toBeVisible();
+});
+
 test('back preserves previously entered school details', async ({ page }) => {
   await guidedShell(page, { initialized: false, sessionMethod: null });
   await unlock(page);
