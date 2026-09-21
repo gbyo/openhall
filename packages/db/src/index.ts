@@ -7,6 +7,7 @@ export * from './repositories/authorization-repository.js';
 export * from './repositories/idempotency-repository.js';
 export * from './repositories/outbox-repository.js';
 export * from './repositories/pass-repository.js';
+export * from './repositories/policy-repository.js';
 export * from './repositories/schedule-repository.js';
 export * from './temporal-types.js';
 export * from './tenant-scope.js';

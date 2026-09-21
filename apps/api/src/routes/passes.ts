@@ -41,7 +41,7 @@ const CancelHeadersSchema = Type.Object({
   'if-match': Type.Optional(Type.String({ minLength: 1 })),
 });
 
-const TITLE_BY_CODE: Record<PassErrorCode, string> = {
+export const TITLE_BY_CODE: Record<PassErrorCode, string> = {
   destination_not_found: 'Destination not found',
   destination_unavailable: 'Destination unavailable',
   student_not_found: 'Student not found',
@@ -56,6 +56,13 @@ const TITLE_BY_CODE: Record<PassErrorCode, string> = {
   stale_pass_revision: 'Stale pass revision',
   forbidden: 'Forbidden',
   recovery_session_restricted: 'Recovery session restricted',
+  approval_not_found: 'Approval not found',
+  invalid_approval_state: 'Invalid approval state',
+  override_not_found: 'Override not found',
+  override_not_available: 'Override not available',
+  invalid_override_state: 'Invalid override state',
+  override_requires_independent_approver: 'Override requires independent approver',
+  policy_configuration_error: 'Policy configuration error',
 };
 
 async function sendPassProblem(

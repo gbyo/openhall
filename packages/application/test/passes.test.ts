@@ -58,6 +58,21 @@ describe('Idempotency-Key contract', () => {
     expect(key >= -(2n ** 63n) && key < 2n ** 63n).toBe(true);
     expect(advisoryLockKey('tenant', 'account', 'pass.request.self:v1', 'abc')).toBe(key);
   });
+
+  it('scopes idempotency identity per command namespace', async () => {
+    const { fingerprintApprovalResolve } = await import('../src/passes/idempotency.js');
+    // Approve and deny are distinct commands: the same key across them starts
+    // an independent execution (documented on advisoryLockKey). Fingerprints
+    // separate decisions within and across commands.
+    expect(
+      fingerprintApprovalResolve('019abc00-0000-7000-8000-000000000050', 'pass-1', 1n, 'approved'),
+    ).not.toBe(
+      fingerprintApprovalResolve('019abc00-0000-7000-8000-000000000050', 'pass-1', 1n, 'denied'),
+    );
+    expect(advisoryLockKey('tenant', 'account', 'pass.approval.approve:v1', 'abc')).not.toBe(
+      advisoryLockKey('tenant', 'account', 'pass.approval.deny:v1', 'abc'),
+    );
+  });
 });
 
 describe('pass ETag and If-Match', () => {

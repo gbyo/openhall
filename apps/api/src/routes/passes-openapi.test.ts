@@ -113,7 +113,7 @@ describe('Phase 5 pass OpenAPI surface', () => {
     expect(request.description).toMatch(/not a finalized IETF RFC/);
   });
 
-  it('exposes no future approve/depart/queue HTTP commands', async () => {
+  it('exposes no future depart/queue HTTP commands', async () => {
     const doc = await loadDocument();
     const passPaths = Object.keys(doc.paths).filter((key) => key.includes('/passes'));
     expect(passPaths.sort()).toEqual(
@@ -121,8 +121,54 @@ describe('Phase 5 pass OpenAPI surface', () => {
         '/api/v1/me/passes',
         '/api/v1/me/passes/active',
         '/api/v1/me/passes/{passId}/cancel',
+        '/api/v1/me/passes/{passId}/overrides',
+        '/api/v1/passes/{passId}/overrides',
         '/api/v1/students/{studentId}/passes',
       ].sort(),
     );
+    for (const key of passPaths) {
+      expect(key).not.toMatch(/depart|queue|ready|complete/);
+    }
+  });
+});
+
+describe('Phase 6 policy workflow OpenAPI surface', () => {
+  const workflowPosts = [
+    '/api/v1/pass-approvals/{approvalId}/approve',
+    '/api/v1/pass-approvals/{approvalId}/deny',
+    '/api/v1/me/passes/{passId}/overrides',
+    '/api/v1/passes/{passId}/overrides',
+    '/api/v1/pass-overrides/{overrideId}/approve',
+    '/api/v1/pass-overrides/{overrideId}/deny',
+  ] as const;
+
+  it('exposes stable workflow operation IDs', async () => {
+    const doc = await loadDocument();
+    expect(operation(doc, '/api/v1/me/pass-approvals/pending', 'get').operationId).toBe(
+      'listMyPendingPassApprovals',
+    );
+    expect(operation(doc, '/api/v1/me/pass-overrides/pending', 'get').operationId).toBe(
+      'listMyPendingPassOverrides',
+    );
+    expect(operation(doc, '/api/v1/pass-approvals/{approvalId}/approve', 'post').operationId).toBe(
+      'approvePassApproval',
+    );
+    expect(operation(doc, '/api/v1/pass-overrides/{overrideId}/deny', 'post').operationId).toBe(
+      'denyPassOverride',
+    );
+  });
+
+  it('requires CSRF, Idempotency-Key, and If-Match on workflow POST commands', async () => {
+    const doc = await loadDocument();
+    for (const path of workflowPosts) {
+      const op = operation(doc, path, 'post');
+      const schemes = (op.security ?? []).flatMap((entry) => Object.keys(entry));
+      expect(schemes).toContain('cookieAuth');
+      expect(schemes).toContain('csrfHeader');
+      const headers = parameterNames(op, 'header');
+      expect(headers).toContain('idempotency-key');
+      expect(headers).toContain('if-match');
+      expect(op.description).toMatch(/ETag/);
+    }
   });
 });

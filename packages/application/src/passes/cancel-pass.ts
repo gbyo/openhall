@@ -5,6 +5,7 @@ import type { Principal } from '../authentication/principal.js';
 import type { AuditWriter } from '../auditing/audit.js';
 import type { IdempotencyTransactionStore } from '../idempotency/coordinator.js';
 import { runIdempotentCommand } from '../idempotency/coordinator.js';
+import { buildPolicyProjection, type PolicyRepository } from '../policy/index.js';
 import type {
   OutboxWriter,
   TenantTransactionContext,
@@ -24,6 +25,7 @@ export interface CancelPassDependencies {
   readonly clock: Clock;
   readonly runner: TenantTransactionRunner;
   readonly passes: PassRepository;
+  readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
   readonly outbox: OutboxWriter;
@@ -126,7 +128,7 @@ export async function cancelSelfPass(
           'This pass cannot be self-cancelled.',
         );
       }
-      const updated = await passes.updatePassToCancelled(context, row.id, row.revision);
+      const updated = await passes.updatePassToCancelled(context, row.id, row.revision, now);
       if (updated?.revision !== nextRevision) {
         throw new PassApplicationError(
           'stale_pass_revision',
@@ -134,10 +136,14 @@ export async function cancelSelfPass(
         );
       }
       const at: Temporal.Instant = now;
+      // Terminal cleanup: no actionable pending approval/override may survive
+      // on a cancelled pass. System provenance; no extra pass revision.
+      await dependencies.policy.cancelAllPendingWorkflows(context, row.id, at);
       await passes.appendPassEvent(context, {
         passId: row.id,
         sequence: updated.revision,
         eventType: 'pass.cancelled',
+        actorKind: 'person',
         actorPersonId: input.principal.personId,
         occurredAt: at,
         metadata: {
@@ -182,6 +188,9 @@ export async function cancelSelfPass(
           destinationId: row.destinationId,
         },
       });
+      const latest = await dependencies.policy.loadLatestEvaluation(context, row.id);
+      const liveApprovals = await dependencies.policy.listApprovalsForPass(context, row.id);
+      const liveOverrides = await dependencies.policy.listOverridesForPass(context, row.id);
       const representation: PassRepresentation = {
         id: updated.id,
         organizationId: updated.organizationId,
@@ -201,6 +210,8 @@ export async function cancelSelfPass(
         requestedAt: updated.requestedAt.toString(),
         lifecycleState: updated.lifecycleState,
         revision: updated.revision.toString(10),
+        policy:
+          latest === null ? null : buildPolicyProjection(latest, liveApprovals, liveOverrides),
       };
       return {
         representation,

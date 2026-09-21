@@ -49,6 +49,8 @@ const SECTION_SCOPED_TEACHER_CAPS: readonly Capability[] = [
   'pass.create.student',
   'pass.approve.section',
   'pass.view.section_live',
+  'pass.override.request.student',
+  'pass.override.resolve.section',
 ];
 
 function deny(reason: AuthorizationDenialReason): AuthorizationDecision {
@@ -114,11 +116,16 @@ function capabilityAllowsResourceKind(capability: Capability, kind: string): boo
     case 'audit.view':
       return kind === 'organization';
     case 'pass.request.self':
+    case 'pass.override.request.self':
       return kind === 'student';
     case 'pass.create.student':
+    case 'pass.override.request.student':
       return kind === 'student' || kind === 'student_in_section';
     case 'pass.approve.section':
+    case 'pass.override.resolve.section':
       return kind === 'student_in_section';
+    case 'pass.override.resolve.school':
+      return kind === 'student';
     case 'pass.view.section_live':
       return kind === 'section';
     case 'destination.station.manage':
@@ -657,8 +664,10 @@ export class RelationshipAuthorizationService {
     const date = schoolDateFor(at, organization.timeZone);
     if (date === null) return deny('invalid_school_time_zone');
 
-    if (capability === 'pass.request.self') {
+    if (capability === 'pass.request.self' || capability === 'pass.override.request.self') {
       // Self semantics: target must be the principal; admin grants never fabricate it.
+      // Override self-requests additionally require the current student
+      // relationship; recovery sessions never reach here (restricted above).
       if (resource.studentId !== principal.personId) return deny('target_not_active_student');
       const affiliations = activeAffiliations(actor, organization.id, date);
       if (affiliations.includes('student')) {
@@ -795,8 +804,9 @@ export class RelationshipAuthorizationService {
       };
     }
 
-    // Counselor/office may create for students in the school (section target).
-    if (capability === 'pass.create.student') {
+    // Counselor/office may create for students in the school (section target),
+    // and may request overrides there; override resolution stays school-tier.
+    if (capability === 'pass.create.student' || capability === 'pass.override.request.student') {
       for (const role of ['counselor', 'office_staff'] as const) {
         const grant = hasStaffBackedGrant(actor, role, organization.id, date);
         if (grant !== null) {
@@ -832,7 +842,10 @@ export class RelationshipAuthorizationService {
         Temporal.PlainDate.compare(date, teacherMembership.endsOn) <= 0);
     if (!teacherActive) {
       return deny(
-        capability === 'pass.approve.section' || capability === 'pass.create.student'
+        capability === 'pass.approve.section' ||
+          capability === 'pass.create.student' ||
+          capability === 'pass.override.request.student' ||
+          capability === 'pass.override.resolve.section'
           ? 'teacher_not_assigned'
           : 'no_applicable_grant',
       );

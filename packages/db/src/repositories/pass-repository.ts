@@ -184,11 +184,58 @@ export class PostgresPassRepository implements PassRepository {
     context: TenantTransactionContext,
     passId: PassId,
     expectedRevision: bigint,
+    at: Temporal.Instant,
   ): Promise<PassRow | null> {
     const connection = connectionFor(context);
     const updated = await connection
       .updateTable('pass')
-      .set({ lifecycle_state: 'cancelled', revision: String(expectedRevision + 1n) })
+      .set({
+        lifecycle_state: 'cancelled',
+        revision: String(expectedRevision + 1n),
+        updated_at: toDatabaseInstant(at),
+      })
+      .where('tenant_id', '=', context.tenantId)
+      .where('id', '=', passId)
+      .where('revision', '=', String(expectedRevision))
+      .returningAll()
+      .executeTakeFirst();
+    if (updated === undefined) return null;
+    return this.toPassRow(connection, updated);
+  }
+
+  async touchPassRevision(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null> {
+    const connection = connectionFor(context);
+    const updated = await connection
+      .updateTable('pass')
+      .set({ revision: String(expectedRevision + 1n), updated_at: toDatabaseInstant(at) })
+      .where('tenant_id', '=', context.tenantId)
+      .where('id', '=', passId)
+      .where('revision', '=', String(expectedRevision))
+      .returningAll()
+      .executeTakeFirst();
+    if (updated === undefined) return null;
+    return this.toPassRow(connection, updated);
+  }
+
+  async updatePassToDenied(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null> {
+    const connection = connectionFor(context);
+    const updated = await connection
+      .updateTable('pass')
+      .set({
+        lifecycle_state: 'denied',
+        revision: String(expectedRevision + 1n),
+        updated_at: toDatabaseInstant(at),
+      })
       .where('tenant_id', '=', context.tenantId)
       .where('id', '=', passId)
       .where('revision', '=', String(expectedRevision))
@@ -207,8 +254,8 @@ export class PostgresPassRepository implements PassRepository {
         pass_id: input.passId,
         sequence: input.sequence,
         event_type: input.eventType,
-        actor_kind: 'person',
-        actor_person_id: input.actorPersonId,
+        actor_kind: input.actorKind,
+        actor_person_id: input.actorKind === 'person' ? input.actorPersonId : null,
         occurred_at: toDatabaseInstant(input.occurredAt),
         metadata: { ...(input.metadata as Record<string, never>) },
       })

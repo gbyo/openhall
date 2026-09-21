@@ -1,5 +1,6 @@
 import type { Principal } from '../authentication/principal.js';
 import type { TenantTransactionRunner } from '../persistence.js';
+import { buildPolicyProjection, type PolicyRepository } from '../policy/index.js';
 import { PassApplicationError } from './errors.js';
 import type { PassRepository } from './ports.js';
 import { etagForPass, placementKindFromRow, type PassRepresentation } from './representations.js';
@@ -7,6 +8,7 @@ import { etagForPass, placementKindFromRow, type PassRepresentation } from './re
 export interface ActivePassDependencies {
   readonly runner: TenantTransactionRunner;
   readonly passes: PassRepository;
+  readonly policy: PolicyRepository;
 }
 
 export interface ActivePassResult {
@@ -18,6 +20,8 @@ export interface ActivePassResult {
  * GET /api/v1/me/passes/active — the caller's own active pass, or null.
  * Never accepts a studentId; searches student_id = principal.personId.
  * Recovery sessions are rejected; no pass existence leaks across students.
+ * Attaches the latest safe policy projection without re-evaluating: reads
+ * stay reads, and legacy passes without an evaluation project policy:null.
  */
 export async function getActiveSelfPass(
   principal: Principal,
@@ -29,10 +33,19 @@ export async function getActiveSelfPass(
       'Recovery sessions cannot read passes.',
     );
   }
-  const row = await dependencies.runner.run(principal.tenantId, (context) =>
-    dependencies.passes.findActivePassForStudent(context, principal.personId),
-  );
-  if (row?.tenantId !== principal.tenantId || row.studentId !== principal.personId) {
+  const loaded = await dependencies.runner.run(principal.tenantId, async (context) => {
+    const row = await dependencies.passes.findActivePassForStudent(context, principal.personId);
+    if (row === null) return null;
+    return {
+      row,
+      evaluation: await dependencies.policy.loadLatestEvaluation(context, row.id),
+      approvals: await dependencies.policy.listApprovalsForPass(context, row.id),
+      overrides: await dependencies.policy.listOverridesForPass(context, row.id),
+    };
+  });
+  if (loaded === null) return { pass: null, etag: null };
+  const { row } = loaded;
+  if (row.tenantId !== principal.tenantId || row.studentId !== principal.personId) {
     return { pass: null, etag: null };
   }
   const pass: PassRepresentation = {
@@ -54,6 +67,10 @@ export async function getActiveSelfPass(
     requestedAt: row.requestedAt.toString(),
     lifecycleState: row.lifecycleState,
     revision: row.revision.toString(10),
+    policy:
+      loaded.evaluation === null
+        ? null
+        : buildPolicyProjection(loaded.evaluation, loaded.approvals, loaded.overrides),
   };
   return { pass, etag: etagForPass(row.id, row.revision) };
 }

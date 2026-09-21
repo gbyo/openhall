@@ -63,7 +63,7 @@ afterAll(async () => {
 
 describe('migration 004 authorization relationships', () => {
   it('advances the expected migration marker', () => {
-    expect(EXPECTED_MIGRATION).toBe('005_pass_command_core');
+    expect(EXPECTED_MIGRATION).toBe('006_movement_policy_approvals_overrides');
   });
 
   it('migrates a blank database 001 -> 004', async () => {

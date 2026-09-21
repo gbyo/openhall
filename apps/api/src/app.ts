@@ -19,6 +19,7 @@ import { registerAuthRoutes } from './routes/auth.js';
 import { registerBootstrapRoutes } from './routes/bootstrap.js';
 import { registerMeRoutes } from './routes/me.js';
 import { registerPassesRoutes } from './routes/passes.js';
+import { registerPolicyRoutes } from './routes/policy.js';
 import { createPassDependencies } from './passes/dependencies.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerSystemRoutes } from './routes/system.js';
@@ -243,8 +244,13 @@ export async function createApp(options: CreateAppOptions): Promise<FastifyInsta
     typedApp,
     createAuthorizationDependencies(options.database, dependencies.tenantRunner),
   );
+  const passDependencies = createPassDependencies(options.database);
   registerPassesRoutes(typedApp, {
-    passes: createPassDependencies(options.database),
+    passes: passDependencies,
+    auth: dependencies,
+  });
+  registerPolicyRoutes(typedApp, {
+    passes: passDependencies,
     auth: dependencies,
   });
 

@@ -1020,11 +1020,16 @@ describe('pass command durability', () => {
         [passId],
       )
     ).rows;
-    expect(outbox).toHaveLength(1);
-    expect(outbox[0]?.event_type).toBe('pass.requested');
-    const payloadRaw = JSON.stringify(outbox[0]?.payload);
-    for (const leaked of ['teacher', 'email', 'session', 'displayname']) {
-      expect(payloadRaw.toLowerCase()).not.toContain(leaked);
+    expect(outbox.map((entry) => entry.event_type).sort()).toEqual(
+      ['pass.policy_evaluated', 'pass.requested'].sort(),
+    );
+    const evaluated = outbox.find((entry) => entry.event_type === 'pass.policy_evaluated');
+    expect((evaluated?.payload as { decision?: string }).decision).toBe('allow');
+    for (const entry of outbox) {
+      const payloadRaw = JSON.stringify(entry.payload);
+      for (const leaked of ['teacher', 'email', 'session', 'displayname']) {
+        expect(payloadRaw.toLowerCase()).not.toContain(leaked);
+      }
     }
     const audit = (
       await pool.query<{ action: string; metadata: unknown }>(

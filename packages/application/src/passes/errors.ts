@@ -12,7 +12,14 @@ export type PassErrorCode =
   | 'invalid_precondition'
   | 'stale_pass_revision'
   | 'forbidden'
-  | 'recovery_session_restricted';
+  | 'recovery_session_restricted'
+  | 'approval_not_found'
+  | 'invalid_approval_state'
+  | 'override_not_found'
+  | 'override_not_available'
+  | 'invalid_override_state'
+  | 'override_requires_independent_approver'
+  | 'policy_configuration_error';
 
 export class PassApplicationError extends Error {
   constructor(
@@ -29,6 +36,8 @@ export function passHttpStatus(code: PassErrorCode): number {
     case 'destination_not_found':
     case 'student_not_found':
     case 'pass_not_found':
+    case 'approval_not_found':
+    case 'override_not_found':
       return 404;
     case 'forbidden':
     case 'recovery_session_restricted':
@@ -37,6 +46,10 @@ export function passHttpStatus(code: PassErrorCode): number {
     case 'idempotency_key_reused':
     case 'invalid_pass_transition':
     case 'destination_unavailable':
+    case 'invalid_approval_state':
+    case 'override_not_available':
+    case 'invalid_override_state':
+    case 'override_requires_independent_approver':
       return 409;
     case 'stale_pass_revision':
       return 412;

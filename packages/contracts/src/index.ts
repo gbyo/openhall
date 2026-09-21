@@ -173,6 +173,10 @@ export const CapabilitySchema = Type.Union(
     Type.Literal('pass.cancel.self'),
     Type.Literal('pass.create.student'),
     Type.Literal('pass.approve.section'),
+    Type.Literal('pass.override.request.self'),
+    Type.Literal('pass.override.request.student'),
+    Type.Literal('pass.override.resolve.section'),
+    Type.Literal('pass.override.resolve.school'),
     Type.Literal('pass.view.section_live'),
     Type.Literal('pass.view.school_live'),
     Type.Literal('pass.view.school_history'),
@@ -388,6 +392,22 @@ const PassOriginLocationSchema = Type.Object(
 );
 
 /**
+ * Latest safe movement-policy projection. Null for legacy passes that
+ * predate Phase 6 evaluation; reads never fabricate a historical decision.
+ */
+export const PassPolicySchema = Type.Object(
+  {
+    decision: Type.String(),
+    evaluatedAt: InstantSchema,
+    reasonCodes: Type.Array(Type.String()),
+    approvalPending: Type.Boolean(),
+    overrideAvailable: Type.Boolean(),
+    overridePending: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+
+/**
  * Small safe pass representation. Revision is a decimal string because the
  * underlying value is PostgreSQL bigint, never a JSON number.
  */
@@ -396,6 +416,7 @@ export const PassSchema = Type.Object(
     id: UuidSchema,
     organizationId: UuidSchema,
     studentId: UuidSchema,
+    policy: Type.Union([PassPolicySchema, Type.Null()]),
     destination: Type.Object(
       {
         id: UuidSchema,
@@ -429,6 +450,106 @@ export const ActiveSelfPassSchema = Type.Object(
 export const PassResponseSchema = Type.Object(
   { pass: PassSchema },
   { $id: 'PassResponse', additionalProperties: false },
+);
+
+/** POST override request body: category only, nothing else. */
+export const OverrideRequestBodySchema = Type.Object(
+  {
+    category: Type.Union([
+      Type.Literal('urgent'),
+      Type.Literal('private'),
+      Type.Literal('safety'),
+      Type.Literal('staff_directed'),
+    ]),
+  },
+  { $id: 'OverrideRequestBody', additionalProperties: false },
+);
+
+const PendingApprovalSectionSchema = Type.Object(
+  {
+    id: UuidSchema,
+    code: Type.Union([Type.String(), Type.Null()]),
+    title: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+const PersonDisplaySchema = Type.Object(
+  {
+    id: UuidSchema,
+    displayName: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+const DestinationDisplaySchema = Type.Object(
+  {
+    id: UuidSchema,
+    displayName: Type.String(),
+    serviceType: Type.String(),
+  },
+  { additionalProperties: false },
+);
+
+/** Staff-facing pending approval: useful data only, no rule JSON or grants. */
+export const PendingApprovalSchema = Type.Object(
+  {
+    approvalId: UuidSchema,
+    passId: UuidSchema,
+    passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+    passEtag: Type.String({ minLength: 1 }),
+    student: PersonDisplaySchema,
+    destination: DestinationDisplaySchema,
+    requiredSection: PendingApprovalSectionSchema,
+    requestedAt: InstantSchema,
+  },
+  { $id: 'PendingApproval', additionalProperties: false },
+);
+
+export const PendingApprovalListSchema = Type.Object(
+  { approvals: Type.Array(PendingApprovalSchema) },
+  { $id: 'PendingApprovalList', additionalProperties: false },
+);
+
+/** Staff-facing pending override: no rule configuration, no explanations. */
+export const PendingOverrideSchema = Type.Object(
+  {
+    overrideId: UuidSchema,
+    passId: UuidSchema,
+    passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+    passEtag: Type.String({ minLength: 1 }),
+    student: PersonDisplaySchema,
+    destination: DestinationDisplaySchema,
+    category: Type.Union([
+      Type.Literal('urgent'),
+      Type.Literal('private'),
+      Type.Literal('safety'),
+      Type.Literal('staff_directed'),
+    ]),
+    overrideMode: Type.Union([
+      Type.Literal('never'),
+      Type.Literal('authorized'),
+      Type.Literal('approval_required'),
+    ]),
+    reasonCode: Type.Union([
+      Type.Literal('no_violation'),
+      Type.Literal('schedule_boundary_blackout'),
+      Type.Literal('current_section_teacher_approval_required'),
+      Type.Literal('approval_context_unavailable'),
+      Type.Literal('approval_satisfied'),
+      Type.Literal('approval_denied'),
+      Type.Literal('override_denied'),
+      Type.Literal('rule_overridden'),
+      Type.Literal('policy_configuration_error'),
+    ]),
+    requestedAt: InstantSchema,
+  },
+  { $id: 'PendingOverride', additionalProperties: false },
+);
+
+export const PendingOverrideListSchema = Type.Object(
+  { overrides: Type.Array(PendingOverrideSchema) },
+  { $id: 'PendingOverrideList', additionalProperties: false },
 );
 
 /**

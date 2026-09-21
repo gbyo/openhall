@@ -59,6 +59,10 @@ export interface ResourceByCapability {
   'pass.cancel.self': SelfResource;
   'pass.create.student': StudentResource | StudentInSectionResource;
   'pass.approve.section': StudentInSectionResource;
+  'pass.override.request.self': StudentResource;
+  'pass.override.request.student': StudentResource | StudentInSectionResource;
+  'pass.override.resolve.section': StudentInSectionResource;
+  'pass.override.resolve.school': StudentResource;
 
   'pass.view.section_live': SectionResource;
   'pass.view.school_live': OrganizationResource;

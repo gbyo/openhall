@@ -4,10 +4,17 @@ import {
   RelationshipAuthorizationService,
   cancelSelfPass,
   getActiveSelfPass,
+  listPendingApprovals,
+  listPendingOverrides,
   requestSelfPass,
   requestStudentPass,
+  resolvePassApproval,
+  requestPassOverride,
+  resolvePassOverride,
   type ActivePassDependencies,
+  type ApprovalCommandDependencies,
   type CancelPassDependencies,
+  type OverrideCommandDependencies,
   type RequestPassDependencies,
 } from '@openhall/application';
 import {
@@ -17,6 +24,7 @@ import {
   PostgresIdempotencyRepository,
   PostgresOutboxWriter,
   PostgresPassRepository,
+  PostgresPolicyRepository,
   PostgresTenantTransactionRunner,
   type DB as Database,
 } from '@openhall/db';
@@ -26,6 +34,8 @@ export interface PassDependencies {
   readonly request: RequestPassDependencies;
   readonly cancel: CancelPassDependencies;
   readonly active: ActivePassDependencies;
+  readonly approvals: ApprovalCommandDependencies;
+  readonly overrides: OverrideCommandDependencies;
 }
 
 /**
@@ -41,6 +51,7 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
     new PostgresExpectedPlacementRepository(database),
   );
   const passes = new PostgresPassRepository();
+  const policy = new PostgresPolicyRepository();
   const idempotency = new PostgresIdempotencyRepository();
   const audit = new PostgresAuditWriter();
   const outbox = new PostgresOutboxWriter();
@@ -51,15 +62,50 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
     facts,
     placement,
     passes,
+    policy,
     idempotency,
     audit,
     outbox,
   };
   return {
     request,
-    cancel: { clock, runner, passes, idempotency, audit, outbox },
-    active: { runner, passes },
+    cancel: { clock, runner, passes, policy, idempotency, audit, outbox },
+    active: { runner, passes, policy },
+    approvals: {
+      clock,
+      runner,
+      authorization,
+      facts,
+      placement,
+      passes,
+      policy,
+      idempotency,
+      audit,
+      outbox,
+    },
+    overrides: {
+      clock,
+      runner,
+      authorization,
+      facts,
+      placement,
+      passes,
+      policy,
+      idempotency,
+      audit,
+      outbox,
+    },
   };
 }
 
-export { cancelSelfPass, getActiveSelfPass, requestSelfPass, requestStudentPass };
+export {
+  cancelSelfPass,
+  getActiveSelfPass,
+  listPendingApprovals,
+  listPendingOverrides,
+  requestPassOverride,
+  requestSelfPass,
+  requestStudentPass,
+  resolvePassApproval,
+  resolvePassOverride,
+};

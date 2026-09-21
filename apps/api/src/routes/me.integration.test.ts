@@ -349,6 +349,8 @@ describe('GET /api/v1/me/organizations/:organizationId/context', () => {
       'pass.create.student',
       'pass.approve.section',
       'pass.view.section_live',
+      'pass.override.request.student',
+      'pass.override.resolve.section',
     ]);
     expect(body.expectedPlacement).toBeNull();
   });
