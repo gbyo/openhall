@@ -207,6 +207,7 @@ test('sign-in choice is keyboard operable', async ({ page }) => {
   await page.getByRole('radio', { name: 'Google Workspace' }).focus();
   await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('radio', { name: 'Another OpenID Connect provider' })).toBeChecked();
+  await expect(page.getByText('Question 3 of 4')).toBeVisible();
   await expect(page.getByLabel('Provider name')).toBeVisible();
 });
 
@@ -271,6 +272,7 @@ test('review summarizes without secrets and creates with setup-later', async ({ 
   await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'Ready to set up WayPass' })).toBeVisible();
+  await expect(page.getByText('Question 4 of 4')).toBeVisible();
   const summary = page.getByRole('list', { name: 'Setup answers' });
   await expect(summary.getByText('Ninety Six High School')).toBeVisible();
   await expect(summary.getByText('Gibson Bell')).toBeVisible();
@@ -278,6 +280,35 @@ test('review summarizes without secrets and creates with setup-later', async ({ 
   await expect(page.getByText('test-setup-code')).toHaveCount(0);
   await page.getByRole('button', { name: 'Create WayPass' }).click();
   await expect(page.getByText('Finish setting up school sign-in')).toBeVisible();
+});
+
+test('submit disables while creating to prevent duplicate submit', async ({ page }) => {
+  const state: GuidedMocks = { initialized: false, sessionMethod: 'setup' };
+  await guidedShell(page, state);
+  let calls = 0;
+  await page.route('**/api/v1/bootstrap/initialize', (route) => {
+    calls += 1;
+    state.initialized = true;
+    return new Promise((resolve) => setTimeout(resolve, 800)).then(() =>
+      route.fulfill({
+        json: {
+          authenticated: true,
+          authenticationMethod: 'setup',
+          absoluteExpiresAt: '2026-09-22T14:42:00.000Z',
+        },
+      }),
+    );
+  });
+  await unlock(page);
+  await fillSchool(page);
+  await fillAdministrator(page);
+  await page.getByRole('radio', { name: 'Set up sign-in later' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Ready to set up WayPass' })).toBeVisible();
+  await page.getByRole('button', { name: 'Create WayPass' }).click();
+  await expect(page.getByRole('button', { name: 'Creating…', exact: true })).toBeDisabled();
+  await expect(page.getByText('Finish setting up school sign-in')).toBeVisible();
+  expect(calls).toBe(1);
 });
 
 test('connect sign-in sends only genuine google input', async ({ page }) => {
