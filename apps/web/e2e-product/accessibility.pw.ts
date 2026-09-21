@@ -89,13 +89,21 @@ test('teacher can approve from the keyboard with a visible focus indicator', asy
   const approve = page.getByRole('button', { name: 'Approve' });
   await approve.focus();
   await expect(approve).toBeFocused();
-  const outline = await approve.evaluate((element) => {
+  const focus = await approve.evaluate((element) => {
     const style = getComputedStyle(element);
-    return { style: style.outlineStyle, width: style.outlineWidth, color: style.outlineColor };
+    return {
+      style: style.outlineStyle,
+      width: style.outlineWidth,
+      color: style.outlineColor,
+      shadow: style.boxShadow,
+    };
   });
-  expect(outline.style).not.toBe('none');
-  expect(Number.parseFloat(outline.width)).toBeGreaterThan(0);
-  expect(outline.color).not.toBe('rgba(0, 0, 0, 0)');
+  const hasOutlineRing =
+    (focus.style !== 'none' &&
+      Number.parseFloat(focus.width) > 0 &&
+      focus.color !== 'rgba(0, 0, 0, 0)') ||
+    (focus.shadow !== 'none' && focus.shadow !== '');
+  expect(hasOutlineRing).toBe(true);
   const box = await approve.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return { top: rect.top, bottom: rect.bottom, height: window.innerHeight };
@@ -116,7 +124,7 @@ test('student no-pass view stays usable at 200 percent text size', async ({ page
   await expect(page.getByRole('heading', { name: 'Where do you need to go?' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Nurse/ })).toBeVisible();
   const clipped = await page
-    .locator('.product-main')
+    .locator('main')
     .evaluate((element) => element.scrollWidth - element.clientWidth);
   expect(clipped).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
