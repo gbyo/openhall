@@ -129,7 +129,7 @@ export function registerPassesRoutes(app: FastifyInstance, options: RegisterPass
         description:
           'Request a pass for the authenticated student. The target student and request source are server-derived. Requires Idempotency-Key (OpenHall API contract, not a finalized IETF RFC). Success returns ETag for the pass revision. Cache-Control: no-store.',
         security: COOKIE_CSRF_SECURITY,
-        body: schemaRef(PassRequestBodySchema),
+        body: PassRequestBodySchema,
         headers: IdempotencyHeadersSchema,
         response: { 201: schemaRef(PassResponseSchema), ...MUTATION_ERRORS },
       },
@@ -178,7 +178,7 @@ export function registerPassesRoutes(app: FastifyInstance, options: RegisterPass
           'Staff-created pass request for a student. Organization-level pass.create.student is attempted first; denied teachers fall back to the resolved current section. Requires Idempotency-Key (OpenHall API contract). Success returns ETag. Cache-Control: no-store.',
         security: COOKIE_CSRF_SECURITY,
         params: StudentIdParamsSchema,
-        body: schemaRef(PassRequestBodySchema),
+        body: PassRequestBodySchema,
         headers: IdempotencyHeadersSchema,
         response: { 201: schemaRef(PassResponseSchema), ...MUTATION_ERRORS },
       },
