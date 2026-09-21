@@ -9,11 +9,25 @@ import type { ExplicitRole } from './decisions.js';
  */
 export const ROLE_CAPABILITIES: Record<ExplicitRole, readonly Capability[]> = {
   destination_staff: ['destination.station.manage'],
-  counselor: ['pass.create.student', 'pass.view.school_live', 'scheduled_authorization.manage'],
-  office_staff: ['pass.create.student', 'pass.view.school_live', 'scheduled_authorization.manage'],
+  counselor: [
+    'pass.create.student',
+    'pass.view.school_live',
+    'scheduled_authorization.manage',
+    'pass.override.request.student',
+    'pass.override.resolve.school',
+  ],
+  office_staff: [
+    'pass.create.student',
+    'pass.view.school_live',
+    'scheduled_authorization.manage',
+    'pass.override.request.student',
+    'pass.override.resolve.school',
+  ],
   school_admin: [
     'pass.create.student',
     'pass.approve.section',
+    'pass.override.request.student',
+    'pass.override.resolve.school',
     'pass.view.section_live',
     'pass.view.school_live',
     'pass.view.school_history',
@@ -42,6 +56,9 @@ export const SYSTEM_ADMIN_CAPABILITIES: readonly Capability[] = [
   'organization.context.read',
   'pass.create.student',
   'pass.approve.section',
+  'pass.override.request.student',
+  'pass.override.resolve.section',
+  'pass.override.resolve.school',
   'pass.view.section_live',
   'pass.view.school_live',
   'pass.view.school_history',

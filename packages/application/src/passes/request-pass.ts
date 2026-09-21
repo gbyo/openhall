@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Temporal } from '@js-temporal/polyfill';
-import { createRequestedPass } from '@openhall/domain';
+import { createRequestedPass, transitionPass } from '@openhall/domain';
 import type { Clock } from '@openhall/domain';
 import type { Principal } from '../authentication/principal.js';
 import type { AuditWriter } from '../auditing/audit.js';
@@ -16,6 +16,12 @@ import type {
   TenantTransactionRunner,
 } from '../persistence.js';
 import type { ExpectedPlacementResolver, ExpectedPlacementResult } from '../scheduling/index.js';
+import {
+  buildPolicyProjection,
+  evaluateAndPersistPolicy,
+  reconcilePendingApprovals,
+  type PolicyRepository,
+} from '../policy/index.js';
 import { PassApplicationError } from './errors.js';
 import {
   advisoryLockKey,
@@ -33,6 +39,7 @@ export interface RequestPassDependencies {
   readonly facts: AuthorizationFactsRepository;
   readonly placement: ExpectedPlacementResolver;
   readonly passes: PassRepository;
+  readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
   readonly outbox: OutboxWriter;
@@ -58,7 +65,11 @@ export interface RequestPassResult {
   readonly replayed: boolean;
 }
 
-function toRepresentation(row: PassRow, placementKind: string): PassRepresentation {
+function toRepresentation(
+  row: PassRow,
+  placementKind: string,
+  policy: PassRepresentation['policy'],
+): PassRepresentation {
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -78,6 +89,7 @@ function toRepresentation(row: PassRow, placementKind: string): PassRepresentati
     requestedAt: row.requestedAt.toString(),
     lifecycleState: row.lifecycleState,
     revision: row.revision.toString(10),
+    policy,
   };
 }
 
@@ -330,10 +342,35 @@ async function executeRequest(
         passId: row.id,
         sequence: 1n,
         eventType: 'pass.requested',
+        actorKind: 'person',
         actorPersonId: principal.personId,
         occurredAt: now,
         metadata,
       });
+      const decided = await evaluateAndPersistPolicy(context, dependencies.policy, {
+        pass: {
+          id: row.id,
+          revision: row.revision,
+          organizationId: row.organizationId,
+          studentId: row.studentId,
+          destinationId: row.destinationId,
+          requestSource,
+          originBlockId: row.originScheduleBlockId,
+          originSectionId: row.originSectionId,
+          originLocationId: row.originLocationId,
+        },
+        placement,
+        at: now,
+        stage: 'request',
+      });
+      const reconciled = await reconcilePendingApprovals(context, dependencies.policy, {
+        organizationId: row.organizationId,
+        passId: row.id,
+        outcome: decided.outcome,
+        resultIdsByRule: decided.resultIdsByRule,
+        at: now,
+      });
+      const createdApprovals = reconciled.created;
       await audit.append(context, {
         action: 'pass.requested',
         actorKind: 'account',
@@ -370,13 +407,148 @@ async function executeRequest(
           destinationId,
         },
       });
+      const reasonCodes: string[] = [];
+      for (const result of decided.outcome.results) {
+        if (!reasonCodes.includes(result.reasonCode)) reasonCodes.push(result.reasonCode);
+      }
+      const overrideAvailable = decided.outcome.results.some(
+        (result) => result.contribution === 'override_required',
+      );
+      await outbox.append(context, {
+        tenantId: principal.tenantId,
+        organizationId: schoolId,
+        aggregateKind: 'pass',
+        aggregateId: row.id,
+        eventType: 'pass.policy_evaluated',
+        occurredAt: now.toString(),
+        payload: {
+          schemaVersion: 1,
+          passId: row.id,
+          organizationId: schoolId,
+          studentId: targetStudentId,
+          passRevision: '1',
+          decision: decided.outcome.decision,
+          reasonCodes,
+          approvalPending: createdApprovals.length > 0,
+          overrideAvailable,
+        },
+      });
+      for (const approval of createdApprovals) {
+        await outbox.append(context, {
+          tenantId: principal.tenantId,
+          organizationId: schoolId,
+          aggregateKind: 'pass',
+          aggregateId: row.id,
+          eventType: 'pass.approval_required',
+          occurredAt: now.toString(),
+          payload: {
+            schemaVersion: 1,
+            approvalId: approval.id,
+            passId: row.id,
+            organizationId: schoolId,
+            studentId: targetStudentId,
+            requiredSectionId: approval.requiredSectionId,
+            passRevision: '1',
+          },
+        });
+      }
+      let finalRow = row;
+      let liveApprovals = [...reconciled.kept];
+      if (decided.outcome.decision === 'deny') {
+        try {
+          transitionPass(
+            {
+              id: row.id,
+              tenantId: row.tenantId,
+              organizationId: row.organizationId,
+              studentId: row.studentId,
+              originLocationId: row.originLocationId,
+              originSectionId: row.originSectionId,
+              originScheduleBlockId: row.originScheduleBlockId,
+              destinationId: row.destinationId,
+              returnLocationId: row.returnLocationId,
+              requestSource,
+              requestedByPersonId: row.requestedByPersonId,
+              requestedAt: row.requestedAt,
+              lifecycleState: row.lifecycleState as 'requested',
+              expectedReturnAt: row.expectedReturnAt,
+              scheduledAuthorizationId: row.scheduledAuthorizationId,
+              revision: row.revision,
+            },
+            'denied',
+          );
+        } catch {
+          throw new PassApplicationError('invalid_pass_transition', 'This pass cannot be denied.');
+        }
+        const denied = await passes.updatePassToDenied(context, row.id, row.revision, now);
+        if (denied === null) {
+          throw new PassApplicationError(
+            'stale_pass_revision',
+            'The pass has changed since this client last read it.',
+          );
+        }
+        await passes.appendPassEvent(context, {
+          passId: row.id,
+          sequence: denied.revision,
+          eventType: 'pass.denied',
+          actorKind: 'system',
+          actorPersonId: null,
+          occurredAt: now,
+          metadata: {
+            schemaVersion: 1,
+            state: 'denied',
+            revision: denied.revision.toString(10),
+          },
+        });
+        await outbox.append(context, {
+          tenantId: principal.tenantId,
+          organizationId: schoolId,
+          aggregateKind: 'pass',
+          aggregateId: row.id,
+          eventType: 'pass.denied',
+          occurredAt: now.toString(),
+          payload: {
+            schemaVersion: 1,
+            passId: row.id,
+            organizationId: schoolId,
+            studentId: targetStudentId,
+            lifecycleState: 'denied',
+            revision: denied.revision.toString(10),
+            destinationId,
+          },
+        });
+        // Terminal passes must not leave actionable workflow rows.
+        await dependencies.policy.cancelAllPendingWorkflows(context, row.id, now);
+        finalRow = denied;
+        liveApprovals = [];
+      }
+      const projection = buildPolicyProjection(
+        {
+          id: decided.evaluationId,
+          passRevision: finalRow.revision,
+          stage: 'request',
+          decision: decided.outcome.decision,
+          evaluatedAt: now,
+          results: decided.outcome.results.map((result) => ({
+            id: decided.resultIdsByRule.get(result.ruleId) ?? '',
+            ruleId: result.ruleId,
+            ruleRevision: result.ruleRevision,
+            outcome: result.outcome,
+            reasonCode: result.reasonCode,
+            overrideMode: result.overrideMode,
+            contribution: result.contribution,
+          })),
+        },
+        liveApprovals,
+        [],
+      );
       // Derive the placement kind from the stored row, exactly as later
       // reads do, so the create response matches subsequent GETs. The
       // detailed snapshot stays in the pass.requested event metadata.
-      const representation = toRepresentation(row, placementKindFromRow(row));
+      const representation = toRepresentation(finalRow, placementKindFromRow(finalRow), projection);
       return {
         representation,
-        etag: etagForPass(row.id, row.revision),
+        etag: etagForPass(finalRow.id, finalRow.revision),
       };
     },
     toStored: (value) => ({

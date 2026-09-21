@@ -145,8 +145,8 @@ async function seedProvider(tenantId: string, key: string): Promise<string> {
 }
 
 describe('migration 003 on PostgreSQL 18', () => {
-  it('migrates a blank database through 005', async () => {
-    expect(EXPECTED_MIGRATION).toBe('005_pass_command_core');
+  it('migrates a blank database through 006', async () => {
+    expect(EXPECTED_MIGRATION).toBe('006_movement_policy_approvals_overrides');
     const rows = await pool.query<{ name: string }>(
       'SELECT name FROM kysely_migration ORDER BY name',
     );
@@ -156,6 +156,7 @@ describe('migration 003 on PostgreSQL 18', () => {
       '003_identity_secure_sessions',
       '004_authorization_relationships',
       '005_pass_command_core',
+      '006_movement_policy_approvals_overrides',
     ]);
   });
 

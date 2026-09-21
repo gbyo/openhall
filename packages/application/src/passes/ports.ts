@@ -58,6 +58,8 @@ export interface PassEventInput {
   readonly passId: PassId;
   readonly sequence: bigint;
   readonly eventType: string;
+  /** System actors record automated policy outcomes with a null person. */
+  readonly actorKind: 'person' | 'system';
   readonly actorPersonId: PersonId | null;
   readonly occurredAt: Temporal.Instant;
   readonly metadata: Readonly<Record<string, unknown>>;
@@ -100,6 +102,27 @@ export interface PassRepository {
     context: TenantTransactionContext,
     passId: PassId,
     expectedRevision: bigint,
+  ): Promise<PassRow | null>;
+  /**
+   * Workflow revision bump without a lifecycle change: records a policy
+   * workflow mutation (approval/override) so the ETag moves and stale UI
+   * actions are rejected. Exactly one increment per workflow mutation.
+   */
+  touchPassRevision(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
+  ): Promise<PassRow | null>;
+  /**
+   * Transitions a locked pass to denied, incrementing revision once.
+   * Returns null when the row no longer matches the expected revision.
+   */
+  updatePassToDenied(
+    context: TenantTransactionContext,
+    passId: PassId,
+    expectedRevision: bigint,
+    at: Temporal.Instant,
   ): Promise<PassRow | null>;
   appendPassEvent(context: TenantTransactionContext, input: PassEventInput): Promise<void>;
 }

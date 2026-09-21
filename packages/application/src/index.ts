@@ -3,6 +3,7 @@ export * from './authentication/index.js';
 export * from './authorization/index.js';
 export * from './idempotency/index.js';
 export * from './passes/index.js';
+export * from './policy/index.js';
 export * from './integrations/index.js';
 export * from './persistence.js';
 export * from './scheduling/index.js';

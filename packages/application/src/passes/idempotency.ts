@@ -9,6 +9,12 @@ export const PASS_IDEMPOTENCY_COMMANDS = [
   'pass.request.self:v1',
   'pass.request.student:v1',
   'pass.cancel.self:v1',
+  'pass.approval.approve:v1',
+  'pass.approval.deny:v1',
+  'pass.override.request.self:v1',
+  'pass.override.request.student:v1',
+  'pass.override.approve:v1',
+  'pass.override.deny:v1',
 ] as const;
 
 export type PassIdempotencyCommand = (typeof PASS_IDEMPOTENCY_COMMANDS)[number];
@@ -55,6 +61,37 @@ export function fingerprintStaffRequest(studentId: string, destinationId: string
 
 export function fingerprintSelfCancel(passId: string, expectedRevision: bigint): string {
   return hex(['pass.cancel.self:v1', passId, expectedRevision.toString(10)]);
+}
+
+export function fingerprintApprovalResolve(
+  approvalId: string,
+  passId: string,
+  expectedRevision: bigint,
+  decision: 'approved' | 'denied',
+): string {
+  const command = decision === 'approved' ? 'pass.approval.approve:v1' : 'pass.approval.deny:v1';
+  return hex([command, approvalId, passId, expectedRevision.toString(10), decision]);
+}
+
+export function fingerprintOverrideRequest(
+  passId: string,
+  category: string,
+  expectedRevision: bigint,
+  surface: 'self' | 'student',
+): string {
+  const command =
+    surface === 'self' ? 'pass.override.request.self:v1' : 'pass.override.request.student:v1';
+  return hex([command, passId, category, expectedRevision.toString(10), surface]);
+}
+
+export function fingerprintOverrideResolve(
+  overrideId: string,
+  passId: string,
+  expectedRevision: bigint,
+  decision: 'approved' | 'denied',
+): string {
+  const command = decision === 'approved' ? 'pass.override.approve:v1' : 'pass.override.deny:v1';
+  return hex([command, overrideId, passId, expectedRevision.toString(10), decision]);
 }
 
 /**

@@ -1058,7 +1058,13 @@ describe('phase 4 authorization matrix', () => {
         id: 'sec-a1',
         code: 'sec-a1',
         title: 'Title sec-a1',
-        capabilities: ['pass.create.student', 'pass.approve.section', 'pass.view.section_live'],
+        capabilities: [
+          'pass.create.student',
+          'pass.approve.section',
+          'pass.view.section_live',
+          'pass.override.request.student',
+          'pass.override.resolve.section',
+        ],
       },
     ]);
 

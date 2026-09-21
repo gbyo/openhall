@@ -372,6 +372,22 @@ export interface Pass {
   updated_at: Generated<string>;
 }
 
+export interface PassApproval {
+  created_at: Generated<string>;
+  decided_at: string | null;
+  decided_by_person_id: string | null;
+  decision: Generated<string>;
+  decision_actor_kind: string | null;
+  id: Generated<string>;
+  organization_id: string;
+  origin_evaluation_result_id: string;
+  pass_id: string;
+  policy_rule_id: string;
+  policy_rule_revision: number;
+  required_section_id: string;
+  tenant_id: string;
+}
+
 export interface PassEvent {
   actor_integration_id: string | null;
   actor_kind: string;
@@ -386,13 +402,18 @@ export interface PassEvent {
 }
 
 export interface PassOverride {
-  category: string | null;
+  category: string;
   decided_at: string | null;
   decided_by_person_id: string | null;
   decision: Generated<string>;
+  decision_actor_kind: string | null;
   evaluation_result_id: string;
   id: Generated<string>;
+  organization_id: string;
+  override_mode: string;
   pass_id: string;
+  policy_rule_id: string;
+  policy_rule_revision: number;
   requested_at: Generated<string>;
   requested_by_person_id: string;
   tenant_id: string;
@@ -410,15 +431,19 @@ export interface Person {
 }
 
 export interface PolicyEvaluation {
+  context_snapshot: Generated<Json>;
   decision: string;
   evaluated_at: Generated<string>;
   id: Generated<string>;
   pass_id: string;
+  pass_revision: Int8;
+  schema_version: Generated<number>;
   stage: string;
   tenant_id: string;
 }
 
 export interface PolicyEvaluationResult {
+  contribution: Generated<string>;
   evaluation_id: string;
   id: Generated<string>;
   outcome: string;
@@ -426,6 +451,7 @@ export interface PolicyEvaluationResult {
   policy_rule_id: string;
   policy_rule_revision: number;
   reason_code: string;
+  rule_snapshot: Generated<Json>;
   tenant_id: string;
 }
 
@@ -590,6 +616,7 @@ export interface DB {
   organization_membership: OrganizationMembership;
   outbox_event: OutboxEvent;
   pass: Pass;
+  pass_approval: PassApproval;
   pass_event: PassEvent;
   pass_override: PassOverride;
   person: Person;
