@@ -30,36 +30,18 @@ test('sign-in keeps discovery and OIDC start behavior intact', async ({ page }) 
   );
 });
 
-test('bootstrap keeps every setup field and submit action available', async ({ page }) => {
+test('bootstrap begins with the setup-code unlock established by guided setup', async ({
+  page,
+}) => {
   await mockBootstrap(page, false);
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Set up WayPass' })).toBeVisible();
-  for (const label of [
-    'Operator token',
-    'Organization name',
-    'Organization slug (lowercase)',
-    'School name',
-    'School slug (lowercase)',
-    'School time zone (e.g. America/Chicago)',
-    'Administrator given name',
-    'Administrator family name',
-    'Administrator display name',
-    'Provider key (lowercase)',
-    'Provider display name',
-    'Provider issuer URL',
-    'Client ID',
-    'Client secret',
-    'Scopes (space separated)',
-  ]) {
-    await expect(page.getByLabel(label, { exact: true })).toBeVisible();
-  }
-  await expect(page.getByRole('combobox', { name: 'Provider', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "Let's set up WayPass" })).toBeVisible();
+  await expect(page.getByLabel('Setup code', { exact: true })).toBeVisible();
   await expect(
-    page.getByRole('combobox', { name: 'Client authentication', exact: true }),
+    page.getByText('Enter the one-time setup code shown by your WayPass server.'),
   ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Validate and continue with the provider' }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Where do I find this?' })).toBeVisible();
 });
 
 test('recovery and logout-all preserve in-memory CSRF request behavior', async ({ page }) => {

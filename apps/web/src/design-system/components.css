@@ -381,7 +381,7 @@
   display: grid;
   overflow: auto;
   place-items: center;
-  background: rgb(24 35 33 / 48%);
+  background: color-mix(in oklch, var(--foreground) 48%, transparent);
   padding: var(--wf-space-5);
   transition: opacity var(--wf-motion-overlay) var(--wf-ease-standard);
 }
@@ -474,7 +474,12 @@
   height: var(--wf-skeleton-height);
   max-width: 100%;
   border-radius: var(--wf-radius-detail);
-  background: linear-gradient(90deg, var(--wf-surface-subtle), #e2e7e2, var(--wf-surface-subtle));
+  background: linear-gradient(
+    90deg,
+    var(--muted),
+    color-mix(in oklch, var(--muted), var(--foreground) 5%),
+    var(--muted)
+  );
   background-size: 200% 100%;
   animation: wf-skeleton-pulse 1.8s var(--wf-ease-standard) infinite;
 }

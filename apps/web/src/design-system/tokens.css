@@ -1,36 +1,36 @@
 :root {
   color-scheme: light;
 
-  --wf-color-text: #182321;
-  --wf-color-text-muted: #56615e;
-  --wf-color-text-inverse: #ffffff;
-  --wf-surface-canvas: #f6f7f4;
-  --wf-surface-default: #ffffff;
-  --wf-surface-subtle: #eef1ed;
-  --wf-surface-selected: #dcebf0;
-  --wf-border-default: #d6dcd8;
-  --wf-border-strong: #aeb9b3;
-  --wf-focus: #0b5870;
-  --wf-action-primary: #1f5e72;
-  --wf-action-primary-hover: #174b5b;
-  --wf-action-primary-pressed: #123e4b;
-  --wf-action-secondary: #edf3f4;
-  --wf-action-danger: #9b302d;
-  --wf-status-ready: #1c6b4b;
-  --wf-status-ready-subtle: #e4f1ea;
-  --wf-status-queued: #8a5800;
-  --wf-status-queued-subtle: #f8efd8;
-  --wf-status-danger: #b23a36;
-  --wf-status-danger-subtle: #f9e8e6;
-  --wf-status-neutral: #52605c;
   /*
-   * Informational product states (temporary setup access, neutral service
-   * notices). Aliased to the primary action palette so informational
-   * surfaces stay unmistakably WayPass without inventing a new blue.
+   * Temporary compatibility aliases for screens that have not reached their
+   * UI 0.3 migration PR. New work uses the shadcn semantic variables in
+   * index.css directly; these aliases must not become a second token system.
    */
-  --wf-status-info: var(--wf-action-primary);
-  --wf-status-info-subtle: var(--wf-surface-selected);
-  --wf-accent-signal: #e5b84c;
+  --wf-color-text: var(--foreground);
+  --wf-color-text-muted: var(--muted-foreground);
+  --wf-color-text-inverse: var(--primary-foreground);
+  --wf-surface-canvas: var(--background);
+  --wf-surface-default: var(--card);
+  --wf-surface-subtle: var(--muted);
+  --wf-surface-selected: var(--accent);
+  --wf-border-default: var(--border);
+  --wf-border-strong: color-mix(in oklch, var(--border), var(--foreground) 24%);
+  --wf-focus: var(--ring);
+  --wf-action-primary: var(--primary);
+  --wf-action-primary-hover: color-mix(in oklch, var(--primary), var(--foreground) 12%);
+  --wf-action-primary-pressed: color-mix(in oklch, var(--primary), var(--foreground) 22%);
+  --wf-action-secondary: var(--secondary);
+  --wf-action-danger: var(--destructive);
+  --wf-status-ready: var(--success);
+  --wf-status-ready-subtle: var(--success-subtle);
+  --wf-status-queued: var(--warning);
+  --wf-status-queued-subtle: var(--warning-subtle);
+  --wf-status-danger: var(--destructive);
+  --wf-status-danger-subtle: var(--destructive-subtle);
+  --wf-status-neutral: var(--muted-foreground);
+  --wf-status-info: var(--info);
+  --wf-status-info-subtle: var(--info-subtle);
+  --wf-accent-signal: var(--warning);
 
   --wf-space-0: 0;
   --wf-space-1: 0.125rem;
@@ -43,16 +43,16 @@
   --wf-space-8: 3rem;
   --wf-space-9: 4rem;
 
-  --wf-radius-detail: 0.25rem;
-  --wf-radius-control: 0.5rem;
-  --wf-radius-surface: 0.625rem;
-  --wf-radius-container: 0.75rem;
-  --wf-radius-pass: 1rem;
+  --wf-radius-detail: calc(var(--radius) * 0.6);
+  --wf-radius-control: calc(var(--radius) * 0.8);
+  --wf-radius-surface: var(--radius);
+  --wf-radius-container: calc(var(--radius) * 1.4);
+  --wf-radius-pass: calc(var(--radius) * 1.8);
 
   --wf-border-width: 1px;
-  --wf-elevation-overlay: 0 0.75rem 2rem rgb(24 35 33 / 14%);
-  --wf-control-height: 2.75rem;
-  --wf-control-height-compact: 2.25rem;
+  --wf-elevation-overlay: var(--shadow-lg);
+  --wf-control-height: 2.25rem;
+  --wf-control-height-compact: 2rem;
 
   --wf-motion-pressed: 80ms;
   --wf-motion-state: 120ms;

@@ -9,12 +9,48 @@
   *,
   *::before,
   *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
   }
 }
 
 @media (forced-colors: active) {
   :root {
+    --background: Canvas;
+    --foreground: CanvasText;
+    --card: Canvas;
+    --card-foreground: CanvasText;
+    --popover: Canvas;
+    --popover-foreground: CanvasText;
+    --primary: Highlight;
+    --primary-foreground: HighlightText;
+    --secondary: ButtonFace;
+    --secondary-foreground: ButtonText;
+    --muted: Canvas;
+    --muted-foreground: CanvasText;
+    --accent: Highlight;
+    --accent-foreground: HighlightText;
+    --destructive: CanvasText;
+    --destructive-subtle: Canvas;
+    --success: CanvasText;
+    --success-subtle: Canvas;
+    --warning: CanvasText;
+    --warning-subtle: Canvas;
+    --info: CanvasText;
+    --info-subtle: Canvas;
+    --border: CanvasText;
+    --input: CanvasText;
+    --ring: Highlight;
+    --sidebar: Canvas;
+    --sidebar-foreground: CanvasText;
+    --sidebar-primary: Highlight;
+    --sidebar-primary-foreground: HighlightText;
+    --sidebar-accent: Highlight;
+    --sidebar-accent-foreground: HighlightText;
+    --sidebar-border: CanvasText;
+    --sidebar-ring: Highlight;
     --wf-color-text: CanvasText;
     --wf-color-text-muted: CanvasText;
     --wf-color-text-inverse: ButtonText;
