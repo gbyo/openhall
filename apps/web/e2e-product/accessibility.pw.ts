@@ -1,6 +1,16 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { DESTINATION, mockPass, ORG, PASS, PERSON, SECTION, shell, studentApis } from './fixtures';
+import {
+  DESTINATION,
+  mockPass,
+  ORG,
+  orgDestinations,
+  PASS,
+  PERSON,
+  SECTION,
+  shell,
+  studentApis,
+} from './fixtures';
 
 const STUDENT = {
   affiliations: ['student'],
@@ -228,6 +238,78 @@ test('station actions stay available in forced colors', async ({ page }) => {
   const checkIn = page.getByRole('button', { name: 'Check in' });
   await expect(checkIn).toBeVisible();
   await expect(checkIn).toBeEnabled();
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(
+    results.violations.filter((violation) =>
+      ['serious', 'critical'].includes(violation.impact ?? ''),
+    ),
+  ).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('admin schedules have no page-level horizontal overflow at 320px', async ({ page }) => {
+  const errors = listenForErrors(page);
+  await page.setViewportSize({ width: 320, height: 900 });
+  await shell(page, { affiliations: ['staff'], capabilities: ['schedule.manage'] });
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/blocks`, (route) =>
+    route.fulfill({
+      json: {
+        blocks: [
+          {
+            id: 'block-1',
+            code: 'HR',
+            displayName: 'Homeroom',
+            kind: 'instructional',
+            status: 'active',
+          },
+        ],
+      },
+      headers: { ETag: '"schedule:test:1"' },
+    }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/templates`, (route) =>
+    route.fulfill({ json: { templates: [] } }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/calendar*`, (route) =>
+    route.fulfill({ json: { days: [] } }),
+  );
+  await page.goto(`/schools/${ORG}/admin/schedules`);
+  await expect(page.getByRole('heading', { name: 'Schedules' })).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(overflow).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('staff access has no serious axe findings', async ({ page }) => {
+  const errors = listenForErrors(page);
+  await shell(page, { affiliations: ['staff'], capabilities: ['authorization.manage'] });
+  await page.route(`**/api/v1/organizations/${ORG}/authorization-grants`, (route) =>
+    route.fulfill({
+      json: {
+        grants: [
+          {
+            id: 'grant-1',
+            role: 'destination_staff',
+            person: { id: PERSON, displayName: 'Sam Patel' },
+            destination: { id: DESTINATION, displayName: 'Nurse' },
+            status: 'active',
+          },
+        ],
+      },
+    }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/people*`, (route) =>
+    route.fulfill({
+      json: { people: [{ personId: 'staff-2', displayName: 'Jordan Lee' }] },
+    }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
+    route.fulfill({ json: orgDestinations() }),
+  );
+  await page.goto(`/schools/${ORG}/admin/staff-access`);
+  await expect(page.getByRole('heading', { name: 'Staff access' })).toBeVisible();
   const results = await new AxeBuilder({ page }).analyze();
   expect(
     results.violations.filter((violation) =>
