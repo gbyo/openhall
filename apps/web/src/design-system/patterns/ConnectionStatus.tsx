@@ -1,4 +1,4 @@
-import { Button } from '../primitives/Button';
+import { Button } from '@/components/ui/button';
 
 export type ConnectionState = 'reconnecting' | 'stale' | 'unreachable';
 

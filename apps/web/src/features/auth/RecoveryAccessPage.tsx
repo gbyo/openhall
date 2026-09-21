@@ -1,11 +1,15 @@
 import { useEffect, useState, type SubmitEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { Alert } from '../../design-system/primitives/Alert';
-import { TextField } from '../../design-system/primitives/TextField';
 import { AppFrame } from '../../app/AppFrame';
 import { queryClient } from '../../app/query-client';
 import { ApiProblem } from '../../api/problems';
 import { consumeRecoveryCode } from '../setup/setup-api';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 
 /** Unauthenticated recovery entry: trades a recovery code for a session. */
 export function RecoveryAccessPage() {
@@ -44,45 +48,47 @@ export function RecoveryAccessPage() {
 
   return (
     <AppFrame>
-      <section className="setup-view setup-view--narrow" aria-labelledby="recovery-access-title">
-        <p className="auth-kicker">WayPass</p>
-        <h1 className="wf-type-page-title" id="recovery-access-title">
-          Recovery access
-        </h1>
-        <p className="setup-lede">
-          Enter the temporary recovery code shown by your WayPass server.
-        </p>
-        {error ? (
-          <Alert tone="danger" role="alert" title="Recovery could not continue">
-            <p>{error}</p>
-          </Alert>
-        ) : null}
-        <form onSubmit={(event) => void submit(event)} noValidate>
-          <TextField
-            id="recovery-access-code"
-            label="Recovery code"
-            type="password"
-            autoComplete="off"
-            value={code}
-            onChange={(event) => {
-              setCode(event.target.value);
-            }}
-            error={error ?? undefined}
-            required
-          />
-          <div className="setup-actions">
-            <div className="setup-actions__buttons">
-              <button
-                type="submit"
-                className="wf-button wf-button--primary wf-button--standard"
-                disabled={pending}
-              >
-                {pending ? 'Working…' : 'Continue'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </section>
+      <div className="mx-auto grid w-full max-w-md gap-4 py-10">
+        <Card>
+          <CardHeader>
+            <h1 className="text-xl font-semibold tracking-tight">Recovery access</h1>
+            <CardDescription>
+              Enter the temporary recovery code shown by your WayPass server.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4" onSubmit={(event) => void submit(event)} noValidate>
+              {error ? (
+                <Alert variant="destructive" role="alert">
+                  <AlertTitle>Recovery could not continue</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              ) : null}
+              <Field>
+                <FieldLabel htmlFor="recovery-access-code">Recovery code</FieldLabel>
+                <Input
+                  id="recovery-access-code"
+                  type="password"
+                  autoComplete="off"
+                  value={code}
+                  aria-invalid={error ? true : undefined}
+                  onChange={(event) => {
+                    setCode(event.target.value);
+                  }}
+                  required
+                />
+                {error ? <FieldError>{error}</FieldError> : null}
+              </Field>
+              <div>
+                <Button type="submit" disabled={pending}>
+                  {pending && <Spinner data-icon="inline-start" />}
+                  {pending ? 'Working…' : 'Continue'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </AppFrame>
   );
 }

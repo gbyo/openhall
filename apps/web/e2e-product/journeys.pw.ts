@@ -163,13 +163,22 @@ test('teacher creates a pass for a student from the class roster', async ({ page
   await page.goto(`/schools/${ORG}/classes/${SECTION}`);
   await expect(page.getByRole('heading', { name: 'Science 7' })).toBeVisible();
   await expect(page.getByText('Blake Chen')).toBeVisible();
+  await page.getByRole('tab', { name: /Out now/ }).click();
   await expect(page.getByText('No one is out right now.')).toBeVisible();
-  const row = page.locator('.roster-row', { hasText: 'Alex Rivera' });
+  await page.getByRole('tab', { name: 'Roster' }).click();
+  const row = page.locator('[data-slot="item"]', { hasText: 'Alex Rivera' });
   await row.getByRole('button', { name: 'Create pass' }).click();
-  await row.getByRole('button', { name: 'Nurse' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder('Search destinations').fill('Nurse');
+  await page.getByRole('option', { name: 'Nurse' }).click();
+  await dialog.getByRole('button', { name: 'Create pass' }).click();
   expect(created).toBe(true);
   await expect(page.getByText('Out · Nurse')).toBeVisible();
-  await expect(page.locator('.students-out').getByText('Alex Rivera')).toBeVisible();
+  await page.getByRole('tab', { name: /Out now/ }).click();
+  await expect(
+    page.getByRole('list', { name: 'Students out' }).getByText('Alex Rivera'),
+  ).toBeVisible();
 });
 
 test('teacher starts a ready pass from the roster', async ({ page }) => {
@@ -311,15 +320,15 @@ test('station moves students from on-the-way through Here with row ETags', async
   expect(etags.checkIn).toBe('"pass:test:4"');
   await expect(page.getByText('2 here')).toBeVisible();
   await page
-    .locator('.station-row', { hasText: 'Alex Rivera' })
+    .locator('[data-slot="item"]', { hasText: 'Alex Rivera' })
     .getByRole('button', {
       name: 'Begin return',
     })
     .click();
   expect(etags.beginReturn).toBe('"pass:test:5"');
-  await expect(page.locator('.station-row', { hasText: 'Alex Rivera' })).toHaveCount(0);
+  await expect(page.locator('[data-slot="item"]', { hasText: 'Alex Rivera' })).toHaveCount(0);
   await page
-    .locator('.station-row', { hasText: 'Blake Chen' })
+    .locator('[data-slot="item"]', { hasText: 'Blake Chen' })
     .getByRole('button', {
       name: 'Complete here',
     })
@@ -405,10 +414,14 @@ test('office searches live movement and creates a pass', async ({ page }) => {
   await expect(page.getByText('Blake Chen')).toHaveCount(0);
   await expect(page.getByText('Alex Rivera')).toBeVisible();
   await page.getByLabel('Search live movement').fill('');
-  await page.locator('.workspace__actions').getByRole('button', { name: 'Create pass' }).click();
-  await page.getByLabel('Student').selectOption(PERSON);
-  await page.getByLabel('Destination').selectOption(DESTINATION);
-  await page.locator('form.inline-form').getByRole('button', { name: 'Create pass' }).click();
+  await page.getByRole('button', { name: 'Create pass' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder('Search students').fill('Alex Rivera');
+  await page.getByRole('option', { name: 'Alex Rivera' }).click();
+  await dialog.getByPlaceholder('Search destinations').fill('Nurse');
+  await page.getByRole('option', { name: 'Nurse' }).click();
+  await dialog.getByRole('button', { name: 'Create pass' }).click();
   expect(created).toMatchObject({ destinationId: DESTINATION });
 });
 
@@ -529,30 +542,90 @@ test('admin staff access shows duties in school language', async ({ page }) => {
   );
   await page.goto(`/schools/${ORG}/admin/staff-access`);
   await expect(page.getByRole('heading', { name: 'Staff access' })).toBeVisible();
-  await expect(
-    page.locator('.data-table__row', { hasText: 'Sam Patel' }).getByText('Destination staff'),
-  ).toBeVisible();
-  await expect(page.getByLabel('Duty')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Grant access' })).toBeVisible();
+  const grantRow = page
+    .getByRole('table', { name: 'Staff access grants' })
+    .getByRole('row', { name: /Sam Patel/ });
+  await expect(grantRow.getByText('Destination staff')).toBeVisible();
+  await page.getByRole('button', { name: 'Grant access' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Grant access' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Duty')).toBeVisible();
+  await expect(dialog.getByLabel('Staff member')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
 });
 
-test('admin scheduled passes read like appointments', async ({ page }) => {
+test('admin destinations create in a dialog over the list', async ({ page }) => {
   await shell(page, ADMIN);
-  await page.route(`**/api/v1/organizations/${ORG}/scheduled-authorizations`, (route) =>
+  await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
+    route.fulfill({ json: orgDestinations() }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
+    route.fulfill({ json: orgLocations() }),
+  );
+  await page.goto(`/schools/${ORG}/admin/destinations`);
+  await expect(page.getByRole('heading', { name: 'Destinations' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Destinations' }).getByText('Nurse')).toBeVisible();
+  await page.getByRole('button', { name: 'New destination' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New destination' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Display name')).toBeVisible();
+  await expect(dialog.getByLabel('Type')).toBeVisible();
+  await expect(dialog.getByLabel('Location')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
+test('admin schedules add blocks in a dialog over the list', async ({ page }) => {
+  await shell(page, ADMIN);
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/blocks`, (route) =>
     route.fulfill({
       json: {
-        authorizations: [
+        blocks: [
           {
-            id: 'auth-1',
-            student: { id: PERSON, displayName: 'Alex Rivera' },
-            destination: { id: DESTINATION, displayName: 'Nurse' },
-            validFrom: '2027-01-05T15:00:00Z',
-            validUntil: '2027-01-05T16:00:00Z',
+            id: 'block-1',
+            code: 'HR',
+            displayName: 'Homeroom',
+            kind: 'instructional',
             status: 'active',
           },
         ],
       },
+      headers: { ETag: '"schedule:test:1"' },
     }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/templates`, (route) =>
+    route.fulfill({ json: { templates: [] } }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/schedule/calendar*`, (route) =>
+    route.fulfill({ json: { days: [] } }),
+  );
+  await page.goto(`/schools/${ORG}/admin/schedules`);
+  await expect(page.getByRole('heading', { name: 'Schedules' })).toBeVisible();
+  await page.getByRole('button', { name: 'New block' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New block' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('Code')).toBeVisible();
+  await expect(dialog.getByLabel('Name')).toBeVisible();
+  await expect(dialog.getByLabel('Type')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
+test('admin scheduled passes read like appointments', async ({ page }) => {
+  await shell(page, ADMIN);
+  const authorizations: unknown[] = [
+    {
+      id: 'auth-1',
+      student: { id: PERSON, displayName: 'Alex Rivera' },
+      destination: { id: DESTINATION, displayName: 'Nurse' },
+      validFrom: '2027-01-05T15:00:00Z',
+      validUntil: '2027-01-05T16:00:00Z',
+      status: 'active',
+    },
+  ];
+  await page.route(`**/api/v1/organizations/${ORG}/scheduled-authorizations`, (route) =>
+    route.fulfill({ json: { authorizations } }),
   );
   await page.route(`**/api/v1/organizations/${ORG}/students*`, (route) =>
     route.fulfill({ json: { students: [{ id: PERSON, displayName: 'Alex Rivera' }] } }),
@@ -560,19 +633,183 @@ test('admin scheduled passes read like appointments', async ({ page }) => {
   await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
     route.fulfill({ json: orgDestinations() }),
   );
+  await page.route(`**/api/v1/me/organizations/${ORG}/destinations`, (route) =>
+    route.fulfill({ json: { destinations: orgDestinations().destinations } }),
+  );
   await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
     route.fulfill({ json: orgLocations() }),
   );
+  let created = false;
+  await page.unroute(`**/api/v1/organizations/${ORG}/scheduled-authorizations`);
+  await page.route(`**/api/v1/organizations/${ORG}/scheduled-authorizations`, async (route) => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().headers()['idempotency-key']).toBeTruthy();
+      created = true;
+      authorizations.push({
+        id: 'auth-2',
+        student: { id: PERSON, displayName: 'Alex Rivera' },
+        destination: { id: DESTINATION, displayName: 'Nurse' },
+        validFrom: '2027-01-06T15:00:00Z',
+        validUntil: '2027-01-06T16:00:00Z',
+        status: 'active',
+      });
+      await route.fulfill({ json: { id: 'auth-2' } });
+      return;
+    }
+    await route.fulfill({ json: { authorizations } });
+  });
   await page.goto(`/schools/${ORG}/admin/scheduled-passes`);
+  await expect(page).toHaveURL(new RegExp(`/schools/${ORG}/scheduled-passes`));
   await expect(page.getByRole('heading', { name: 'Scheduled passes' })).toBeVisible();
-  await expect(page.locator('.plain-list').getByText('Alex Rivera')).toBeVisible();
-  await expect(page.locator('.plain-list').getByText('Nurse')).toBeVisible();
-  await expect(page.getByLabel('Approval').locator('option')).toContainText([
-    'Already approved',
-    'Teacher approval still required',
-  ]);
-  await expect(page.getByText('skips only ordinary classroom approval')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Schedule pass' })).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Scheduled passes' }).getByText('Alex Rivera'),
+  ).toBeVisible();
+  await expect(page.getByText('Upcoming', { exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'New scheduled pass' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByPlaceholder('Search students').fill('Alex Rivera');
+  await page.getByRole('option', { name: 'Alex Rivera' }).click();
+  await dialog.getByPlaceholder('Search destinations').fill('Nurse');
+  await page.getByRole('option', { name: 'Nurse' }).click();
+  await dialog.getByLabel('From').fill('2027-01-06T15:00');
+  await dialog.getByLabel('Until').fill('2027-01-06T16:00');
+  await dialog.getByRole('radio', { name: 'Teacher approval still required' }).check();
+  await expect(dialog.getByText('skips only ordinary classroom approval')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Schedule pass' }).click();
+  expect(created).toBe(true);
+  await expect(dialog).toBeHidden();
+});
+
+test('admin cancels a scheduled pass only after confirmation', async ({ page }) => {
+  await shell(page, ADMIN);
+  const authorizations: unknown[] = [
+    {
+      id: 'auth-1',
+      student: { id: PERSON, displayName: 'Alex Rivera' },
+      destination: { id: DESTINATION, displayName: 'Nurse' },
+      validFrom: '2027-01-05T15:00:00Z',
+      validUntil: '2027-01-05T16:00:00Z',
+      status: 'active',
+    },
+  ];
+  await page.route(`**/api/v1/organizations/${ORG}/scheduled-authorizations`, (route) =>
+    route.fulfill({ json: { authorizations } }),
+  );
+  await page.route(`**/api/v1/scheduled-authorizations/auth-1`, (route) =>
+    route.fulfill({ json: { id: 'auth-1' }, headers: { ETag: '"auth:test:1"' } }),
+  );
+  let cancelled = false;
+  await page.route(`**/api/v1/scheduled-authorizations/auth-1/cancel`, async (route) => {
+    expect(route.request().headers()['if-match']).toBe('"auth:test:1"');
+    expect(route.request().headers()['idempotency-key']).toBeTruthy();
+    cancelled = true;
+    authorizations.pop();
+    await route.fulfill({ json: { id: 'auth-1', status: 'cancelled' } });
+  });
+  await page.goto(`/schools/${ORG}/scheduled-passes`);
+  await expect(page.getByRole('heading', { name: 'Scheduled passes' })).toBeVisible();
+  await page.getByRole('button', { name: "Actions for Alex Rivera's scheduled pass" }).click();
+  await page.getByRole('menuitem', { name: 'Cancel scheduled pass' }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(
+    confirm.getByRole('heading', { name: "Cancel Alex Rivera's scheduled pass?" }),
+  ).toBeVisible();
+  await confirm.getByRole('button', { name: 'Cancel scheduled pass' }).click();
+  await expect.poll(() => cancelled).toBe(true);
+  await expect(page.getByText('Alex Rivera')).toHaveCount(0);
+});
+
+test('admin manages locations through dialog and sheet, not inline forms', async ({ page }) => {
+  await shell(page, ADMIN);
+  let locs: Record<string, unknown>[] = [
+    {
+      id: '00000000-0000-4000-8000-000000000015',
+      organizationId: ORG,
+      parentLocationId: null,
+      kind: 'room',
+      name: 'Health Office',
+      code: null,
+      floorLabel: '1',
+      status: 'active',
+      revision: '1',
+      createdAt: '2026-09-21T14:00:00Z',
+      updatedAt: '2026-09-21T14:00:00Z',
+    },
+  ];
+  await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
+    route.fulfill({ json: { locations: locs } }),
+  );
+  let created = false;
+  await page.unroute(`**/api/v1/organizations/${ORG}/locations`);
+  await page.route(`**/api/v1/organizations/${ORG}/locations`, async (route) => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().headers()['idempotency-key']).toBeTruthy();
+      created = true;
+      locs = [
+        ...locs,
+        {
+          id: '00000000-0000-4000-8000-000000000021',
+          organizationId: ORG,
+          parentLocationId: null,
+          kind: 'room',
+          name: 'Gym',
+          code: null,
+          floorLabel: null,
+          status: 'active',
+          revision: '1',
+          createdAt: '2026-09-21T14:00:00Z',
+          updatedAt: '2026-09-21T14:00:00Z',
+        },
+      ];
+      await route.fulfill({ json: { id: '00000000-0000-4000-8000-000000000021' } });
+      return;
+    }
+    await route.fulfill({ json: { locations: locs } });
+  });
+  await page.route(`**/api/v1/locations/00000000-0000-4000-8000-000000000015`, async (route) => {
+    if (route.request().method() === 'PUT') {
+      expect(route.request().headers()['if-match']).toBe('"loc:test:1"');
+      locs = [{ ...locs[0], name: 'Health Office Updated' }];
+      await route.fulfill({ json: { location: locs[0] } });
+      return;
+    }
+    await route.fulfill({ json: { location: locs[0] }, headers: { ETag: '"loc:test:1"' } });
+  });
+  await page.route(
+    `**/api/v1/locations/00000000-0000-4000-8000-000000000015/archive`,
+    async (route) => {
+      locs = [{ ...locs[0], status: 'archived' }];
+      await route.fulfill({ json: { location: locs[0] } });
+    },
+  );
+  await page.goto(`/schools/${ORG}/admin/locations`);
+  await expect(page.getByRole('heading', { name: 'Locations' })).toBeVisible();
+  await expect(page.getByText('Health Office')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add location' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'New location' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New location' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel('Name').fill('Gym');
+  await dialog.getByRole('button', { name: 'Create location' }).click();
+  expect(created).toBe(true);
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Gym')).toBeVisible();
+  await page.getByRole('button', { name: 'Actions for Health Office' }).click();
+  await page.getByRole('menuitem', { name: 'Edit location' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Edit Health Office' });
+  await expect(sheet).toBeVisible();
+  await sheet.getByLabel('Name').fill('Health Office Updated');
+  await sheet.getByRole('button', { name: 'Save changes' }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText('Health Office Updated')).toBeVisible();
+  await page.getByRole('button', { name: 'Actions for Health Office Updated' }).click();
+  await page.getByRole('menuitem', { name: 'Archive location' }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Archive location' }).click();
+  await expect.poll(() => locs[0]?.status).toBe('archived');
+  await expect(page.getByText('Archived')).toBeVisible();
 });
 
 test('admin people page is a directory with sign-in management, not roster editing', async ({
@@ -651,7 +888,9 @@ test('admin locations list school places', async ({ page }) => {
   );
   await page.goto(`/schools/${ORG}/admin/locations`);
   await expect(page.getByRole('heading', { name: 'Locations' })).toBeVisible();
-  await expect(page.locator('.data-table__row', { hasText: 'Health Office' })).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Locations' }).getByText('Health Office'),
+  ).toBeVisible();
 });
 
 test('school chooser lists schools and index routes a student to their pass', async ({ page }) => {

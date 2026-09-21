@@ -2,8 +2,19 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, confirmed } from '../../../api/client';
 import { queryKeys } from '../../../api/query-keys';
-import { Button } from '../../../design-system/primitives/Button';
 import { useSchool } from '../../../app/school/SchoolShell';
+import { PageHeader } from '../../../components/workspace/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 function actionLabel(value: string): string {
   return value
@@ -24,46 +35,76 @@ export function Component() {
         }),
       ),
   });
+  const events = audit.data?.events ?? [];
   return (
-    <section className="workspace">
-      <header className="workspace__header">
-        <p className="auth-kicker">Accountability</p>
-        <h1 className="wf-type-page-title">Audit</h1>
-        <p>A chronological record of confirmed school changes. No movement analytics or scoring.</p>
-      </header>
-      <div className="data-table audit-table">
-        <div className="data-table__head">
-          <span>Time</span>
-          <span>Actor</span>
-          <span>Action</span>
-          <span>Target</span>
-          <span>Outcome</span>
-          <span>Request ID</span>
+    <section className="grid gap-6">
+      <PageHeader
+        title="Audit"
+        description="A chronological record of confirmed school changes. No movement analytics or scoring."
+      />
+      {audit.isPending ? (
+        <div className="grid gap-2" role="status" aria-label="Loading audit events">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
-        {audit.data?.events.map((event) => (
-          <div className="data-table__row" key={event.id}>
-            <time>
-              {new Intl.DateTimeFormat([], { dateStyle: 'short', timeStyle: 'short' }).format(
-                new Date(event.occurredAt),
-              )}
-            </time>
-            <span>{event.actor.displayName ?? event.actor.kind}</span>
-            <strong>{actionLabel(event.action)}</strong>
-            <span>{event.target.kind}</span>
-            <span>{event.outcome}</span>
-            <code>{event.requestId}</code>
-          </div>
-        ))}
-      </div>
+      ) : events.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>No audit events yet</EmptyTitle>
+            <EmptyDescription>
+              Confirmed school changes will appear here in chronological order.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border">
+          <Table aria-label="Audit events">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Time</TableHead>
+                <TableHead>Actor</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Target</TableHead>
+                <TableHead>Outcome</TableHead>
+                <TableHead>Request ID</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {events.map((event) => (
+                <TableRow key={event.id}>
+                  <TableCell>
+                    <time>
+                      {new Intl.DateTimeFormat([], {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }).format(new Date(event.occurredAt))}
+                    </time>
+                  </TableCell>
+                  <TableCell>{event.actor.displayName ?? event.actor.kind}</TableCell>
+                  <TableCell className="font-medium">{actionLabel(event.action)}</TableCell>
+                  <TableCell>{event.target.kind}</TableCell>
+                  <TableCell>{event.outcome}</TableCell>
+                  <TableCell>
+                    <code className="text-xs">{event.requestId}</code>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
       {audit.data?.nextCursor && (
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setCursor(audit.data.nextCursor ?? undefined);
-          }}
-        >
-          Next page
-        </Button>
+        <div>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setCursor(audit.data.nextCursor ?? undefined);
+            }}
+          >
+            Next page
+          </Button>
+        </div>
       )}
     </section>
   );
