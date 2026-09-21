@@ -149,19 +149,18 @@ export class PostgresEnrollmentRepository implements EnrollmentRepository {
     personId: string,
   ): Promise<{ readonly id: string }> {
     const connection = connectionFor(context);
-    try {
-      const row = await connection
-        .insertInto('account')
-        .values({ tenant_id: context.tenantId, person_id: personId })
-        .returning('id')
-        .executeTakeFirstOrThrow();
-      return { id: row.id };
-    } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
-      const existing = await this.loadAccountForPerson(context, personId);
-      if (existing === null) throw error;
-      return existing;
+    const row = await connection
+      .insertInto('account')
+      .values({ tenant_id: context.tenantId, person_id: personId })
+      .onConflict((conflict) => conflict.columns(['tenant_id', 'person_id']).doNothing())
+      .returning('id')
+      .executeTakeFirst();
+    if (row !== undefined) return { id: row.id };
+    const existing = await this.loadAccountForPerson(context, personId);
+    if (existing === null) {
+      throw new Error('Account conflict did not resolve to an existing person account.');
     }
+    return existing;
   }
 
   async hasProviderIdentity(

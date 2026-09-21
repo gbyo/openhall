@@ -286,13 +286,13 @@ export async function completeIdentityEnrollment(
         expectedNonce: secret.nonce,
       });
     } catch (error) {
-      await denyEnrollment(context, dependencies, transaction.id, input.requestId, error);
+      await denyEnrollment(tenantId, dependencies, transaction.id, input.requestId, error);
       throw new AuthenticationError('auth_provider_unavailable');
     }
     // Explicit mix-up check: the verified issuer must be the transaction's provider.
     if (identity.issuer !== provider.issuer && identity.issuer !== issuer.issuer) {
       await denyEnrollment(
-        context,
+        tenantId,
         dependencies,
         transaction.id,
         input.requestId,
@@ -313,7 +313,7 @@ export async function completeIdentityEnrollment(
 }
 
 async function denyEnrollment(
-  context: TenantTransactionContext,
+  tenantId: string,
   dependencies: EnrollmentAuthDependencies,
   transactionId: string,
   requestId: string,
@@ -321,17 +321,19 @@ async function denyEnrollment(
 ): Promise<never> {
   await dependencies.transactions.markFailed(transactionId, dependencies.clock.now());
   const now = dependencies.clock.now();
-  await dependencies.audit.append(context, {
-    action: 'auth.enrollment_denied',
-    actorKind: 'system',
-    targetKind: 'oidc_login_transaction',
-    targetId: transactionId,
-    outcome: 'denied',
-    occurredAt: now,
-    requestId,
-    metadata: {
-      reason: error instanceof AuthenticationError ? error.code : 'auth_provider_unavailable',
-    },
+  await dependencies.runner.run(tenantId, async (auditContext) => {
+    await dependencies.audit.append(auditContext, {
+      action: 'auth.enrollment_denied',
+      actorKind: 'system',
+      targetKind: 'oidc_login_transaction',
+      targetId: transactionId,
+      outcome: 'denied',
+      occurredAt: now,
+      requestId,
+      metadata: {
+        reason: error instanceof AuthenticationError ? error.code : 'auth_provider_unavailable',
+      },
+    });
   });
   if (error instanceof AuthenticationError) {
     throw error;
@@ -394,7 +396,7 @@ async function finalizeEnrollment(
   const existing = await directory.findIdentity(context, input.issuer, input.subject);
   if (existing !== undefined && existing.accountId !== account.id) {
     await denyEnrollment(
-      context,
+      input.tenantId,
       dependencies,
       input.transactionId,
       input.requestId,

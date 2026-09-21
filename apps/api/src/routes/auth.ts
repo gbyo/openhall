@@ -255,7 +255,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthDepen
           },
         },
       },
-      config: { rateLimit: { max: 100, timeWindow: '1 minute' } },
+      config: { rateLimit: { max: 5, timeWindow: '1 minute', groupId: 'operator-token' } },
     },
     async (request, reply) => {
       const d = id();

@@ -572,6 +572,17 @@ describe('identity enrollment OIDC flow', () => {
         )
       ).rows[0];
       expect(grant?.consumed_at).toBeNull();
+      const denial = (
+        await pool.query<{ reason: string | null }>(
+          `SELECT metadata->>'reason' AS reason
+           FROM audit_event
+           WHERE tenant_id = $1 AND action = 'auth.enrollment_denied'
+           ORDER BY occurred_at DESC
+           LIMIT 1`,
+          [tenantA],
+        )
+      ).rows[0];
+      expect(denial?.reason).toBe('identity_link_conflict');
     } finally {
       provider.rig.subjectOverride = undefined;
     }
