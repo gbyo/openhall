@@ -13,6 +13,7 @@ import type {
   OutboxWriter,
   TenantTransactionContext,
   TenantTransactionRunner,
+  type TenantTransactionSettings,
 } from '../persistence.js';
 import { ControlPlaneError } from './errors.js';
 import { etagForSchedule, parseResourceIfMatch } from './etags.js';
@@ -219,10 +220,7 @@ async function lockAggregate(
     now,
     'schedule_not_found',
   );
-  const configuration = await dependencies.schedules.loadConfigurationForUpdate(
-    context,
-    organizationId,
-  );
+  const configuration = await dependencies.schedules.loadConfiguration(context, organizationId);
   if (configuration === null) {
     // Never fabricate a missing aggregate: school provisioning owns creation.
     throw new ControlPlaneError('schedule_not_found', 'Schedule not found.');
@@ -438,6 +436,19 @@ function validateSlots(
   return byStart.map((slot, index) => ({ ...slot, ordinal: index + 1 }));
 }
 
+const SCHEDULE_READ_TRANSACTION_SETTINGS: TenantTransactionSettings = {
+  isolationLevel: 'repeatable read',
+  accessMode: 'read only',
+};
+
+function runScheduleRead<TResult>(
+  dependencies: ScheduleDependencies,
+  tenantId: string,
+  operation: (context: TenantTransactionContext) => Promise<TResult>,
+): Promise<TResult> {
+  return dependencies.runner.run(tenantId, operation, SCHEDULE_READ_TRANSACTION_SETTINGS);
+}
+
 /**
  * Schedule reads are views of one aggregate, so every response carries the
  * same current strong schedule ETag. Reads authorize schedule.view: they
@@ -483,7 +494,7 @@ export async function listScheduleBlocks(
   readonly etag: string;
 }> {
   const now = dependencies.clock.now();
-  return dependencies.runner.run(principal.tenantId, async (context) => {
+  return runScheduleRead(dependencies, principal.tenantId, async (context) => {
     const aggregate = await readAggregate(context, dependencies, principal, organizationId, now);
     const blocks = await dependencies.schedules.listBlocks(context, organizationId);
     return {
@@ -505,7 +516,7 @@ export async function listScheduleTemplates(
   readonly etag: string;
 }> {
   const now = dependencies.clock.now();
-  return dependencies.runner.run(principal.tenantId, async (context) => {
+  return runScheduleRead(dependencies, principal.tenantId, async (context) => {
     const aggregate = await readAggregate(context, dependencies, principal, organizationId, now);
     const templates = await dependencies.schedules.listTemplates(context, organizationId);
     const withSlots = await Promise.all(
@@ -550,21 +561,17 @@ export async function listCalendarRange(
     throw new ControlPlaneError('invalid_precondition', 'Invalid calendar range.');
   }
   const now = dependencies.clock.now();
-  return dependencies.runner.run(principal.tenantId, async (context) => {
+  return runScheduleRead(dependencies, principal.tenantId, async (context) => {
     const aggregate = await readAggregate(context, dependencies, principal, organizationId, now);
-    const days: CalendarDayView[] = [];
-    let cursor: Temporal.PlainDate = start;
-    while (Temporal.PlainDate.compare(cursor, end) <= 0) {
-      const row = await dependencies.schedules.loadDayByDate(
-        context,
-        organizationId,
-        cursor.toString(),
-      );
-      if (row !== null && row.tenantId === principal.tenantId) {
-        days.push(toCalendarDayView(row));
-      }
-      cursor = cursor.add({ days: 1 });
-    }
+    const rows = await dependencies.schedules.listDaysInRange(
+      context,
+      organizationId,
+      start.toString(),
+      end.toString(),
+    );
+    const days = rows
+      .filter((row) => row.tenantId === principal.tenantId)
+      .map(toCalendarDayView);
     return {
       days,
       revision: aggregate.revision.toString(10),
