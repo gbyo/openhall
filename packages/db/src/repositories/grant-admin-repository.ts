@@ -222,7 +222,7 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
     const row = await connection
       .insertInto('account')
       .values({ tenant_id: context.tenantId, person_id: personId })
-      .onConflict((conflict) => conflict.doNothing())
+      .onConflict((conflict) => conflict.columns(['tenant_id', 'person_id']).doNothing())
       .returning('id')
       .executeTakeFirst();
     if (row !== undefined) return { id: row.id };
