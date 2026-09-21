@@ -2,7 +2,7 @@ import { useEffect, useState, type ChangeEvent } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { QuestionnaireTitle } from '@/components/ui/questionnaire';
+import { QuestionnaireDescription, QuestionnaireTitle } from '@/components/ui/questionnaire';
 import { useFocusField } from './SetupLayout';
 import { useSetup } from './setup-state';
 import type { StepContentProps } from './SchoolStep';
@@ -63,10 +63,11 @@ export function AdministratorFields({ handleRef, onInvalidChange }: StepContentP
   return (
     <>
       <QuestionnaireTitle>
-        <h1 className="setup-title" id="setup-admin-title">
-          Who will manage WayPass?
-        </h1>
+        <h1 id="setup-admin-title">Who will manage WayPass?</h1>
       </QuestionnaireTitle>
+      <QuestionnaireDescription>
+        This person’s account will manage WayPass for your school.
+      </QuestionnaireDescription>
       <Field data-invalid={errors.givenName !== undefined}>
         <FieldLabel htmlFor="setup-admin-given">First name</FieldLabel>
         <Input
@@ -101,12 +102,8 @@ export function AdministratorFields({ handleRef, onInvalidChange }: StepContentP
           <FieldError id="setup-admin-family-error">{errors.familyName}</FieldError>
         ) : null}
       </Field>
-      <Collapsible
-        open={customOpen}
-        onOpenChange={setCustomOpen}
-        className="rounded-2xl border border-border px-4 py-3"
-      >
-        <CollapsibleTrigger className="text-[15px] font-semibold">
+      <Collapsible open={customOpen} onOpenChange={setCustomOpen}>
+        <CollapsibleTrigger className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80">
           Customize display name
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-3">

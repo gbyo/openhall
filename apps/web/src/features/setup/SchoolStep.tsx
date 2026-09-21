@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/combobox';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { QuestionnaireTitle } from '@/components/ui/questionnaire';
+import { QuestionnaireDescription, QuestionnaireTitle } from '@/components/ui/questionnaire';
 import { useFocusField } from './SetupLayout';
 import type { StepHandle } from './SetupLayout';
 import { deriveSlugDefault, supportedTimeZones, timeZoneLabel, useSetup } from './setup-state';
@@ -109,10 +109,11 @@ export function SchoolFields({ handleRef, onInvalidChange }: StepContentProps) {
   return (
     <>
       <QuestionnaireTitle>
-        <h1 className="setup-title" id="setup-school-title">
-          Tell us about your school
-        </h1>
+        <h1 id="setup-school-title">Tell us about your school</h1>
       </QuestionnaireTitle>
+      <QuestionnaireDescription>
+        We’ll use this information to configure WayPass.
+      </QuestionnaireDescription>
       <Field data-invalid={errors.name !== undefined}>
         <FieldLabel htmlFor="setup-school-name">School name</FieldLabel>
         <Input
@@ -165,12 +166,8 @@ export function SchoolFields({ handleRef, onInvalidChange }: StepContentProps) {
           <FieldError id="setup-time-zone-error">{errors.timeZone}</FieldError>
         ) : null}
       </Field>
-      <Collapsible
-        open={advancedOpen}
-        onOpenChange={setAdvancedOpen}
-        className="rounded-2xl border border-border px-4 py-3"
-      >
-        <CollapsibleTrigger className="text-[15px] font-semibold">
+      <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+        <CollapsibleTrigger className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary/80">
           Advanced settings
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-3">
