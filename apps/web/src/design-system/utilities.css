@@ -1,0 +1,30 @@
+.wf-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.wf-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wf-space-5);
+}
+
+.wf-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wf-space-4);
+  align-items: center;
+}
+
+.wf-surface {
+  border: var(--wf-border-width) solid var(--wf-border-default);
+  border-radius: var(--wf-radius-surface);
+  background: var(--wf-surface-default);
+}

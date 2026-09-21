@@ -1,0 +1,40 @@
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wf-motion-pressed: 1ms;
+    --wf-motion-state: 1ms;
+    --wf-motion-standard: 1ms;
+    --wf-motion-overlay: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --wf-color-text: CanvasText;
+    --wf-color-text-muted: CanvasText;
+    --wf-color-text-inverse: ButtonText;
+    --wf-surface-canvas: Canvas;
+    --wf-surface-default: Canvas;
+    --wf-surface-subtle: Canvas;
+    --wf-surface-selected: Highlight;
+    --wf-border-default: CanvasText;
+    --wf-border-strong: CanvasText;
+    --wf-focus: Highlight;
+    --wf-action-primary: ButtonFace;
+    --wf-action-primary-hover: ButtonFace;
+    --wf-action-primary-pressed: ButtonFace;
+    --wf-status-ready: CanvasText;
+    --wf-status-queued: CanvasText;
+    --wf-status-danger: CanvasText;
+    --wf-accent-signal: Highlight;
+  }
+
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}

@@ -1,13 +1,27 @@
+/// <reference types="vite/client" />
+
 import {
   StrictMode,
   useCallback,
   useEffect,
   useState,
   type ChangeEvent,
+  type ReactNode,
   type SubmitEvent,
 } from 'react';
 import { createRoot } from 'react-dom/client';
+import '@fontsource-variable/public-sans/wght.css';
+import './design-system/tokens.css';
+import './design-system/reset.css';
+import './design-system/typography.css';
+import './design-system/motion.css';
+import './design-system/utilities.css';
+import './design-system/components.css';
 import './styles.css';
+import { Button } from './design-system/primitives/Button';
+import { TextField } from './design-system/primitives/TextField';
+import { Alert } from './design-system/primitives/Alert';
+import { RecoveryBanner } from './design-system/patterns/RecoveryBanner';
 
 type Phase =
   | { kind: 'loading' }
@@ -64,40 +78,77 @@ function LoginView({ initialError }: { initialError: string | undefined }) {
       });
   }, []);
   return (
-    <section aria-labelledby="login-title">
-      <p className="eyebrow">Sign in</p>
-      <h1 id="login-title">OpenHall</h1>
-      {initialError === 'identity_not_linked' ? (
-        <p role="alert">
-          Your account is not linked to this OpenHall installation. Contact your school
-          administrator.
+    <div className="auth-layout">
+      <section className="auth-intro" aria-labelledby="login-title">
+        <div className="auth-waymark" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <p className="auth-kicker">Welcome to OpenHall</p>
+        <h1 className="wf-type-page-title" id="login-title">
+          Sign in to your school
+        </h1>
+        <p className="auth-intro__copy">
+          Use the account your school provided. OpenHall keeps the next step clear without asking
+          for another password.
         </p>
-      ) : (
-        initialError && <p role="alert">Sign-in failed ({initialError}). Please try again.</p>
-      )}
-      {failed && <p role="alert">Could not load sign-in options. Please try again.</p>}
-      {tenant && (
-        <>
-          <p>
-            {tenant.name} ({tenant.slug})
+      </section>
+      <section className="auth-action" aria-label="Sign-in options">
+        {initialError === 'identity_not_linked' ? (
+          <Alert tone="danger" role="alert" title="Account not linked">
+            <p>
+              Your account is not linked to this OpenHall installation. Contact your school
+              administrator.
+            </p>
+          </Alert>
+        ) : (
+          initialError && (
+            <Alert tone="danger" role="alert" title="Sign-in failed">
+              <p>Sign-in failed ({initialError}). Please try again.</p>
+            </Alert>
+          )
+        )}
+        {failed && (
+          <Alert tone="danger" role="alert" title="Sign-in options unavailable">
+            <p>Could not load sign-in options. Please try again.</p>
+          </Alert>
+        )}
+        {!discovery && !failed && (
+          <p className="auth-loading" role="status">
+            Finding your school…
           </p>
-          <ul>
-            {(discovery?.providers ?? []).map((provider) => (
-              <li key={provider.key}>
-                <a
-                  href={`/api/v1/auth/oidc/${tenant.slug}/${provider.key}/start?return_path=${encodeURIComponent('/')}`}
-                >
-                  Continue with {provider.displayName}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {discovery?.tenantSelectionRequired && (
-        <p>Select your school organization to continue. (Multi-tenant selection coming soon.)</p>
-      )}
-    </section>
+        )}
+        {tenant && (
+          <div className="auth-provider-list">
+            <div>
+              <p className="wf-type-heading">{tenant.name}</p>
+              <p className="auth-school-slug">{tenant.slug}</p>
+            </div>
+            <ul>
+              {(discovery?.providers ?? []).map((provider) => (
+                <li key={provider.key}>
+                  <a
+                    className="auth-provider-link"
+                    href={`/api/v1/auth/oidc/${tenant.slug}/${provider.key}/start?return_path=${encodeURIComponent('/')}`}
+                  >
+                    <span>Continue with {provider.displayName}</span>
+                    <span aria-hidden="true">→</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {discovery?.tenantSelectionRequired && (
+          <Alert title="Choose your school">
+            <p>
+              Select your school organization to continue. (Multi-tenant selection coming soon.)
+            </p>
+          </Alert>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -190,58 +241,107 @@ function SetupView() {
     [form],
   );
   const field = (name: string, label: string, type = 'text', secret = false) => (
-    <label>
-      {label}
-      <input
-        type={secret ? 'password' : type}
-        value={form[name as keyof typeof form]}
-        onChange={set(name)}
-        required
-        autoComplete="off"
-      />
-    </label>
+    <TextField
+      id={`setup-${name}`}
+      label={label}
+      type={secret ? 'password' : type}
+      value={form[name as keyof typeof form]}
+      onChange={set(name)}
+      required
+      autoComplete="off"
+    />
   );
   return (
-    <section aria-labelledby="setup-title">
-      <p className="eyebrow">First-time setup</p>
-      <h1 id="setup-title">Initialize OpenHall</h1>
-      <p>Paste the one-time operator token issued on the server. It is never stored.</p>
-      {error && <p role="alert">{error}</p>}
+    <section className="setup-view" aria-labelledby="setup-title">
+      <header className="setup-view__header">
+        <p className="auth-kicker">First-time setup</p>
+        <h1 className="wf-type-page-title" id="setup-title">
+          Initialize OpenHall
+        </h1>
+        <p>
+          Connect the school and its sign-in provider. The one-time operator token is used for this
+          request and is never stored.
+        </p>
+      </header>
+      {error && (
+        <Alert tone="danger" role="alert" title="Setup could not continue">
+          <p>{error}</p>
+        </Alert>
+      )}
       <form
+        className="setup-form"
         onSubmit={(event) => {
           void submit(event);
         }}
       >
-        {field('operatorToken', 'Operator token', 'text', true)}
-        {field('tenantName', 'Organization name')}
-        {field('tenantSlug', 'Organization slug (lowercase)')}
-        {field('schoolName', 'School name')}
-        {field('schoolSlug', 'School slug (lowercase)')}
-        {field('schoolTimeZone', 'School time zone (e.g. America/Chicago)')}
-        {field('adminGivenName', 'Administrator given name')}
-        {field('adminFamilyName', 'Administrator family name')}
-        {field('adminDisplayName', 'Administrator display name')}
-        <label>
-          Provider
-          <select value={form.providerPreset} onChange={set('providerPreset')}>
-            <option value="google">Google Workspace</option>
-            <option value="generic">Generic OpenID Connect</option>
-          </select>
-        </label>
-        {field('providerKey', 'Provider key (lowercase)')}
-        {field('providerDisplayName', 'Provider display name')}
-        {field('providerIssuer', 'Provider issuer URL')}
-        {field('providerClientId', 'Client ID')}
-        {field('providerClientSecret', 'Client secret', 'text', true)}
-        <label>
-          Client authentication
-          <select value={form.providerAuthMethod} onChange={set('providerAuthMethod')}>
-            <option value="client_secret_post">client_secret_post</option>
-            <option value="client_secret_basic">client_secret_basic</option>
-          </select>
-        </label>
-        {field('providerScopes', 'Scopes (space separated)')}
-        <button type="submit">Validate and continue with the provider</button>
+        <fieldset className="setup-form__section setup-form__section--token">
+          <legend>Server access</legend>
+          {field('operatorToken', 'Operator token', 'text', true)}
+        </fieldset>
+        <fieldset className="setup-form__section">
+          <legend>School</legend>
+          <div className="setup-form__grid">
+            {field('tenantName', 'Organization name')}
+            {field('tenantSlug', 'Organization slug (lowercase)')}
+            {field('schoolName', 'School name')}
+            {field('schoolSlug', 'School slug (lowercase)')}
+            <div className="setup-form__wide">
+              {field('schoolTimeZone', 'School time zone (e.g. America/Chicago)')}
+            </div>
+          </div>
+        </fieldset>
+        <fieldset className="setup-form__section">
+          <legend>Administrator</legend>
+          <div className="setup-form__grid">
+            {field('adminGivenName', 'Administrator given name')}
+            {field('adminFamilyName', 'Administrator family name')}
+            <div className="setup-form__wide">
+              {field('adminDisplayName', 'Administrator display name')}
+            </div>
+          </div>
+        </fieldset>
+        <fieldset className="setup-form__section">
+          <legend>Sign-in provider</legend>
+          <div className="setup-form__grid">
+            <div className="wf-field">
+              <label className="wf-field__label" htmlFor="setup-provider-preset">
+                Provider
+              </label>
+              <select
+                id="setup-provider-preset"
+                className="wf-input"
+                value={form.providerPreset}
+                onChange={set('providerPreset')}
+              >
+                <option value="google">Google Workspace</option>
+                <option value="generic">Generic OpenID Connect</option>
+              </select>
+            </div>
+            {field('providerKey', 'Provider key (lowercase)')}
+            {field('providerDisplayName', 'Provider display name')}
+            {field('providerIssuer', 'Provider issuer URL')}
+            {field('providerClientId', 'Client ID')}
+            {field('providerClientSecret', 'Client secret', 'text', true)}
+            <div className="wf-field">
+              <label className="wf-field__label" htmlFor="setup-provider-auth-method">
+                Client authentication
+              </label>
+              <select
+                id="setup-provider-auth-method"
+                className="wf-input"
+                value={form.providerAuthMethod}
+                onChange={set('providerAuthMethod')}
+              >
+                <option value="client_secret_post">client_secret_post</option>
+                <option value="client_secret_basic">client_secret_basic</option>
+              </select>
+            </div>
+            {field('providerScopes', 'Scopes (space separated)')}
+          </div>
+        </fieldset>
+        <div className="setup-form__actions">
+          <Button type="submit">Validate and continue with the provider</Button>
+        </div>
       </form>
     </section>
   );
@@ -273,26 +373,66 @@ function AuthenticatedView({ recovery }: { recovery: boolean }) {
     window.location.href = '/';
   }, []);
   return (
-    <section aria-labelledby="account-title">
-      {recovery && (
-        <p role="alert" className="warning">
-          Recovery session: short-lived break-glass access. Sign out when finished.
-        </p>
-      )}
-      <p className="eyebrow">Signed in</p>
-      <h1 id="account-title">{me ? me.person.displayName : 'OpenHall'}</h1>
-      {me && (
-        <p>
-          {me.person.givenName} {me.person.familyName} · {me.tenant.name}
-        </p>
-      )}
-      <button type="button" onClick={() => void logout(false)}>
-        Sign out
-      </button>{' '}
-      <button type="button" onClick={() => void logout(true)}>
-        Sign out everywhere
-      </button>
-    </section>
+    <div className="account-view">
+      {recovery && <RecoveryBanner compact />}
+      <section className="account-view__content" aria-labelledby="account-title">
+        <div className="account-view__marker" aria-hidden="true">
+          <span />
+        </div>
+        <div className="account-view__identity">
+          <p className="auth-kicker">Signed in</p>
+          <h1 className="wf-type-page-title" id="account-title">
+            {me ? me.person.displayName : 'OpenHall'}
+          </h1>
+          {me ? (
+            <p>
+              {me.person.givenName} {me.person.familyName} · {me.tenant.name}
+            </p>
+          ) : (
+            <p className="auth-loading" role="status">
+              Loading account details…
+            </p>
+          )}
+        </div>
+        <div className="account-view__placeholder">
+          <p className="wf-type-heading">Your OpenHall workspace is ready.</p>
+          <p>
+            The student, teacher, station, and administrator experiences arrive in the next product
+            phase.
+          </p>
+        </div>
+        <div className="account-view__actions" aria-label="Account actions">
+          <Button type="button" variant="primary" onClick={() => void logout(false)}>
+            Sign out
+          </Button>
+          <Button type="button" variant="quiet" onClick={() => void logout(true)}>
+            Sign out everywhere
+          </Button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AppFrame({ children }: { children: ReactNode }) {
+  return (
+    <main className="app-frame">
+      <header className="app-frame__header">
+        <a className="app-wordmark" href="/" aria-label="OpenHall home">
+          <span className="app-wordmark__route" aria-hidden="true">
+            <i />
+            <i />
+          </span>
+          <span>OpenHall</span>
+        </a>
+        <span className="app-frame__descriptor">School movement, clearly understood</span>
+      </header>
+      <div className="app-frame__body">{children}</div>
+      <footer className="app-frame__footer">
+        <span>OpenHall</span>
+        <span>Private to your school</span>
+      </footer>
+    </main>
   );
 }
 
@@ -331,44 +471,86 @@ function Shell() {
   }, []);
   if (phase.kind === 'loading') {
     return (
-      <main>
-        <p>Loading OpenHall…</p>
-      </main>
+      <AppFrame>
+        <section className="system-message" aria-labelledby="loading-title">
+          <span className="system-message__route" aria-hidden="true">
+            <i />
+            <i />
+          </span>
+          <div>
+            <h1 className="wf-type-heading" id="loading-title">
+              Opening OpenHall
+            </h1>
+            <p role="status">Checking your school and sign-in session…</p>
+          </div>
+        </section>
+      </AppFrame>
     );
   }
   if (phase.kind === 'setup') {
     return (
-      <main>
+      <AppFrame>
         <SetupView />
-      </main>
+      </AppFrame>
     );
   }
   if (phase.kind === 'login') {
     return (
-      <main>
+      <AppFrame>
         <LoginView initialError={phase.error} />
-      </main>
+      </AppFrame>
     );
   }
   if (phase.kind === 'logged-out') {
     return (
-      <main>
-        <p>Signed out.</p>
-        <a href="/">Sign in again</a>
-      </main>
+      <AppFrame>
+        <section className="system-message" aria-labelledby="signed-out-title">
+          <span
+            className="system-message__route system-message__route--complete"
+            aria-hidden="true"
+          >
+            <i />
+            <i />
+          </span>
+          <div>
+            <h1 className="wf-type-heading" id="signed-out-title">
+              Signed out.
+            </h1>
+            <a className="auth-text-link" href="/">
+              Sign in again
+            </a>
+          </div>
+        </section>
+      </AppFrame>
     );
   }
   return (
-    <main>
+    <AppFrame>
       <AuthenticatedView recovery={phase.recovery} />
-    </main>
+    </AppFrame>
   );
 }
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Application root element is missing');
-createRoot(rootElement).render(
-  <StrictMode>
-    <Shell />
-  </StrictMode>,
-);
+const root = createRoot(rootElement);
+
+async function renderApplication() {
+  if (import.meta.env.DEV && window.location.pathname === '/__wayfinder') {
+    const { WayfinderReferencePage } =
+      await import('./design-system/reference/WayfinderReferencePage');
+    root.render(
+      <StrictMode>
+        <WayfinderReferencePage />
+      </StrictMode>,
+    );
+    return;
+  }
+  root.render(
+    <StrictMode>
+      <Shell />
+    </StrictMode>,
+  );
+}
+
+void renderApplication();
