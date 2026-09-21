@@ -48,9 +48,7 @@ afterAll(async () => {
     const admin = new Client({ connectionString: administration.toString() });
     await admin.connect();
     try {
-      await admin.query(
-        `DROP DATABASE IF EXISTS ${quotedIdentifier(databaseName)} WITH (FORCE)`,
-      );
+      await admin.query(`DROP DATABASE IF EXISTS ${quotedIdentifier(databaseName)} WITH (FORCE)`);
     } finally {
       await admin.end();
     }
