@@ -118,11 +118,8 @@ async function seedSchool(scratch: Pool, tag: string) {
   // room/room_category exist only from migration 011 on; pinned-version
   // fixtures use the legacy location/destination model.
   const hasRooms =
-    (
-      await scratch.query<{ reg: string | null }>(
-        `SELECT to_regclass('room') AS reg`,
-      )
-    ).rows[0]?.reg !== null;
+    (await scratch.query<{ reg: string | null }>(`SELECT to_regclass('room') AS reg`)).rows[0]
+      ?.reg !== null;
   if (!hasRooms) {
     const location = idOf(
       await scratch.query(
@@ -142,7 +139,17 @@ async function seedSchool(scratch: Pool, tag: string) {
         [tenantId, school, student, destination],
       ),
     );
-    return { tenantId, school, otherSchool, section, foreignSection, student, destination, room: destination, pass: legacyPass };
+    return {
+      tenantId,
+      school,
+      otherSchool,
+      section,
+      foreignSection,
+      student,
+      destination,
+      room: destination,
+      pass: legacyPass,
+    };
   }
   const category = idOf(
     await scratch.query(
@@ -162,7 +169,17 @@ async function seedSchool(scratch: Pool, tag: string) {
       [tenantId, school, student, room],
     ),
   );
-  return { tenantId, school, otherSchool, section, foreignSection, student, destination: room, room, pass };
+  return {
+    tenantId,
+    school,
+    otherSchool,
+    section,
+    foreignSection,
+    student,
+    destination: room,
+    room,
+    pass,
+  };
 }
 
 async function seedRule(

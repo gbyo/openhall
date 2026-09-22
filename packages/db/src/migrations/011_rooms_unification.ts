@@ -43,6 +43,7 @@ DECLARE
   uncategorized_destinations bigint;
   unexpected_destination_status bigint;
   unexpected_location_status bigint;
+  unmergeable_status_pairs bigint;
   colliding_ids bigint;
 BEGIN
   SELECT count(*) INTO orphan_destinations
@@ -87,6 +88,19 @@ BEGIN
     RAISE EXCEPTION
       '011 rooms unification: % location row(s) carry an unexpected status; resolve manually',
       unexpected_location_status;
+  END IF;
+
+  -- Status reconciliation (section 4a) has no safe answer when the place is
+  -- retired but its pass target is not: the destination would have to keep
+  -- accepting or holding classes in a location the school archived.
+  SELECT count(*) INTO unmergeable_status_pairs
+  FROM destination d
+  JOIN location l ON l.tenant_id = d.tenant_id AND l.id = d.location_id
+  WHERE l.status = 'archived' AND d.status <> 'archived';
+  IF unmergeable_status_pairs > 0 THEN
+    RAISE EXCEPTION
+      '011 rooms unification: % destination row(s) are still active/closed on an archived location; archive the destination or reactivate the location first',
+      unmergeable_status_pairs;
   END IF;
 
   -- Room UUIDs preserve old destination/location UUIDs where unambiguous,
@@ -170,6 +184,24 @@ LEFT JOIN (
 -- 4a. One room per destination, preserving the destination UUID. The room
 -- name collapses the old display-name/service-type split into the single
 -- canonical name; capacity/queue/check-in/flow settings travel with it.
+--
+-- Status is RECONCILED from both halves, never copied from the destination
+-- alone. In the unified model 'closed' means "cannot receive new passes"
+-- while still resolving as a current class/origin, and only 'archived'
+-- leaves the schedule. So a still-valid classroom Location keeps its room
+-- alive even when its Destination was closed or archived:
+--
+--   location  destination  room     why
+--   --------  -----------  -------  ----------------------------------------
+--   active    active       open     both halves live
+--   active    closed       closed   classroom stands; no new passes
+--   active    archived     closed   classroom stands; pass target retired
+--   inactive  active       open     destination still accepts passes
+--   inactive  closed       closed   neither half is taking new movement
+--   inactive  archived     archived both halves retired
+--   archived  *            archived only reachable when the destination is
+--                                   archived too; every other archived-location
+--                                   pair is rejected by the preflight above.
 INSERT INTO room (
   id, tenant_id, organization_id, category_id, name, code, floor_label,
   status, student_self_requestable, origin_selectable, capacity,
@@ -181,7 +213,12 @@ SELECT
   d.id, d.tenant_id, d.organization_id, d.category_id,
   coalesce(nullif(btrim(d.display_name), ''), l.name),
   l.code, l.floor_label,
-  CASE d.status WHEN 'active' THEN 'open' WHEN 'closed' THEN 'closed' ELSE 'archived' END,
+  CASE
+    WHEN l.status = 'archived' OR (d.status = 'archived' AND l.status <> 'active')
+      THEN 'archived'
+    WHEN d.status = 'active' THEN 'open'
+    ELSE 'closed'
+  END,
   d.student_self_requestable, true, d.capacity,
   d.queue_enabled, d.check_in_mode, d.default_duration_seconds,
   d.max_duration_seconds, d.ready_claim_timeout_seconds, d.queue_timeout_seconds,
@@ -191,7 +228,10 @@ JOIN location l ON l.tenant_id = d.tenant_id AND l.id = d.location_id;
 
 -- 4b. One room per location that is NOT folded into a single destination
 -- (no destination, or several genuinely distinct destinations), preserving
--- the location UUID so schedule/origin history keeps its identity.
+-- the location UUID so schedule/origin history keeps its identity. These
+-- rooms have no destination half, so the location status maps directly:
+-- 'inactive' becomes 'closed' (still a valid class/origin, no new passes)
+-- and only 'archived' leaves the schedule.
 INSERT INTO room (
   id, tenant_id, organization_id, category_id, name, code, floor_label,
   status, student_self_requestable, origin_selectable,

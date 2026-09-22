@@ -108,10 +108,7 @@ export interface RoomFlowRepository {
   /** All tenant ids, for per-tenant worker sweeps. No tenant scoping needed. */
   listTenantIds(): Promise<string[]>;
   acquireRoomLock(context: TenantTransactionContext, lockKey: bigint): Promise<void>;
-  loadRoomConfig(
-    context: TenantTransactionContext,
-    roomId: string,
-  ): Promise<RoomFlowConfig | null>;
+  loadRoomConfig(context: TenantTransactionContext, roomId: string): Promise<RoomFlowConfig | null>;
   /**
    * Reservations consuming capacity at `at`: released_at IS NULL AND
    * (claimed OR still within the ready claim window). An expired unclaimed

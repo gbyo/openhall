@@ -16,6 +16,7 @@ function category(
     name: id,
     iconKey: 'generic',
     toneKey: 'neutral',
+    studentSurface: 'primary',
     pickerMode: 'auto',
     sortOrder: 0,
     rooms: [],
@@ -35,13 +36,10 @@ function room(id: string, name: string) {
 }
 
 describe('server-defined student room catalog', () => {
-  it('splits secondary surfaces into More when the contract carries them', () => {
+  it('splits secondary surfaces into More using the configured placement', () => {
     const { primary, secondary } = splitStudentCatalog([
       category('restroom', { name: 'Restroom' }),
-      {
-        ...category('planetarium', { name: 'Planetarium' }),
-        studentSurface: 'secondary',
-      } as StudentCatalogCategory,
+      category('planetarium', { name: 'Planetarium', studentSurface: 'secondary' }),
     ]);
     expect(primary.map((entry) => entry.name)).toEqual(['Restroom']);
     expect(secondary.map((entry) => entry.name)).toEqual(['Planetarium']);

@@ -173,7 +173,6 @@ export class PostgresExpectedPlacementRepository implements ExpectedPlacementRep
       roomId: string | null;
       roomName: string | null;
       roomCode: string | null;
-      
     }>`
       SELECT membership.section_id AS "membershipSectionId",
              membership.person_id AS "membershipPersonId",
@@ -203,7 +202,11 @@ export class PostgresExpectedPlacementRepository implements ExpectedPlacementRep
         AND membership.role = 'student'
         AND membership.status = 'active'
         AND section_row.status = 'active'
-        AND (room_row.id IS NULL OR room_row.status = 'open')
+        -- Expected Placement answers "where is this class meeting", not
+        -- "can this room receive new passes". A closed room still holds its
+        -- scheduled class (and still works as an origin); only archived
+        -- rooms leave the schedule.
+        AND (room_row.id IS NULL OR room_row.status <> 'archived')
       ORDER BY meeting.id
     `.execute(this.database);
     return result.rows.map((row) => ({

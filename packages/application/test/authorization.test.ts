@@ -408,9 +408,7 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
 
   // Room staff d1 at room-a1.
   facts.memberships.set('d1', [membership('school-a', 'staff')]);
-  facts.grants.set('acct-d1', [
-    grant('g-room-1', 'room_staff', 'room', { roomId: 'room-a1' }),
-  ]);
+  facts.grants.set('acct-d1', [grant('g-room-1', 'room_staff', 'room', { roomId: 'room-a1' })]);
   // Room staff d2 whose grant expired, and d3 without staff membership.
   facts.memberships.set('d2', [membership('school-a', 'staff')]);
   facts.grants.set('acct-d2', [
@@ -421,9 +419,7 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
     }),
   ]);
   facts.memberships.set('d3', []);
-  facts.grants.set('acct-d3', [
-    grant('g-room-3', 'room_staff', 'room', { roomId: 'room-a1' }),
-  ]);
+  facts.grants.set('acct-d3', [grant('g-room-3', 'room_staff', 'room', { roomId: 'room-a1' })]);
 
   // Counselor, office staff, school admin at school-a.
   facts.memberships.set('c1', [membership('school-a', 'staff')]);

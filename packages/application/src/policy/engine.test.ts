@@ -334,6 +334,81 @@ describe('validity and scope', () => {
   });
 });
 
+describe('approver is configuration, never scope', () => {
+  function approvalRuleWith(
+    approver: 'current_section_teacher' | 'room_responsible_staff',
+    overrides: Partial<PolicyRuleInput> = {},
+  ): PolicyRuleInput {
+    return rule({
+      id: 'approval-rule',
+      ruleType: 'approval_requirement',
+      configuration: { schemaVersion: 1, requestSources: ['student_web'], approver },
+      ...overrides,
+    });
+  }
+
+  it('keeps a room-scoped rule bound to the section teacher when configured so', () => {
+    const outcome = evaluatePolicy(
+      contextAt('2026-09-21T12:30:00Z', [
+        approvalRuleWith('current_section_teacher', {
+          scopeKind: 'room',
+          scopeOrganizationId: null,
+          scopeRoomId: DESTINATION,
+        }),
+      ]),
+    );
+    expect(outcome.results[0]?.reasonCode).toBe('current_section_teacher_approval_required');
+    expect(outcome.approvalRequirements[0]).toMatchObject({
+      approverKind: 'current_section_teacher',
+      requiredSectionId: SECTION_P3,
+      requiredRoomId: null,
+    });
+  });
+
+  it('binds room responsible staff on an organization-scoped rule when configured so', () => {
+    const outcome = evaluatePolicy(
+      contextAt('2026-09-21T12:30:00Z', [approvalRuleWith('room_responsible_staff')]),
+    );
+    expect(outcome.results[0]?.reasonCode).toBe('room_responsible_staff_approval_required');
+    expect(outcome.approvalRequirements[0]).toMatchObject({
+      approverKind: 'room_responsible_staff',
+      requiredSectionId: null,
+      requiredRoomId: DESTINATION,
+    });
+  });
+
+  it('never lets a scheduled preapproval satisfy a room-responsible-staff rule', () => {
+    const outcome = evaluatePolicy(
+      contextAt('2026-09-21T12:30:00Z', [approvalRuleWith('room_responsible_staff')], undefined, [
+        {
+          scheduledAuthorizationId: 'scheduled-1',
+          studentId: STUDENT,
+          destinationRoomId: DESTINATION,
+        },
+      ]),
+    );
+    expect(outcome.decision).toBe('approval_required');
+    expect(outcome.results[0]?.reasonCode).toBe('room_responsible_staff_approval_required');
+  });
+
+  it('rejects an unknown approver as a configuration error', () => {
+    const outcome = evaluatePolicy(
+      contextAt('2026-09-21T12:30:00Z', [
+        rule({
+          id: 'approval-rule',
+          ruleType: 'approval_requirement',
+          configuration: {
+            schemaVersion: 1,
+            requestSources: ['student_web'],
+            approver: 'principal',
+          },
+        }),
+      ]),
+    );
+    expect(outcome.results[0]?.reasonCode).toBe('policy_configuration_error');
+  });
+});
+
 describe('approval evidence binding', () => {
   const approval = rule({
     id: 'appr',

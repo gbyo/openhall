@@ -113,11 +113,8 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
   // fixtures use the legacy location/destination model while latest-level
   // fixtures use rooms.
   const hasRooms =
-    (
-      await target.query<{ reg: string | null }>(
-        `SELECT to_regclass('room') AS reg`,
-      )
-    ).rows[0]?.reg !== null;
+    (await target.query<{ reg: string | null }>(`SELECT to_regclass('room') AS reg`)).rows[0]
+      ?.reg !== null;
   if (!hasRooms) {
     const locationA = idOf(
       await target.query<{ id: string }>(
@@ -155,11 +152,8 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
   // room_category exists only from migration 010 on; pinned-version
   // fixtures must not reference it while latest-level fixtures must.
   const hasCategories =
-    (
-      await target.query<{ reg: string | null }>(
-        `SELECT to_regclass('room_category') AS reg`,
-      )
-    ).rows[0]?.reg !== null;
+    (await target.query<{ reg: string | null }>(`SELECT to_regclass('room_category') AS reg`))
+      .rows[0]?.reg !== null;
   async function categoryFor(school: string, name: string): Promise<string | null> {
     if (!hasCategories) return null;
     return idOf(
@@ -176,9 +170,7 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
       hasCategories
         ? `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Nurse B') RETURNING id`
         : `INSERT INTO room (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse B') RETURNING id`,
-      hasCategories && categoryB !== null
-        ? [tenantId, schoolB, categoryB]
-        : [tenantId, schoolB],
+      hasCategories && categoryB !== null ? [tenantId, schoolB, categoryB] : [tenantId, schoolB],
     ),
   );
   const roomA = idOf(
@@ -186,9 +178,7 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
       hasCategories
         ? `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Restroom A') RETURNING id`
         : `INSERT INTO room (tenant_id, organization_id, name) VALUES ($1, $2, 'Restroom A') RETURNING id`,
-      hasCategories && categoryA !== null
-        ? [tenantId, schoolA, categoryA]
-        : [tenantId, schoolA],
+      hasCategories && categoryA !== null ? [tenantId, schoolA, categoryA] : [tenantId, schoolA],
     ),
   );
   return {
@@ -239,7 +229,9 @@ describe('migration 005 pass command core', () => {
         'pass_phase8_departure_destination_revision',
       ]);
       const roomKey = await scratch.query(
-        `SELECT conname FROM pg_constraint WHERE conname LIKE 'room\_tenant\_school\_key' OR (conname LIKE 'room\_%' AND contype = 'u')`,
+        `SELECT conname FROM pg_constraint
+         WHERE conname LIKE 'room@_tenant@_school@_key' ESCAPE '@'
+            OR (conname LIKE 'room@_%' ESCAPE '@' AND contype = 'u')`,
       );
       expect(roomKey.rows.length).toBeGreaterThan(0);
     } finally {
@@ -335,13 +327,7 @@ describe('migration 005 pass command core', () => {
       await expect(
         scratch.query(
           `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, origin_room_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, $5, 'student_web', 'requested') RETURNING id`,
-          [
-            fixture.tenantId,
-            fixture.schoolB,
-            fixture.studentA,
-            fixture.roomB,
-            fixture.roomA,
-          ],
+          [fixture.tenantId, fixture.schoolB, fixture.studentA, fixture.roomB, fixture.roomA],
         ),
       ).rejects.toThrow(/pass_phase11_origin_room_same_school/);
       const blockB = idOf(

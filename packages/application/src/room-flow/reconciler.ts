@@ -164,10 +164,7 @@ export class DestinationFlowReconciler {
       ) {
         return false;
       }
-      await flow.acquireRoomLock(
-        context,
-        roomFlowLockKey(tenantId, pass.destinationRoomId),
-      );
+      await flow.acquireRoomLock(context, roomFlowLockKey(tenantId, pass.destinationRoomId));
       const config = await flow.loadRoomConfig(context, pass.destinationRoomId);
       if (config === null) return false;
       if (config.status === 'closed' || config.status === 'archived') {
@@ -376,10 +373,7 @@ export class DestinationFlowReconciler {
       if (config === null || (config.status !== 'closed' && config.status !== 'archived')) {
         return false;
       }
-      await flow.acquireRoomLock(
-        context,
-        roomFlowLockKey(tenantId, pass.destinationRoomId),
-      );
+      await flow.acquireRoomLock(context, roomFlowLockKey(tenantId, pass.destinationRoomId));
       if (pass.lifecycleState === 'queued') {
         const entry = await flow.loadActiveQueueEntryForPass(context, pass.id);
         if (entry === null) return false;
@@ -473,9 +467,7 @@ export class DestinationFlowReconciler {
     now: Temporal.Instant,
   ): Promise<PromotionAttempt> {
     const { runner, flow, placement } = this.dependencies;
-    const discovered = await runner.run(tenantId, (context) =>
-      flow.loadQueueHead(context, roomId),
-    );
+    const discovered = await runner.run(tenantId, (context) => flow.loadQueueHead(context, roomId));
     if (discovered?.passLifecycleState !== 'queued') return 'deferred';
     if (Temporal.Instant.compare(now, discovered.entry.flowExpiresAt) >= 0) return 'deferred';
     // Approximate capacity gate before the authoritative transaction.

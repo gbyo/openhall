@@ -12,9 +12,7 @@ import { createHash } from 'node:crypto';
  * No code path may acquire the room lock before the pass lock.
  */
 export function roomFlowLockKey(tenantId: string, roomId: string): bigint {
-  const digest = createHash('sha256')
-    .update(['room-flow:v1', tenantId, roomId].join('|'))
-    .digest();
+  const digest = createHash('sha256').update(['room-flow:v1', tenantId, roomId].join('|')).digest();
   // Signed 64-bit for pg_advisory_xact_lock(bigint).
   return digest.readBigInt64BE(0);
 }

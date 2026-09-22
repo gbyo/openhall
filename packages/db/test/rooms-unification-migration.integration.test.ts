@@ -99,7 +99,10 @@ async function stagePreRoomsWorld(scratch: Pool): Promise<Fixture> {
   const health = await location('clinic', 'Health Office', 'active', { code: 'HO', floor: '1' });
   const guidance = await location('office', 'Guidance Office');
   const room305 = await location('classroom', 'Room 305', 'inactive', { code: '305' });
-  const lab214 = await location('classroom', 'Science Lab 214', 'active', { code: '214', floor: '2' });
+  const lab214 = await location('classroom', 'Science Lab 214', 'active', {
+    code: '214',
+    floor: '2',
+  });
   const oldGym = await location('gym', 'Old Gym', 'archived');
 
   const destination = async (
@@ -280,6 +283,49 @@ async function stagePreRoomsWorld(scratch: Pool): Promise<Fixture> {
   };
 }
 
+/**
+ * Minimal pre-rooms world holding one location/destination pair per status
+ * combination, so the 4a reconciliation table can be asserted directly.
+ */
+async function stageStatusPairs(
+  scratch: Pool,
+  pairs: readonly (readonly [string, string])[],
+): Promise<{ tenant: string; school: string; destinations: string[] }> {
+  const tenant = idOf(
+    await scratch.query(`INSERT INTO tenant (name, slug) VALUES ('T', $1) RETURNING id`, [
+      `tpairs${randomUUID().replaceAll('-', '').slice(0, 8)}`,
+    ]),
+  );
+  const school = idOf(
+    await scratch.query(
+      `INSERT INTO organization (tenant_id, kind, name, slug, time_zone)
+       VALUES ($1, 'school', 'S', $2, 'America/New_York') RETURNING id`,
+      [tenant, `spairs${randomUUID().replaceAll('-', '').slice(0, 8)}`],
+    ),
+  );
+  const destinations: string[] = [];
+  for (const [locationStatus, destinationStatus] of pairs) {
+    const location = idOf(
+      await scratch.query(
+        `INSERT INTO location (tenant_id, organization_id, kind, name, status)
+         VALUES ($1, $2, 'classroom', $3, $4) RETURNING id`,
+        [tenant, school, `L ${locationStatus}/${destinationStatus}`, locationStatus],
+      ),
+    );
+    destinations.push(
+      idOf(
+        await scratch.query(
+          `INSERT INTO destination (tenant_id, organization_id, location_id, service_type,
+                                    display_name, status)
+           VALUES ($1, $2, $3, 'classroom', $4, $5) RETURNING id`,
+          [tenant, school, location, `D ${locationStatus}/${destinationStatus}`, destinationStatus],
+        ),
+      ),
+    );
+  }
+  return { tenant, school, destinations };
+}
+
 describe('migration 011 rooms unification', () => {
   it('unifies categories and rooms while preserving every reference', async () => {
     const { url, pool: scratch } = await freshDatabase();
@@ -373,7 +419,11 @@ describe('migration 011 rooms unification', () => {
         'Mrs Carter',
       ]);
       expect(guidanceRooms.map((row) => row.id).sort()).toEqual(
-        [fixture.destinations.carter, fixture.destinations.jackson, fixture.locations.guidance].sort(),
+        [
+          fixture.destinations.carter,
+          fixture.destinations.jackson,
+          fixture.locations.guidance,
+        ].sort(),
       );
       const guidanceLocationRoom = guidanceRooms.find((row) => row.name === 'Guidance Office');
       expect(guidanceLocationRoom?.category_id).toBeNull();
@@ -508,9 +558,10 @@ describe('migration 011 rooms unification', () => {
 
       // Queue and reservation rows follow the destination room by identity.
       const queue = (
-        await scratch.query<{ room_id: string }>('SELECT room_id FROM queue_entry WHERE tenant_id = $1', [
-          fixture.tenant,
-        ])
+        await scratch.query<{ room_id: string }>(
+          'SELECT room_id FROM queue_entry WHERE tenant_id = $1',
+          [fixture.tenant],
+        )
       ).rows[0];
       expect(queue?.room_id).toBe(fixture.destinations.health);
       const reservation = (
@@ -648,6 +699,57 @@ describe('migration 011 rooms unification', () => {
           [fixture.tenant, fixture.school, student, otherRoom],
         ),
       ).rejects.toThrow(/pass_phase11_destination_room_same_school/);
+    } finally {
+      await handle.destroy();
+      await scratch.end();
+    }
+  });
+
+  it('reconciles location and destination status instead of copying the destination', async () => {
+    // Every mergeable combination of the two old status vocabularies. A
+    // valid classroom Location must survive a closed or archived
+    // Destination, because in the unified model only `archived` leaves the
+    // schedule.
+    const pairs = [
+      ['active', 'active'],
+      ['active', 'closed'],
+      ['active', 'archived'],
+      ['inactive', 'active'],
+      ['inactive', 'closed'],
+      ['inactive', 'archived'],
+      ['archived', 'archived'],
+    ] as const;
+    const expected = ['open', 'closed', 'closed', 'open', 'closed', 'archived', 'archived'];
+    const { url, pool: scratch } = await freshDatabase();
+    const handle = createDatabase(url, { max: 1 });
+    try {
+      await migrateTo(handle, '009_guided_setup_authentication');
+      const fixture = await stageStatusPairs(scratch, pairs);
+      await migrateToLatest(handle.database);
+
+      const rows = (
+        await scratch.query<{ id: string; status: string }>(
+          'SELECT id, status FROM room WHERE tenant_id = $1',
+          [fixture.tenant],
+        )
+      ).rows;
+      const byId = new Map(rows.map((row) => [row.id, row.status]));
+      expect(fixture.destinations.map((id) => byId.get(id))).toEqual(expected);
+    } finally {
+      await handle.destroy();
+      await scratch.end();
+    }
+  });
+
+  it('refuses to fold a surviving destination onto an archived location', async () => {
+    const { url, pool: scratch } = await freshDatabase();
+    const handle = createDatabase(url, { max: 1 });
+    try {
+      await migrateTo(handle, '009_guided_setup_authentication');
+      await stageStatusPairs(scratch, [['archived', 'active']]);
+      await expect(migrateToLatest(handle.database)).rejects.toThrow(
+        /still active\/closed on an archived location/,
+      );
     } finally {
       await handle.destroy();
       await scratch.end();

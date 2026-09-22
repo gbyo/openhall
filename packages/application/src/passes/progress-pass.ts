@@ -686,11 +686,7 @@ export async function stationBeginReturnPass(
       principal: input.principal,
       passId: input.passId,
       command: 'pass.station.begin_return:v1',
-      fingerprint: fingerprintStationBeginReturn(
-        input.roomId,
-        input.passId,
-        expected.revision,
-      ),
+      fingerprint: fingerprintStationBeginReturn(input.roomId, input.passId, expected.revision),
       key,
       expectedRevision: expected.revision,
       requestId: input.requestId,

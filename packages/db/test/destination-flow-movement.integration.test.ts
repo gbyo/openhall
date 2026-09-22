@@ -99,11 +99,8 @@ async function seedSchool(scratch: Pool, tag: string) {
   // room/room_category exist only from migration 011 on; pinned-version
   // fixtures use the legacy location/destination model.
   const hasRooms =
-    (
-      await scratch.query<{ reg: string | null }>(
-        `SELECT to_regclass('room') AS reg`,
-      )
-    ).rows[0]?.reg !== null;
+    (await scratch.query<{ reg: string | null }>(`SELECT to_regclass('room') AS reg`)).rows[0]
+      ?.reg !== null;
   if (!hasRooms) {
     const location = idOf(
       await scratch.query(
@@ -123,7 +120,15 @@ async function seedSchool(scratch: Pool, tag: string) {
         [tenantId, school, student, destination],
       ),
     );
-    return { tenantId, school, otherSchool, student, destination, room: destination, pass: legacyPass };
+    return {
+      tenantId,
+      school,
+      otherSchool,
+      student,
+      destination,
+      room: destination,
+      pass: legacyPass,
+    };
   }
   const category = idOf(
     await scratch.query(
@@ -259,14 +264,10 @@ describe('migration 007 room flow and movement', () => {
         ]),
       ).rejects.toMatchObject({ code: '23514' });
       await expect(
-        scratch.query(`UPDATE room SET queue_timeout_seconds = 59 WHERE id = $1`, [
-          school.room,
-        ]),
+        scratch.query(`UPDATE room SET queue_timeout_seconds = 59 WHERE id = $1`, [school.room]),
       ).rejects.toMatchObject({ code: '23514' });
       await expect(
-        scratch.query(`UPDATE room SET queue_timeout_seconds = 14401 WHERE id = $1`, [
-          school.room,
-        ]),
+        scratch.query(`UPDATE room SET queue_timeout_seconds = 14401 WHERE id = $1`, [school.room]),
       ).rejects.toMatchObject({ code: '23514' });
       await scratch.query(
         `UPDATE room SET ready_claim_timeout_seconds = 5, queue_timeout_seconds = 14400 WHERE id = $1`,

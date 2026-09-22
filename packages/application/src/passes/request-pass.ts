@@ -685,11 +685,7 @@ export async function requestSelfPass(
   }
   const key = requireIdempotencyKey(input.idempotencyKey);
   const now = dependencies.clock.now();
-  const schoolId = await loadSchoolForRoom(
-    dependencies,
-    input.principal,
-    input.destinationRoomId,
-  );
+  const schoolId = await loadSchoolForRoom(dependencies, input.principal, input.destinationRoomId);
   const placement = await dependencies.placement.resolve({
     tenantId: input.principal.tenantId,
     organizationId: schoolId,
@@ -732,11 +728,7 @@ export async function requestStudentPass(
   }
   const key = requireIdempotencyKey(input.idempotencyKey);
   const now = dependencies.clock.now();
-  const schoolId = await loadSchoolForRoom(
-    dependencies,
-    input.principal,
-    input.destinationRoomId,
-  );
+  const schoolId = await loadSchoolForRoom(dependencies, input.principal, input.destinationRoomId);
   const placement = await dependencies.placement.resolve({
     tenantId: input.principal.tenantId,
     organizationId: schoolId,

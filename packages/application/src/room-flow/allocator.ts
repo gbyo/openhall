@@ -131,10 +131,7 @@ export async function allocateRoomFlow(
   // Serialize the capacity decision per destination. The caller already
   // holds the pass row lock (or created the pass in this transaction), so
   // global order (pass before destination) is preserved.
-  await flow.acquireRoomLock(
-    context,
-    roomFlowLockKey(pass.tenantId, pass.destinationRoomId),
-  );
+  await flow.acquireRoomLock(context, roomFlowLockKey(pass.tenantId, pass.destinationRoomId));
 
   const denyWithReason = async (
     reasonCode: 'room_unavailable' | 'room_capacity_full',

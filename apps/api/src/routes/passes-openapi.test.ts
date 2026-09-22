@@ -211,16 +211,13 @@ describe('Phase 7 room flow and movement OpenAPI surface', () => {
       'completeMyPass',
     );
     expect(
-      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/check-in', 'post')
-        .operationId,
+      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/check-in', 'post').operationId,
     ).toBe('stationCheckInPass');
     expect(
-      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/begin-return', 'post')
-        .operationId,
+      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/begin-return', 'post').operationId,
     ).toBe('stationBeginReturnPass');
     expect(
-      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/complete', 'post')
-        .operationId,
+      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/complete', 'post').operationId,
     ).toBe('stationCompletePass');
     expect(operation(doc, '/api/v1/me/passes/{passId}/queue-status', 'get').operationId).toBe(
       'getMyPassQueueStatus',

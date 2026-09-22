@@ -44,7 +44,11 @@ export async function getOwnQueueStatus(
     if (pass === null) return null;
     const entry = await dependencies.flow.loadActiveQueueEntryForPass(context, pass.id);
     if (entry === null) return { pass, entry: null };
-    const position = await dependencies.flow.queuePosition(context, pass.destinationRoomId, entry.id);
+    const position = await dependencies.flow.queuePosition(
+      context,
+      pass.destinationRoomId,
+      entry.id,
+    );
     return { pass, entry, position };
   });
   if (loaded?.pass.tenantId !== principal.tenantId) {
@@ -153,7 +157,7 @@ export async function getStationView(
     room: {
       id: aggregates.config.id,
       name: aggregates.roomName,
-      
+
       checkInMode: aggregates.config.checkInMode,
       capacity: aggregates.config.capacity,
     },

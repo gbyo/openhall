@@ -160,18 +160,22 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
     context: TenantTransactionContext,
     organizationId: string,
     roomId: string,
-  ): Promise<{ readonly id: string; readonly name: string } | null> {
+  ): Promise<{
+    readonly id: string;
+    readonly name: string;
+    readonly originSelectable: boolean;
+  } | null> {
     const connection = connectionFor(context);
     const row = await connection
       .selectFrom('room')
-      .select(['id', 'name'])
+      .select(['id', 'name', 'origin_selectable'])
       .where('tenant_id', '=', context.tenantId)
       .where('organization_id', '=', organizationId)
       .where('id', '=', roomId)
       .where('status', '=', 'open')
       .executeTakeFirst();
     if (row === undefined) return null;
-    return { id: row.id, name: row.name };
+    return { id: row.id, name: row.name, originSelectable: row.origin_selectable };
   }
 
   async listByOrganization(

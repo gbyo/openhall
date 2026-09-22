@@ -128,10 +128,7 @@ export class PostgresRoomRepository implements RoomRepository {
     return rows.map(toRoomRecord);
   }
 
-  async loadById(
-    context: TenantTransactionContext,
-    roomId: string,
-  ): Promise<RoomRecord | null> {
+  async loadById(context: TenantTransactionContext, roomId: string): Promise<RoomRecord | null> {
     const connection = connectionFor(context);
     const row = await connection
       .selectFrom('room')
@@ -256,10 +253,7 @@ export class PostgresRoomRepository implements RoomRepository {
     return Number(row.count);
   }
 
-  async countActiveStaffGrants(
-    context: TenantTransactionContext,
-    roomId: string,
-  ): Promise<number> {
+  async countActiveStaffGrants(context: TenantTransactionContext, roomId: string): Promise<number> {
     const connection = connectionFor(context);
     const row = await connection
       .selectFrom('authorization_grant')
@@ -361,9 +355,7 @@ export class PostgresRoomRepository implements RoomRepository {
           .onRef('person.id', '=', 'account.person_id'),
       )
       .innerJoin('room', (join) =>
-        join
-          .onRef('room.tenant_id', '=', 'grant.tenant_id')
-          .onRef('room.id', '=', 'grant.room_id'),
+        join.onRef('room.tenant_id', '=', 'grant.tenant_id').onRef('room.id', '=', 'grant.room_id'),
       )
       .select(['grant.room_id as room_id', 'person.display_name as staff_display_name'])
       .where('grant.tenant_id', '=', context.tenantId)

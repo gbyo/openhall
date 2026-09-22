@@ -442,15 +442,18 @@ export async function createScheduledAuthorization(
           create.destinationRoomId,
         );
         if (create.originRoomId !== null) {
-          const location = await dependencies.scheduled.loadActiveRoom(
+          const originRoom = await dependencies.scheduled.loadActiveRoom(
             context,
             input.organizationId,
             create.originRoomId,
           );
-          if (location === null) {
+          // A manually chosen origin must be a room the school marked
+          // origin-selectable. Schedule-derived origins (`expected`) never
+          // reach here and stay governed by the schedule alone.
+          if (!originRoom?.originSelectable) {
             throw new ControlPlaneError(
               'invalid_scheduled_authorization_state',
-              'The origin location is not usable.',
+              'The origin room is not usable.',
             );
           }
         }

@@ -77,7 +77,7 @@ function statusLabel(status: string): string {
 type CommandKind = 'save' | 'open' | 'close' | 'archive';
 
 export function RoomDetailPage() {
-  const { organizationId, context } = useSchool();
+  const { organizationId } = useSchool();
   const roomId = useParams().roomId ?? '';
   const queryClient = useQueryClient();
   const detail = useQuery({
@@ -101,16 +101,17 @@ export function RoomDetailPage() {
         }),
       ),
   });
-  const canReadStudentCatalog = context.capabilities.includes('pass.request.self');
-  const studentCatalog = useQuery({
-    queryKey: queryKeys.studentRoomCatalog(organizationId),
+  // Schedule context comes from the admin-authorized source: it covers every
+  // room, including closed and non-requestable ones the student catalog
+  // never returns, and it does not need `pass.request.self`.
+  const roomContexts = useQuery({
+    queryKey: queryKeys.roomContexts(organizationId),
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/me/organizations/{organizationId}/student-room-catalog', {
+        api.GET('/api/v1/organizations/{organizationId}/room-contexts', {
           params: { path: { organizationId } },
         }),
       ),
-    enabled: canReadStudentCatalog,
   });
   const activeCategories = (categories.data?.categories ?? []).filter(
     (item) => item.status === 'active',
@@ -176,6 +177,7 @@ export function RoomDetailPage() {
       setDraft(null);
       void queryClient.invalidateQueries({ queryKey: queryKeys.room(roomId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.rooms(organizationId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.roomContexts(organizationId) });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.studentRoomCatalog(organizationId),
       });
@@ -207,13 +209,7 @@ export function RoomDetailPage() {
     event.preventDefault();
     if (!saveError) mutation.mutate({ kind: 'save' });
   }
-  const catalogRoom = (() => {
-    for (const category of studentCatalog.data?.categories ?? []) {
-      const found = category.rooms.find((room) => room.id === roomId);
-      if (found) return found;
-    }
-    return null;
-  })();
+  const roomContext = roomContexts.data?.rooms.find((entry) => entry.roomId === roomId) ?? null;
   return (
     <section aria-labelledby="room-title" className="flex max-w-2xl flex-col gap-6">
       <PageHeader
@@ -564,7 +560,7 @@ export function RoomDetailPage() {
               <p className="text-sm text-muted-foreground">
                 Derived from the schedule. Read-only here — change the schedule to change this list.
               </p>
-              {!canReadStudentCatalog || studentCatalog.isPending ? (
+              {roomContexts.isPending ? (
                 <div
                   role="status"
                   aria-label="Loading schedule classes"
@@ -573,34 +569,32 @@ export function RoomDetailPage() {
                   <Skeleton className="h-14 w-full" />
                   <span className="sr-only">Loading schedule classes…</span>
                 </div>
-              ) : (catalogRoom?.searchContext.teacherNames.length ?? 0) === 0 &&
-                (catalogRoom?.searchContext.sectionLabels.length ?? 0) === 0 ? (
+              ) : (roomContext?.teacherNames.length ?? 0) === 0 &&
+                (roomContext?.sectionLabels.length ?? 0) === 0 ? (
                 <Empty>
                   <EmptyHeader>
                     <EmptyTitle>No scheduled classes here</EmptyTitle>
                     <EmptyDescription>
-                      {catalogRoom === null
-                        ? 'Schedule-derived classes are visible once this room appears in the student catalog.'
-                        : 'No classes are currently scheduled in this room.'}
+                      No classes are currently scheduled in this room.
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               ) : (
                 <ItemGroup aria-label="Scheduled classes and teachers">
-                  {(catalogRoom?.searchContext.sectionLabels ?? []).map((section) => (
+                  {(roomContext?.sectionLabels ?? []).map((section) => (
                     <Item key={section} variant="outline">
                       <ItemContent>
                         <ItemTitle>{section}</ItemTitle>
-                        {(catalogRoom?.searchContext.teacherNames ?? []).length > 0 && (
+                        {(roomContext?.teacherNames ?? []).length > 0 && (
                           <ItemDescription>
-                            {(catalogRoom?.searchContext.teacherNames ?? []).join(' · ')}
+                            {(roomContext?.teacherNames ?? []).join(' · ')}
                           </ItemDescription>
                         )}
                       </ItemContent>
                     </Item>
                   ))}
-                  {(catalogRoom?.searchContext.sectionLabels.length ?? 0) === 0 &&
-                    (catalogRoom?.searchContext.teacherNames ?? []).map((teacher) => (
+                  {(roomContext?.sectionLabels.length ?? 0) === 0 &&
+                    (roomContext?.teacherNames ?? []).map((teacher) => (
                       <Item key={teacher} variant="outline">
                         <ItemMedia variant="icon">
                           <span aria-hidden="true" className="size-4" />

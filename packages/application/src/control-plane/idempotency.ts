@@ -18,6 +18,7 @@ import { ControlPlaneError } from './errors.js';
 export const CONTROL_PLANE_COMMANDS = [
   'room.create:v1',
   'room.update:v1',
+  'room.bulk_update:v1',
   'room.open:v1',
   'room.close:v1',
   'room.archive:v1',

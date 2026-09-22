@@ -47,10 +47,24 @@ export interface ScheduleBoundaryConfig {
   readonly requestSources: readonly PassRequestSource[];
 }
 
+/**
+ * Who must approve. Independent of scope: scope answers *where* a rule
+ * applies, the approver answers *who* decides. A room-scoped rule can still
+ * require the student's current section teacher, and an organization-scoped
+ * rule can require the destination room's responsible staff.
+ */
+export const POLICY_APPROVERS = ['current_section_teacher', 'room_responsible_staff'] as const;
+
+export type PolicyApprover = (typeof POLICY_APPROVERS)[number];
+
+export function isPolicyApprover(value: unknown): value is PolicyApprover {
+  return typeof value === 'string' && (POLICY_APPROVERS as readonly string[]).includes(value);
+}
+
 export interface ApprovalRequirementConfig {
   readonly schemaVersion: 1;
   readonly requestSources: readonly PassRequestSource[];
-  readonly approver: 'current_section_teacher';
+  readonly approver: PolicyApprover;
 }
 
 export type PolicyRuleConfiguration =
@@ -149,12 +163,14 @@ export function parsePolicyRuleConfiguration(
     }
     const requestSources = parseRequestSources(configuration.requestSources);
     if (requestSources === null) return invalid('invalid_request_sources');
-    if (configuration.approver !== 'current_section_teacher') return invalid('unknown_approver');
+    // Rules stored before the room vocabulary existed carry
+    // `current_section_teacher`; they keep that meaning exactly.
+    if (!isPolicyApprover(configuration.approver)) return invalid('unknown_approver');
     return {
       valid: true,
       configuration: {
         type: 'approval_requirement',
-        config: { schemaVersion: 1, requestSources, approver: 'current_section_teacher' },
+        config: { schemaVersion: 1, requestSources, approver: configuration.approver },
       },
     };
   }

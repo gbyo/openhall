@@ -1,15 +1,20 @@
 import {
   archiveRoom,
+  bulkUpdateRooms,
   closeRoom,
   createRoom,
   getRoom,
   listMyRooms,
+  listRoomContexts,
   listRooms,
   openRoom,
   updateRoom,
 } from '@openhall/application';
 import {
+  RoomBulkResponseSchema,
+  RoomBulkWriteBodySchema,
   RoomCatalogSchema,
+  RoomContextListSchema,
   RoomListSchema,
   RoomResponseSchema,
   RoomWriteBodySchema,
@@ -84,11 +89,7 @@ export function registerControlPlaneRoutes(
       const principal = request.principal;
       if (principal === undefined) return unauthenticated(reply, request);
       await handle(request, reply, async () => ({
-        body: await listRooms(
-          principal,
-          request.params.organizationId,
-          controlPlane.rooms,
-        ),
+        body: await listRooms(principal, request.params.organizationId, controlPlane.rooms),
         status: 200,
       }));
     },
@@ -150,6 +151,45 @@ export function registerControlPlaneRoutes(
     },
   );
 
+  typedApp.post(
+    '/api/v1/organizations/:organizationId/rooms/bulk',
+    {
+      schema: {
+        operationId: 'bulkUpdateRooms',
+        tags: ['control-plane'],
+        description:
+          'Apply one change (category, student-requestable, or open/close) to many rooms in a single transaction: the whole selection lands or none of it does. Rooms already in the requested state are left untouched. Archiving stays a single-room command. Requires Idempotency-Key. Cache-Control: no-store.',
+        security: COOKIE_CSRF_SECURITY,
+        params: OrganizationIdParamsSchema,
+        body: RoomBulkWriteBodySchema,
+        headers: CreateHeadersSchema,
+        response: { 200: RoomBulkResponseSchema, ...CONTROL_PLANE_ERRORS },
+      },
+      preValidation: [
+        async (request, reply) => requirePrincipal(request, reply),
+        async (request, reply) => requireCsrf(request, reply, auth),
+      ],
+    },
+    async (request, reply) => {
+      const principal = request.principal;
+      if (principal === undefined) return unauthenticated(reply, request);
+      await handle(request, reply, async () => {
+        const result = await bulkUpdateRooms(
+          {
+            principal,
+            organizationId: request.params.organizationId,
+            idempotencyKey: request.headers['idempotency-key'],
+            requestId: request.id,
+            roomIds: request.body.roomIds,
+            change: request.body.change,
+          },
+          controlPlane.rooms,
+        );
+        return { body: { rooms: result.rooms }, status: 200 };
+      });
+    },
+  );
+
   typedApp.get(
     '/api/v1/rooms/:roomId',
     {
@@ -173,11 +213,7 @@ export function registerControlPlaneRoutes(
       const principal = request.principal;
       if (principal === undefined) return unauthenticated(reply, request);
       await handle(request, reply, async () => {
-        const result = await getRoom(
-          principal,
-          request.params.roomId,
-          controlPlane.rooms,
-        );
+        const result = await getRoom(principal, request.params.roomId, controlPlane.rooms);
         return { body: { room: result.room }, etag: result.etag, status: 200 };
       });
     },
@@ -246,11 +282,7 @@ export function registerControlPlaneRoutes(
       {
         schema: {
           operationId:
-            verb === 'open'
-              ? 'openRoom'
-              : verb === 'close'
-                ? 'closeRoom'
-                : 'archiveRoom',
+            verb === 'open' ? 'openRoom' : verb === 'close' ? 'closeRoom' : 'archiveRoom',
           tags: ['control-plane'],
           description:
             verb === 'archive'
@@ -294,6 +326,35 @@ export function registerControlPlaneRoutes(
   }
 
   typedApp.get(
+    '/api/v1/organizations/:organizationId/room-contexts',
+    {
+      schema: {
+        operationId: 'listRoomContexts',
+        tags: ['control-plane'],
+        description:
+          'Schedule- and staffing-derived context (teachers, classes, room staff) for every room in the school, including closed and uncategorized rooms. Requires room.manage on the exact school. Cache-Control: no-store.',
+        security: COOKIE_SECURITY,
+        params: OrganizationIdParamsSchema,
+        response: {
+          200: RoomContextListSchema,
+          401: CONTROL_PLANE_ERRORS[401],
+          403: CONTROL_PLANE_ERRORS[403],
+          404: CONTROL_PLANE_ERRORS[404],
+        },
+      },
+      preHandler: async (request, reply) => requirePrincipal(request, reply),
+    },
+    async (request, reply) => {
+      const principal = request.principal;
+      if (principal === undefined) return unauthenticated(reply, request);
+      await handle(request, reply, async () => ({
+        body: await listRoomContexts(principal, request.params.organizationId, controlPlane.rooms),
+        status: 200,
+      }));
+    },
+  );
+
+  typedApp.get(
     '/api/v1/me/organizations/:organizationId/rooms',
     {
       schema: {
@@ -316,11 +377,7 @@ export function registerControlPlaneRoutes(
       const principal = request.principal;
       if (principal === undefined) return unauthenticated(reply, request);
       await handle(request, reply, async () => ({
-        body: await listMyRooms(
-          principal,
-          request.params.organizationId,
-          controlPlane.rooms,
-        ),
+        body: await listMyRooms(principal, request.params.organizationId, controlPlane.rooms),
         status: 200,
       }));
     },

@@ -784,6 +784,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{organizationId}/rooms/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Apply one change (category, student-requestable, or open/close) to many rooms in a single transaction: the whole selection lands or none of it does. Rooms already in the requested state are left untouched. Archiving stays a single-room command. Requires Idempotency-Key. Cache-Control: no-store. */
+        post: operations["bulkUpdateRooms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/rooms/{roomId}": {
         parameters: {
             query?: never;
@@ -847,6 +864,23 @@ export interface paths {
         put?: never;
         /** @description Archive a room (terminal). Rejects with room_in_use while live references remain. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
         post: operations["archiveRoom"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/room-contexts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Schedule- and staffing-derived context (teachers, classes, room staff) for every room in the school, including closed and uncategorized rooms. Requires room.manage on the exact school. Cache-Control: no-store. */
+        get: operations["listRoomContexts"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7442,6 +7476,201 @@ export interface operations {
             };
         };
     };
+    bulkUpdateRooms: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    roomIds: string[];
+                    change: {
+                        /** @enum {string} */
+                        kind: "category";
+                        categoryId: string | null;
+                    } | {
+                        /** @enum {string} */
+                        kind: "student_requestable";
+                        studentSelfRequestable: boolean;
+                    } | {
+                        /** @enum {string} */
+                        kind: "status";
+                        status: "open" | "closed";
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rooms: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            categoryId: string | null;
+                            name: string;
+                            code: string | null;
+                            floorLabel: string | null;
+                            studentSelfRequestable: boolean;
+                            originSelectable: boolean;
+                            capacity: number | null;
+                            queueEnabled: boolean;
+                            checkInMode: "none" | "optional" | "required";
+                            defaultDurationSeconds: number | null;
+                            maxDurationSeconds: number | null;
+                            readyClaimTimeoutSeconds: number;
+                            queueTimeoutSeconds: number;
+                            status: "open" | "closed" | "archived";
+                            revision: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Malformed input, invalid precondition, or invalid idempotency key */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Resource in use, duplicate, or invalid state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Stale resource revision */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description If-Match required */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     getRoom: {
         parameters: {
             query?: never;
@@ -8270,6 +8499,90 @@ export interface operations {
             };
         };
     };
+    listRoomContexts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rooms: {
+                            /** Format: uuid */
+                            roomId: string;
+                            teacherNames: string[];
+                            sectionLabels: string[];
+                            roomStaffNames: string[];
+                        }[];
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     listMyRooms: {
         parameters: {
             query?: never;
@@ -8296,6 +8609,7 @@ export interface operations {
                             floorLabel: string | null;
                             categoryId: string | null;
                             checkInMode: "none" | "optional" | "required";
+                            originSelectable: boolean;
                         }[];
                     };
                 };
@@ -9091,6 +9405,7 @@ export interface operations {
                             name: string;
                             iconKey: string;
                             toneKey: string;
+                            studentSurface: "primary" | "secondary";
                             pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             rooms: {

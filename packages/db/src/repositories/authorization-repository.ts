@@ -86,7 +86,8 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
       .where('id', '=', roomId)
       .executeTakeFirst();
     if (row === undefined) return null;
-    const status = row.status === 'closed' ? 'closed' : row.status === 'archived' ? 'archived' : 'open';
+    const status =
+      row.status === 'closed' ? 'closed' : row.status === 'archived' ? 'archived' : 'open';
     return {
       id: row.id,
       tenantId: row.tenant_id,
@@ -244,9 +245,7 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
     const rows = await connection
       .selectFrom('authorization_grant as grant')
       .innerJoin('room', (join) =>
-        join
-          .onRef('room.tenant_id', '=', 'grant.tenant_id')
-          .onRef('room.id', '=', 'grant.room_id'),
+        join.onRef('room.tenant_id', '=', 'grant.tenant_id').onRef('room.id', '=', 'grant.room_id'),
       )
       .innerJoin('organization_membership as staff_membership', (join) =>
         join
@@ -315,9 +314,7 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
       .where('meeting.room_id', 'is not', null)
       .execute();
     // IS NOT NULL narrows rows at runtime; the guard below narrows the type.
-    return rows
-      .map((row) => row.room_id)
-      .filter((roomId): roomId is RoomId => roomId !== null);
+    return rows.map((row) => row.room_id).filter((roomId): roomId is RoomId => roomId !== null);
   }
 
   async listRoomTeachers(

@@ -302,14 +302,7 @@ export async function createRoomCategory(
         }
         throw error;
       }
-      await appendCategoryAudit(
-        dependencies,
-        context,
-        input,
-        now,
-        'room_category.created',
-        row,
-      );
+      await appendCategoryAudit(dependencies, context, input, now, 'room_category.created', row);
       await appendCategoryOutbox(dependencies, context, now, 'room_category.created', row);
       const category = toRoomCategoryView(row);
       return { category, etag: etagForRoomCategory(row.id, row.revision) };
@@ -420,14 +413,7 @@ export async function updateRoomCategory(
           'The category has changed since this client last read it.',
         );
       }
-      await appendCategoryAudit(
-        dependencies,
-        context,
-        input,
-        now,
-        'room_category.updated',
-        row,
-      );
+      await appendCategoryAudit(dependencies, context, input, now, 'room_category.updated', row);
       await appendCategoryOutbox(dependencies, context, now, 'room_category.updated', row);
       const category = toRoomCategoryView(row);
       return { category, etag: etagForRoomCategory(row.id, row.revision) };
@@ -508,10 +494,7 @@ export async function archiveRoomCategory(
         );
       }
       if (current.status === 'archived') {
-        throw new ControlPlaneError(
-          'invalid_precondition',
-          'The category is already archived.',
-        );
+        throw new ControlPlaneError('invalid_precondition', 'The category is already archived.');
       }
       const references = await dependencies.categories.countActiveRoomReferences(
         context,
@@ -535,14 +518,7 @@ export async function archiveRoomCategory(
           'The category has changed since this client last read it.',
         );
       }
-      await appendCategoryAudit(
-        dependencies,
-        context,
-        input,
-        now,
-        'room_category.archived',
-        row,
-      );
+      await appendCategoryAudit(dependencies, context, input, now, 'room_category.archived', row);
       await appendCategoryOutbox(dependencies, context, now, 'room_category.archived', row);
       const category = toRoomCategoryView(row);
       return { category, etag: etagForRoomCategory(row.id, row.revision) };

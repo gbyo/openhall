@@ -100,14 +100,7 @@ async function seed() {
       [tenantA, organizationA, category],
     )
   ).rows[0]?.id;
-  if (
-    !organizationA ||
-    !organizationB ||
-    !student ||
-    !staff ||
-    !room ||
-    !category
-  ) {
+  if (!organizationA || !organizationB || !student || !staff || !room || !category) {
     throw new Error('Fixture insert failed');
   }
   return {
@@ -126,14 +119,7 @@ async function insertPass(fixture: Awaited<ReturnType<typeof seed>>, state = 're
   const result = await pool.query<{ id: string }>(
     `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, request_source, requested_by_person_id, lifecycle_state)
      VALUES ($1, $2, $3, $4, 'staff_web', $5, $6) RETURNING id`,
-    [
-      fixture.tenantA,
-      fixture.organizationA,
-      fixture.student,
-      fixture.room,
-      fixture.staff,
-      state,
-    ],
+    [fixture.tenantA, fixture.organizationA, fixture.student, fixture.room, fixture.staff, state],
   );
   const id = result.rows[0]?.id;
   if (!id) throw new Error('Pass fixture insert failed');

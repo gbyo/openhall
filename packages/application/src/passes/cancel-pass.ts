@@ -144,10 +144,7 @@ export async function cancelSelfPass(
       // left to the reconciler so this transaction stays small.
       if (row.lifecycleState === 'queued' || row.lifecycleState === 'ready') {
         const { flow } = dependencies;
-        await flow.acquireRoomLock(
-          context,
-          roomFlowLockKey(row.tenantId, row.destinationRoomId),
-        );
+        await flow.acquireRoomLock(context, roomFlowLockKey(row.tenantId, row.destinationRoomId));
         if (row.lifecycleState === 'queued') {
           const entry = await flow.loadActiveQueueEntryForPass(context, row.id);
           if (entry !== null) {

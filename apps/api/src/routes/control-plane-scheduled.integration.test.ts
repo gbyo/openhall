@@ -428,9 +428,26 @@ describe('scheduled authorization administration', () => {
       authPayload(student.personId, { origin: { strategy: 'specific', roomId: locationA } }),
     );
     expect(specific.statusCode).toBe(201);
-    expect(specific.json<{ authorization: AuthBody }>().authorization.originRoomId).toBe(
-      locationA,
+    expect(specific.json<{ authorization: AuthBody }>().authorization.originRoomId).toBe(locationA);
+  });
+
+  it('refuses a manually chosen origin the school made unselectable', async () => {
+    const student = await makeMember(tenantA, schoolA, 'student', 'Unselectable Origin');
+    const hidden = await insertReturningId(
+      `INSERT INTO room (tenant_id, organization_id, name, status, origin_selectable)
+       VALUES ($1, $2, 'Supply Closet', 'open', false) RETURNING id`,
+      [tenantA, schoolA],
     );
+    const rejected = await createAuth(
+      requireAdmin(),
+      schoolA,
+      authPayload(student.personId, { origin: { strategy: 'specific', roomId: hidden } }),
+    );
+    expect(rejected.statusCode).toBe(409);
+
+    // The schedule-derived origin is unaffected: it never names a room.
+    const expectedOrigin = await createAuth(requireAdmin(), schoolA, authPayload(student.personId));
+    expect(expectedOrigin.statusCode).toBe(201);
   });
 
   it('validates windows, targets, and rooms', async () => {

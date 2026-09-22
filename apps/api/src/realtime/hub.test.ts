@@ -77,12 +77,10 @@ describe('realtime topic isolation', () => {
   });
 
   it('maps room aggregates to the rooms topic', () => {
-    expect(
-      topicsFor(event({ aggregateKind: 'room', payload: {} }), subscriber),
-    ).toContain('rooms');
-    expect(
-      topicsFor(event({ aggregateKind: 'room_category', payload: {} }), subscriber),
-    ).toContain('rooms');
+    expect(topicsFor(event({ aggregateKind: 'room', payload: {} }), subscriber)).toContain('rooms');
+    expect(topicsFor(event({ aggregateKind: 'room_category', payload: {} }), subscriber)).toContain(
+      'rooms',
+    );
   });
 
   it('broadcasts listener health changes and stops after unsubscribe', () => {

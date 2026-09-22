@@ -396,10 +396,7 @@ export interface RoomCategoryRepository {
     context: TenantTransactionContext,
     categoryId: string,
   ): Promise<RoomCategoryRecord | null>;
-  insert(
-    context: TenantTransactionContext,
-    input: NewRoomCategory,
-  ): Promise<RoomCategoryRecord>;
+  insert(context: TenantTransactionContext, input: NewRoomCategory): Promise<RoomCategoryRecord>;
   /**
    * Full replacement of mutable presentation metadata, incrementing revision
    * once. Returns null when the row no longer matches the expected revision.
@@ -426,10 +423,7 @@ export interface RoomCategoryRepository {
    * count: archiving their category would still silently alter student
    * grouping, so the guard is conservative by design.
    */
-  countActiveRoomReferences(
-    context: TenantTransactionContext,
-    categoryId: string,
-  ): Promise<number>;
+  countActiveRoomReferences(context: TenantTransactionContext, categoryId: string): Promise<number>;
 }
 
 /** Purpose-built room persistence port; no generic SQL escape hatch. */
@@ -448,14 +442,8 @@ export interface RoomRepository {
     context: TenantTransactionContext,
     organizationId: string,
   ): Promise<readonly RoomRecord[]>;
-  loadById(
-    context: TenantTransactionContext,
-    roomId: string,
-  ): Promise<RoomRecord | null>;
-  loadForUpdate(
-    context: TenantTransactionContext,
-    roomId: string,
-  ): Promise<RoomRecord | null>;
+  loadById(context: TenantTransactionContext, roomId: string): Promise<RoomRecord | null>;
+  loadForUpdate(context: TenantTransactionContext, roomId: string): Promise<RoomRecord | null>;
   insert(context: TenantTransactionContext, input: NewRoom): Promise<RoomRecord>;
   /**
    * Configuration replacement (never status), incrementing revision once.
@@ -484,10 +472,7 @@ export interface RoomRepository {
   /** Active explicit room_staff grants for this room. */
   countActiveStaffGrants(context: TenantTransactionContext, roomId: string): Promise<number>;
   /** Enabled room-scoped policy rules for this room. */
-  countEnabledPolicyRules(
-    context: TenantTransactionContext,
-    roomId: string,
-  ): Promise<number>;
+  countEnabledPolicyRules(context: TenantTransactionContext, roomId: string): Promise<number>;
   /** Active or future scheduled authorizations targeting this room. */
   countLiveScheduledAuthorizations(
     context: TenantTransactionContext,
@@ -513,9 +498,7 @@ export interface RoomRepository {
   listActiveRoomStaff(
     context: TenantTransactionContext,
     organizationId: string,
-  ): Promise<
-    readonly { readonly roomId: string; readonly staffDisplayName: string }[]
-  >;
+  ): Promise<readonly { readonly roomId: string; readonly staffDisplayName: string }[]>;
   /**
    * Derived class context per room: active teacher memberships on sections
    * meeting at the room. Read-only here; teachers are never granted room
@@ -903,14 +886,19 @@ export interface ScheduledAuthRepository {
     onDate: string,
   ): Promise<{ readonly personId: string } | null>;
   /**
-   * Same-school open room by id with its name; null when missing,
-   * elsewhere, or not open.
+   * Same-school open room by id with its name and origin selectability;
+   * null when missing, elsewhere, or not open. Callers that create an
+   * explicit origin must also honor `originSelectable`.
    */
   loadActiveRoom(
     context: TenantTransactionContext,
     organizationId: string,
     roomId: string,
-  ): Promise<{ readonly id: string; readonly name: string } | null>;
+  ): Promise<{
+    readonly id: string;
+    readonly name: string;
+    readonly originSelectable: boolean;
+  } | null>;
   /** Authorizations for the school, soonest window first. */
   listByOrganization(
     context: TenantTransactionContext,

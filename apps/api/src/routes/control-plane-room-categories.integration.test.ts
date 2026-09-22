@@ -422,11 +422,7 @@ describe('room-category administration', () => {
 
   it('blocks archive while non-archived rooms reference the category', async () => {
     const category = await createCategory(requireAdmin(), schoolA, { name: 'Guarded' });
-    const room = await createRoom(
-      requireAdmin(),
-      schoolA,
-      category.category.id,
-    );
+    const room = await createRoom(requireAdmin(), schoolA, category.category.id);
     expect(room.response.statusCode).toBe(201);
 
     const blocked = await app.inject({
@@ -468,11 +464,7 @@ describe('room-category administration', () => {
     expect(missing.response.statusCode).toBe(400);
 
     const foreign = await createCategory(requireAdminB(), schoolB, { name: 'Far' });
-    const crossSchool = await createRoom(
-      requireAdmin(),
-      schoolA,
-      foreign.category.id,
-    );
+    const crossSchool = await createRoom(requireAdmin(), schoolA, foreign.category.id);
     expect(crossSchool.response.statusCode).toBe(400);
 
     const archivedCat = await createCategory(requireAdmin(), schoolA, { name: 'Gone' });
@@ -481,11 +473,7 @@ describe('room-category administration', () => {
       url: `/api/v1/room-categories/${archivedCat.category.id}/archive`,
       headers: authHeaders(requireAdmin(), randomUUID(), archivedCat.etag),
     });
-    const archivedRef = await createRoom(
-      requireAdmin(),
-      schoolA,
-      archivedCat.category.id,
-    );
+    const archivedRef = await createRoom(requireAdmin(), schoolA, archivedCat.category.id);
     expect(archivedRef.response.statusCode).toBe(400);
 
     const noCategory = await app.inject({

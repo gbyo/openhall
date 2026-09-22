@@ -314,11 +314,17 @@ export class PostgresPolicyRepository implements PolicyRepository {
       return toApprovalRecord(row);
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
-      const existing = await this.findPendingApproval(context, input.passId, input.ruleId, input.ruleRevision, {
-        approverKind: input.approverKind,
-        requiredSectionId: input.requiredSectionId,
-        requiredRoomId: input.requiredRoomId,
-      });
+      const existing = await this.findPendingApproval(
+        context,
+        input.passId,
+        input.ruleId,
+        input.ruleRevision,
+        {
+          approverKind: input.approverKind,
+          requiredSectionId: input.requiredSectionId,
+          requiredRoomId: input.requiredRoomId,
+        },
+      );
       if (existing === null) throw error;
       return existing;
     }

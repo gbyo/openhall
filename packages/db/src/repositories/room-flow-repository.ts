@@ -409,10 +409,7 @@ export class PostgresRoomFlowRepository implements RoomFlowRepository {
     return { position: aheadCount + 1, ahead: aheadCount };
   }
 
-  async listQueuedRoomIds(
-    context: TenantTransactionContext,
-    limit: number,
-  ): Promise<string[]> {
+  async listQueuedRoomIds(context: TenantTransactionContext, limit: number): Promise<string[]> {
     const connection = connectionFor(context);
     const rows = await connection
       .selectFrom('queue_entry')
@@ -572,10 +569,7 @@ export class PostgresRoomFlowRepository implements RoomFlowRepository {
       .where('pass.tenant_id', '=', context.tenantId)
       .where('pass.lifecycle_state', 'in', ['completed', 'denied', 'cancelled', 'expired'])
       .where((eb) =>
-        eb.or([
-          eb('room_reservation.id', 'is not', null),
-          eb('queue_entry.id', 'is not', null),
-        ]),
+        eb.or([eb('room_reservation.id', 'is not', null), eb('queue_entry.id', 'is not', null)]),
       )
       .orderBy('pass.requested_at', 'asc')
       .limit(1)

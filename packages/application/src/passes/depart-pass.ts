@@ -158,10 +158,7 @@ async function executeDeparture(
       if (destination.status !== 'open') {
         // No physical state is mutated as part of this error response; the
         // reconciler terminalizes the stale pre-departure flow afterwards.
-        throw new PassApplicationError(
-          'room_unavailable',
-          'The destination is no longer usable.',
-        );
+        throw new PassApplicationError('room_unavailable', 'The destination is no longer usable.');
       }
       try {
         transitionPass(toAggregate(row), 'outbound');

@@ -72,6 +72,11 @@ export interface RoomCatalogEntry {
   readonly floorLabel: string | null;
   readonly categoryId: string | null;
   readonly checkInMode: RoomCheckInMode;
+  /**
+   * Whether the room may be chosen as an explicit origin. Staff pickers
+   * filter on it; the server enforces it independently.
+   */
+  readonly originSelectable: boolean;
 }
 
 export interface StudentRoomCatalogRoom {
@@ -93,6 +98,8 @@ export interface StudentRoomCatalogCategory {
   readonly name: string;
   readonly iconKey: string;
   readonly toneKey: string;
+  /** Launcher placement: `primary` tiles on home, `secondary` under More. */
+  readonly studentSurface: 'primary' | 'secondary';
   readonly pickerMode: 'auto' | 'list' | 'search';
   readonly sortOrder: number;
   readonly rooms: readonly StudentRoomCatalogRoom[];
@@ -234,7 +241,10 @@ function canonicalConfig(body: RoomConfigBody): CanonicalRoomConfig {
   const name = cleanName(body.name, 'name', 200);
   const code = cleanOptionalName(body.code, 'code', 40);
   const floorLabel = cleanOptionalName(body.floorLabel, 'floorLabel', 40);
-  if (body.categoryId !== null && (typeof body.categoryId !== 'string' || body.categoryId.trim().length === 0)) {
+  if (
+    body.categoryId !== null &&
+    (typeof body.categoryId !== 'string' || body.categoryId.trim().length === 0)
+  ) {
     throw new ControlPlaneError('invalid_precondition', 'Invalid categoryId.');
   }
   if (typeof body.studentSelfRequestable !== 'boolean') {
@@ -405,7 +415,97 @@ export async function listMyRooms(
           floorLabel: row.floorLabel,
           categoryId: row.categoryId,
           checkInMode: row.checkInMode,
+          originSelectable: row.originSelectable,
         })),
+    };
+  });
+}
+
+/**
+ * Schedule- and staffing-derived context for one room: who teaches there,
+ * which classes meet there, and which staff hold an active room grant.
+ */
+export interface RoomContextEntry {
+  readonly roomId: string;
+  readonly teacherNames: readonly string[];
+  readonly sectionLabels: readonly string[];
+  readonly roomStaffNames: readonly string[];
+}
+
+/**
+ * Derives per-room teacher/class/staff context for a whole school. One
+ * source for both the student launcher's search context and the admin
+ * Rooms surfaces, so the two can never disagree.
+ */
+async function loadRoomContexts(
+  context: TenantTransactionContext,
+  dependencies: RoomDependencies,
+  organizationId: string,
+): Promise<Map<string, RoomContextEntry>> {
+  const [classContexts, staffRows] = await Promise.all([
+    dependencies.rooms.listRoomClassContexts(context, organizationId),
+    dependencies.rooms.listActiveRoomStaff(context, organizationId),
+  ]);
+  const byRoom = new Map<
+    string,
+    { teacherNames: string[]; sectionLabels: string[]; roomStaffNames: string[] }
+  >();
+  const entryFor = (roomId: string) => {
+    const existing = byRoom.get(roomId);
+    if (existing) return existing;
+    const created = { teacherNames: [], sectionLabels: [], roomStaffNames: [] };
+    byRoom.set(roomId, created);
+    return created;
+  };
+  for (const row of classContexts) {
+    const entry = entryFor(row.roomId);
+    if (!entry.teacherNames.includes(row.teacherDisplayName)) {
+      entry.teacherNames.push(row.teacherDisplayName);
+    }
+    const label =
+      row.sectionCode === null || row.sectionCode.trim() === ''
+        ? row.sectionTitle
+        : `${row.sectionTitle} (${row.sectionCode})`;
+    if (!entry.sectionLabels.includes(label)) entry.sectionLabels.push(label);
+  }
+  for (const row of staffRows) {
+    const display = row.staffDisplayName.trim();
+    if (!display) continue;
+    const entry = entryFor(row.roomId);
+    if (!entry.roomStaffNames.includes(display)) entry.roomStaffNames.push(display);
+  }
+  return new Map([...byRoom].map(([roomId, entry]) => [roomId, { roomId, ...entry }]));
+}
+
+/**
+ * GET /api/v1/organizations/:organizationId/room-contexts — administrator
+ * view of the same schedule/staffing context the student launcher derives,
+ * for *every* room in the school. Unlike the student catalog it is not
+ * filtered to open, student-requestable rooms, so the Rooms admin surfaces
+ * can show and search closed, uncategorized, and staff-only rooms.
+ * Requires `room.manage`; teacher membership never becomes room staff here.
+ */
+export async function listRoomContexts(
+  principal: Principal,
+  organizationId: string,
+  dependencies: RoomDependencies,
+): Promise<{ readonly rooms: readonly RoomContextEntry[] }> {
+  const now = dependencies.clock.now();
+  return dependencies.runner.run(principal.tenantId, async (context) => {
+    // Same denial shape as the admin room list: a caller without
+    // `room.manage` learns nothing about the school.
+    const decision = await dependencies.authorization.decideWithContext(context, {
+      principal,
+      capability: 'room.manage',
+      resource: { kind: 'organization', organizationId },
+      at: now,
+    });
+    if (!decision.allowed) {
+      throw new ControlPlaneError('room_not_found', 'Room not found.');
+    }
+    const contexts = await loadRoomContexts(context, dependencies, organizationId);
+    return {
+      rooms: [...contexts.values()].sort((a, b) => a.roomId.localeCompare(b.roomId)),
     };
   });
 }
@@ -441,38 +541,17 @@ export async function listMyStudentRoomCatalog(
     if (!decision.allowed) {
       throw new ControlPlaneError('room_not_found', 'Room not found.');
     }
-    const [categories, rooms, classContexts, staffRows] = await Promise.all([
+    const [categories, rooms, roomContexts] = await Promise.all([
       dependencies.categories.listByOrganization(context, organizationId),
       dependencies.rooms.listOpenCatalog(context, organizationId),
-      dependencies.rooms.listRoomClassContexts(context, organizationId),
-      dependencies.rooms.listActiveRoomStaff(context, organizationId),
+      loadRoomContexts(context, dependencies, organizationId),
     ]);
-    const staffByRoom = new Map<string, string[]>();
-    for (const row of staffRows) {
-      const display = row.staffDisplayName.trim();
-      if (!display) continue;
-      const names = staffByRoom.get(row.roomId) ?? [];
-      if (!names.includes(display)) names.push(display);
-      staffByRoom.set(row.roomId, names);
-    }
-    const teachersByRoom = new Map<string, { teachers: string[]; sections: string[] }>();
-    for (const row of classContexts) {
-      const entry = teachersByRoom.get(row.roomId) ?? { teachers: [], sections: [] };
-      if (!entry.teachers.includes(row.teacherDisplayName))
-        entry.teachers.push(row.teacherDisplayName);
-      const label =
-        row.sectionCode === null || row.sectionCode.trim() === ''
-          ? row.sectionTitle
-          : `${row.sectionTitle} (${row.sectionCode})`;
-      if (!entry.sections.includes(label)) entry.sections.push(label);
-      teachersByRoom.set(row.roomId, entry);
-    }
     const eligibleByCategory = new Map<string, StudentRoomCatalogRoom[]>();
     for (const row of rooms) {
       if (row.tenantId !== principal.tenantId) continue;
       if (row.status !== 'open' || !row.studentSelfRequestable) continue;
       if (row.categoryId === null) continue;
-      const context = teachersByRoom.get(row.id);
+      const roomContext = roomContexts.get(row.id);
       const entry: StudentRoomCatalogRoom = {
         id: row.id,
         name: row.name,
@@ -480,9 +559,9 @@ export async function listMyStudentRoomCatalog(
         floorLabel: row.floorLabel,
         checkInMode: row.checkInMode,
         searchContext: {
-          teacherNames: context?.teachers ?? [],
-          sectionLabels: context?.sections ?? [],
-          roomStaffNames: staffByRoom.get(row.id) ?? [],
+          teacherNames: roomContext?.teacherNames ?? [],
+          sectionLabels: roomContext?.sectionLabels ?? [],
+          roomStaffNames: roomContext?.roomStaffNames ?? [],
         },
       };
       const list = eligibleByCategory.get(row.categoryId);
@@ -503,13 +582,15 @@ export async function listMyStudentRoomCatalog(
         name: category.name,
         iconKey: category.iconKey,
         toneKey: category.toneKey,
+        studentSurface: category.studentSurface,
         pickerMode: category.pickerMode,
         sortOrder: category.sortOrder,
         rooms: eligible,
       });
     }
     result.sort(
-      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }),
+      (a, b) =>
+        a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }),
     );
     return { categories: result };
   });
@@ -687,10 +768,7 @@ export async function updateRoom(
         );
       }
       if (current.status === 'archived') {
-        throw new ControlPlaneError(
-          'invalid_room_state',
-          'Archived rooms cannot be edited.',
-        );
+        throw new ControlPlaneError('invalid_room_state', 'Archived rooms cannot be edited.');
       }
       await requireRoomCategory(
         context,
@@ -735,6 +813,210 @@ export async function updateRoom(
     status: 200,
     replayed: outcome.replayed,
   };
+}
+
+/** One bulk change, applied identically to every selected room. */
+export type BulkRoomChange =
+  | { readonly kind: 'category'; readonly categoryId: string | null }
+  | { readonly kind: 'student_requestable'; readonly studentSelfRequestable: boolean }
+  | { readonly kind: 'status'; readonly status: 'open' | 'closed' };
+
+export interface BulkUpdateRoomsInput extends RoomCommandInput {
+  readonly organizationId: string;
+  readonly roomIds: readonly string[];
+  readonly change: BulkRoomChange;
+}
+
+export interface BulkRoomsResult {
+  readonly rooms: readonly RoomView[];
+  readonly replayed: boolean;
+}
+
+const MAX_BULK_ROOMS = 500;
+
+function canonicalBulkRoomIds(roomIds: readonly string[]): string[] {
+  const unique = [...new Set(roomIds)].sort();
+  if (unique.length === 0) {
+    throw new ControlPlaneError('invalid_precondition', 'Select at least one room.');
+  }
+  if (unique.length > MAX_BULK_ROOMS) {
+    throw new ControlPlaneError(
+      'invalid_precondition',
+      `Select at most ${String(MAX_BULK_ROOMS)} rooms.`,
+    );
+  }
+  return unique;
+}
+
+function bulkChangeFingerprint(change: BulkRoomChange): string {
+  switch (change.kind) {
+    case 'category':
+      return `category:${change.categoryId ?? ''}`;
+    case 'student_requestable':
+      return `student_requestable:${change.studentSelfRequestable ? 'on' : 'off'}`;
+    default:
+      return `status:${change.status}`;
+  }
+}
+
+/**
+ * POST /api/v1/organizations/:organizationId/rooms/bulk — one change
+ * applied to many rooms as a single transactional, idempotent command.
+ *
+ * Every selected room is locked, validated, and written inside one
+ * transaction: either the whole selection lands or none of it does, so a
+ * failure halfway through can never leave a school partially reconfigured.
+ * Rooms already in the requested state are left untouched (no revision
+ * bump), which makes the command naturally idempotent on top of the
+ * Idempotency-Key replay guarantee. Archived rooms are never edited.
+ *
+ * Status changes here are the same open/close semantics as the per-room
+ * commands, so archiving stays a deliberate single-room action.
+ */
+export async function bulkUpdateRooms(
+  input: BulkUpdateRoomsInput,
+  dependencies: RoomDependencies,
+): Promise<BulkRoomsResult> {
+  requireNormalSession(input.principal);
+  const key = requireControlPlaneIdempotencyKey(input.idempotencyKey);
+  const roomIds = canonicalBulkRoomIds(input.roomIds);
+  const now = dependencies.clock.now();
+  const fingerprint = fingerprintControlPlane('room.bulk_update:v1', [
+    input.organizationId,
+    bulkChangeFingerprint(input.change),
+    ...roomIds,
+  ]);
+  const outcome = await runControlPlaneCommand(dependencies.runner, dependencies.idempotency, now, {
+    identity: {
+      tenantId: input.principal.tenantId,
+      actorAccountId: input.principal.accountId,
+      command: 'room.bulk_update:v1',
+      key,
+      fingerprint,
+    },
+    lockKey: controlPlaneLockKey(
+      input.principal.tenantId,
+      input.principal.accountId,
+      'room.bulk_update:v1',
+      key,
+    ),
+    execute: async (context) => {
+      await requireOrganizationCapability(
+        context,
+        dependencies.authorization,
+        input.principal,
+        'room.manage',
+        input.organizationId,
+        now,
+        'room_not_found',
+      );
+      if (input.change.kind === 'category') {
+        await requireRoomCategory(
+          context,
+          dependencies,
+          input.principal,
+          input.organizationId,
+          input.change.categoryId,
+        );
+      }
+      // Sorted ids give every concurrent bulk command the same row lock
+      // order, so two overlapping selections queue instead of deadlocking.
+      const rooms: RoomView[] = [];
+      for (const roomId of roomIds) {
+        const current = await dependencies.rooms.loadForUpdate(context, roomId);
+        if (
+          current?.tenantId !== input.principal.tenantId ||
+          current.organizationId !== input.organizationId
+        ) {
+          throw new ControlPlaneError('room_not_found', 'Room not found.');
+        }
+        if (current.status === 'archived') {
+          throw new ControlPlaneError('invalid_room_state', 'Archived rooms cannot be edited.');
+        }
+        rooms.push(await applyBulkChange(dependencies, context, input, now, current));
+      }
+      return { rooms };
+    },
+    toStored: (value) => ({ responseStatus: 200, responseBody: { rooms: value.rooms } }),
+    fromStored: (record) => record.responseBody as { rooms: RoomView[] },
+  });
+  return { rooms: outcome.value.rooms, replayed: outcome.replayed };
+}
+
+/** Applies one bulk change to one already-locked, non-archived room. */
+async function applyBulkChange(
+  dependencies: RoomDependencies,
+  context: TenantTransactionContext,
+  input: BulkUpdateRoomsInput,
+  now: Temporal.Instant,
+  current: RoomRecord,
+): Promise<RoomView> {
+  const change = input.change;
+  if (change.kind === 'status') {
+    // Already in the requested state: leave the row (and its revision)
+    // exactly as it is rather than writing a no-op revision.
+    if (current.status === change.status) return toRoomView(current);
+    const row = await dependencies.rooms.transitionStatusToRevision(
+      context,
+      current.id,
+      current.revision,
+      change.status,
+      now,
+    );
+    if (row === null) {
+      throw new ControlPlaneError(
+        'stale_resource_revision',
+        'The room has changed since this client last read it.',
+      );
+    }
+    const action = change.status === 'open' ? 'room.opened' : 'room.closed';
+    await appendRoomAudit(dependencies, context, input, now, action, row);
+    await appendRoomOutbox(dependencies, context, now, action, row);
+    return toRoomView(row);
+  }
+  const categoryId = change.kind === 'category' ? change.categoryId : current.categoryId;
+  const studentSelfRequestable =
+    change.kind === 'student_requestable'
+      ? change.studentSelfRequestable
+      : current.studentSelfRequestable;
+  if (
+    categoryId === current.categoryId &&
+    studentSelfRequestable === current.studentSelfRequestable
+  )
+    return toRoomView(current);
+  // The full canonicalizer runs so bulk edits obey exactly the same rules
+  // as a single-room PUT — including "student-requestable needs a category".
+  const config = canonicalConfig({
+    name: current.name,
+    code: current.code,
+    floorLabel: current.floorLabel,
+    categoryId,
+    studentSelfRequestable,
+    originSelectable: current.originSelectable,
+    capacity: current.capacity,
+    queueEnabled: current.queueEnabled,
+    checkInMode: current.checkInMode,
+    defaultDurationSeconds: current.defaultDurationSeconds,
+    maxDurationSeconds: current.maxDurationSeconds,
+    readyClaimTimeoutSeconds: current.readyClaimTimeoutSeconds,
+    queueTimeoutSeconds: current.queueTimeoutSeconds,
+  });
+  const row = await dependencies.rooms.updateToRevision(
+    context,
+    current.id,
+    current.revision,
+    config,
+    now,
+  );
+  if (row === null) {
+    throw new ControlPlaneError(
+      'stale_resource_revision',
+      'The room has changed since this client last read it.',
+    );
+  }
+  await appendRoomAudit(dependencies, context, input, now, 'room.updated', row);
+  await appendRoomOutbox(dependencies, context, now, 'room.updated', row);
+  return toRoomView(row);
 }
 
 async function executeStatusCommand(

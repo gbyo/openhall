@@ -109,7 +109,12 @@ export function fingerprintStationCheckIn(
   passId: string,
   expectedRevision: bigint,
 ): string {
-  return hex(['pass.station.check_in:v1', destinationRoomId, passId, expectedRevision.toString(10)]);
+  return hex([
+    'pass.station.check_in:v1',
+    destinationRoomId,
+    passId,
+    expectedRevision.toString(10),
+  ]);
 }
 
 export function fingerprintStationBeginReturn(
@@ -130,7 +135,12 @@ export function fingerprintStationComplete(
   passId: string,
   expectedRevision: bigint,
 ): string {
-  return hex(['pass.station.complete:v1', destinationRoomId, passId, expectedRevision.toString(10)]);
+  return hex([
+    'pass.station.complete:v1',
+    destinationRoomId,
+    passId,
+    expectedRevision.toString(10),
+  ]);
 }
 
 export function fingerprintApprovalResolve(

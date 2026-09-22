@@ -422,10 +422,7 @@ describe('initial request policy integration', () => {
     expect(requiredEtag(created)).toContain(':2"');
     expect(await tableCount('policy_evaluation')).toBe(1);
     expect(
-      await tableCount(
-        'room_reservation',
-        `WHERE pass_id = '${pass.id}' AND released_at IS NULL`,
-      ),
+      await tableCount('room_reservation', `WHERE pass_id = '${pass.id}' AND released_at IS NULL`),
     ).toBe(1);
     expect((await passEvents(pass.id)).map((entry) => entry.event_type)).toEqual([
       'pass.requested',
@@ -554,10 +551,7 @@ describe('standard approval workflow', () => {
     expect(body.movement.readyUntil).not.toBeNull();
     expect(requiredEtag(resolved)).toContain(':3"');
     expect(
-      await tableCount(
-        'room_reservation',
-        `WHERE pass_id = '${pass.id}' AND released_at IS NULL`,
-      ),
+      await tableCount('room_reservation', `WHERE pass_id = '${pass.id}' AND released_at IS NULL`),
     ).toBe(1);
     // A resolved approval cannot be resolved again.
     const retry = await app.inject({
@@ -1156,7 +1150,7 @@ describe('Phase 8 policy rule administration', () => {
             organizationId: null,
             sectionId: sectionA1,
             roomId: null,
-        roomCategoryId: null,
+            roomCategoryId: null,
           },
           priority: 0,
           configuration: { ...VALID_APPROVAL, approver: 'principal' },
@@ -1175,7 +1169,7 @@ describe('Phase 8 policy rule administration', () => {
             organizationId: null,
             sectionId: sectionA1,
             roomId: null,
-        roomCategoryId: null,
+            roomCategoryId: null,
           },
           priority: 0,
           configuration: { schemaVersion: 1, requestSources: ['student_web'] },

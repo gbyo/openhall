@@ -530,9 +530,7 @@ describe('control-plane rooms', () => {
       headers: authHeaders(requireAdmin(), randomUUID(), requiredEtag(current2)),
     });
     expect(blockedByPolicy.statusCode).toBe(409);
-    await pool.query(`UPDATE policy_rule SET enabled = false WHERE scope_room_id = $1`, [
-      roomId,
-    ]);
+    await pool.query(`UPDATE policy_rule SET enabled = false WHERE scope_room_id = $1`, [roomId]);
 
     await pool.query(
       `INSERT INTO scheduled_authorization (tenant_id, organization_id, student_id, destination_room_id,
@@ -624,7 +622,7 @@ describe('control-plane rooms', () => {
       categoryId: created.room.categoryId,
     });
     expect(Object.keys(entry ?? {}).sort()).toEqual(
-      ['categoryId', 'checkInMode', 'code', 'floorLabel', 'id', 'name'].sort(),
+      ['categoryId', 'checkInMode', 'code', 'floorLabel', 'id', 'name', 'originSelectable'].sort(),
     );
 
     const closed = await createRoom(requireAdmin());
@@ -634,10 +632,159 @@ describe('control-plane rooms', () => {
       url: `/api/v1/me/organizations/${schoolA}/rooms`,
       headers: authHeaders(requireStudent()),
     });
-    const ids = catalogAgain
-      .json<{ rooms: { id: string }[] }>()
-      .rooms.map((row) => row.id);
+    const ids = catalogAgain.json<{ rooms: { id: string }[] }>().rooms.map((row) => row.id);
     expect(ids).not.toContain(closed.room.id);
+  });
+
+  it('applies a bulk change to every selected room in one transaction', async () => {
+    const first = await createRoom(requireAdmin());
+    const second = await createRoom(requireAdmin());
+    const categoryResponse = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/room-categories`,
+      headers: authHeaders(requireAdmin(), randomUUID()),
+      payload: { ...categoryBody, name: `Bulk ${randomUUID().slice(0, 8)}` },
+    });
+    const categoryId = categoryResponse.json<{ category: { id: string } }>().category.id;
+
+    const key = randomUUID();
+    const bulk = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/rooms/bulk`,
+      headers: authHeaders(requireAdmin(), key),
+      payload: {
+        roomIds: [first.room.id, second.room.id],
+        change: { kind: 'category', categoryId },
+      },
+    });
+    expect(bulk.statusCode).toBe(200);
+    const rooms = bulk.json<{ rooms: RoomBody[] }>().rooms;
+    expect(rooms.map((room) => room.categoryId)).toEqual([categoryId, categoryId]);
+
+    // Replaying the same key returns the same answer without writing again.
+    const replay = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/rooms/bulk`,
+      headers: authHeaders(requireAdmin(), key),
+      payload: {
+        roomIds: [first.room.id, second.room.id],
+        change: { kind: 'category', categoryId },
+      },
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json<{ rooms: RoomBody[] }>().rooms.map((room) => room.revision)).toEqual(
+      rooms.map((room) => room.revision),
+    );
+  });
+
+  it('leaves every selected room untouched when one of them cannot change', async () => {
+    const healthy = await createRoom(requireAdmin());
+    const archived = await createRoom(requireAdmin());
+    const archiveResponse = await app.inject({
+      method: 'POST',
+      url: `/api/v1/rooms/${archived.room.id}/archive`,
+      headers: authHeaders(requireAdmin(), randomUUID(), archived.etag),
+    });
+    expect(archiveResponse.statusCode).toBe(200);
+
+    const bulk = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/rooms/bulk`,
+      headers: authHeaders(requireAdmin(), randomUUID()),
+      payload: {
+        roomIds: [healthy.room.id, archived.room.id],
+        change: { kind: 'student_requestable', studentSelfRequestable: false },
+      },
+    });
+    expect(bulk.statusCode).toBe(409);
+
+    // The healthy room kept its original configuration: the whole command
+    // rolled back rather than half-applying.
+    const after = await app.inject({
+      method: 'GET',
+      url: `/api/v1/rooms/${healthy.room.id}`,
+      headers: authHeaders(requireAdmin()),
+    });
+    expect(after.json<{ room: RoomBody }>().room).toMatchObject({
+      studentSelfRequestable: true,
+      revision: '1',
+    });
+  });
+
+  it('skips rooms already in the requested state instead of bumping revisions', async () => {
+    const created = await createRoom(requireAdmin());
+    const bulk = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/rooms/bulk`,
+      headers: authHeaders(requireAdmin(), randomUUID()),
+      payload: { roomIds: [created.room.id], change: { kind: 'status', status: 'closed' } },
+    });
+    expect(bulk.statusCode).toBe(200);
+    expect(bulk.json<{ rooms: RoomBody[] }>().rooms[0]).toMatchObject({
+      status: 'closed',
+      revision: '1',
+    });
+
+    const opened = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/rooms/bulk`,
+      headers: authHeaders(requireAdmin(), randomUUID()),
+      payload: { roomIds: [created.room.id], change: { kind: 'status', status: 'open' } },
+    });
+    expect(opened.json<{ rooms: RoomBody[] }>().rooms[0]).toMatchObject({
+      status: 'open',
+      revision: '2',
+    });
+  });
+
+  it('refuses a bulk change reaching into another school', async () => {
+    const mine = await createRoom(requireAdmin());
+    const theirs = await createRoom(requireOtherAdmin(), schoolB);
+    const bulk = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/rooms/bulk`,
+      headers: authHeaders(requireAdmin(), randomUUID()),
+      payload: {
+        roomIds: [mine.room.id, theirs.room.id],
+        change: { kind: 'status', status: 'open' },
+      },
+    });
+    expect(bulk.statusCode).toBe(404);
+  });
+
+  it('serves room context for closed and non-requestable rooms', async () => {
+    const created = await createRoom(requireAdmin(), schoolA, { studentSelfRequestable: false });
+    const contexts = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/room-contexts`,
+      headers: authHeaders(requireAdmin()),
+    });
+    expect(contexts.statusCode).toBe(200);
+
+    // A student cannot read the administrator context source at all.
+    const asStudent = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/room-contexts`,
+      headers: authHeaders(requireStudent()),
+    });
+    expect(asStudent.statusCode).toBe(404);
+
+    // Grant a room staff member, then confirm the closed, non-requestable
+    // room shows up with them — the student catalog would omit it entirely.
+    await pool.query(
+      `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id)
+       VALUES ($1, $2, 'room_staff', 'room', $3)`,
+      [tenantA, requireAdmin().accountId, created.room.id],
+    );
+    const withStaff = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/room-contexts`,
+      headers: authHeaders(requireAdmin()),
+    });
+    const entry = withStaff
+      .json<{ rooms: { roomId: string; roomStaffNames: string[] }[] }>()
+      .rooms.find((row) => row.roomId === created.room.id);
+    expect(entry?.roomStaffNames.length).toBeGreaterThan(0);
   });
 
   it('writes audit and outbox facts for every committed change', async () => {

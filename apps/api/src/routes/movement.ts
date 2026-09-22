@@ -39,10 +39,7 @@ const StationParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
-const RoomParamsSchema = Type.Object(
-  { roomId: UuidSchema },
-  { additionalProperties: false },
-);
+const RoomParamsSchema = Type.Object({ roomId: UuidSchema }, { additionalProperties: false });
 
 const MovementHeadersSchema = Type.Object({
   'idempotency-key': Type.String({ minLength: 1, maxLength: 255 }),

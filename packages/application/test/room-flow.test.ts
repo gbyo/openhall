@@ -46,15 +46,9 @@ function queueEntry() {
 
 describe('destination-flow advisory lock key', () => {
   it('is deterministic per tenant and destination', () => {
-    expect(roomFlowLockKey('tenant-a', 'dest-a')).toBe(
-      roomFlowLockKey('tenant-a', 'dest-a'),
-    );
-    expect(roomFlowLockKey('tenant-a', 'dest-a')).not.toBe(
-      roomFlowLockKey('tenant-a', 'dest-b'),
-    );
-    expect(roomFlowLockKey('tenant-a', 'dest-a')).not.toBe(
-      roomFlowLockKey('tenant-b', 'dest-a'),
-    );
+    expect(roomFlowLockKey('tenant-a', 'dest-a')).toBe(roomFlowLockKey('tenant-a', 'dest-a'));
+    expect(roomFlowLockKey('tenant-a', 'dest-a')).not.toBe(roomFlowLockKey('tenant-a', 'dest-b'));
+    expect(roomFlowLockKey('tenant-a', 'dest-a')).not.toBe(roomFlowLockKey('tenant-b', 'dest-a'));
   });
 
   it('uses a separate domain from the idempotency lock', () => {

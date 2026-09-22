@@ -8,6 +8,7 @@ import { queryKeys } from '../../../api/query-keys';
 import { getCsrfToken } from '../../../api/session';
 import { formString, formStrings } from '../../../api/forms';
 import { useSchool } from '../../../app/school/SchoolShell';
+import type { PolicyApprover } from './policy-approvers.js';
 import { PageHeader } from '../../../components/workspace/PageHeader';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -89,6 +90,7 @@ export function Component() {
   const [creating, setCreating] = useState(false);
   const [ruleType, setRuleType] = useState<PolicyBody['ruleType']>('schedule_boundary');
   const [scopeKind, setScopeKind] = useState<PolicyBody['scope']['kind']>('organization');
+  const [approver, setApprover] = useState<PolicyApprover>('current_section_teacher');
   const policies = useQuery({
     queryKey: queryKeys.policies(organizationId),
     queryFn: () =>
@@ -170,11 +172,7 @@ export function Component() {
                 blockKinds: formStrings(data, 'blockKinds'),
                 requestSources: sources,
               }
-            : {
-                schemaVersion: 1,
-                requestSources: sources,
-                approver: 'current_section_teacher',
-              },
+            : { schemaVersion: 1, requestSources: sources, approver },
         overrideMode: formString(data, 'overrideMode') as PolicyBody['overrideMode'],
         validFrom: optionalInstant(formString(data, 'validFrom'), context.organization.timeZone),
         validUntil: optionalInstant(formString(data, 'validUntil'), context.organization.timeZone),
@@ -296,7 +294,7 @@ export function Component() {
                     Protect the beginning and end of class
                   </NativeSelectOption>
                   <NativeSelectOption value="approval_requirement">
-                    Require classroom teacher approval
+                    Require approval before the pass starts
                   </NativeSelectOption>
                 </NativeSelect>
               </Field>
@@ -345,6 +343,30 @@ export function Component() {
                           </NativeSelectOption>
                         ))}
                 </NativeSelect>
+              </Field>
+            )}
+            {ruleType === 'approval_requirement' && (
+              <Field>
+                <FieldLabel htmlFor="policy-approver">Who approves</FieldLabel>
+                <NativeSelect
+                  id="policy-approver"
+                  name="approver"
+                  value={approver}
+                  onChange={(event) => {
+                    setApprover(event.target.value as PolicyApprover);
+                  }}
+                >
+                  <NativeSelectOption value="current_section_teacher">
+                    The student&apos;s current class teacher
+                  </NativeSelectOption>
+                  <NativeSelectOption value="room_responsible_staff">
+                    Staff responsible for the destination room
+                  </NativeSelectOption>
+                </NativeSelect>
+                <FieldDescription>
+                  Independent of where the rule applies: a room rule can still ask the class
+                  teacher.
+                </FieldDescription>
               </Field>
             )}
             {ruleType === 'schedule_boundary' && (

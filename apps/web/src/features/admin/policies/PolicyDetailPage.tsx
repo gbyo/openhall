@@ -9,6 +9,7 @@ import { getCsrfToken } from '../../../api/session';
 import type { PolicyRule } from '../../../api/types';
 import { ConflictNotice } from '../../../design-system/patterns/ConflictNotice';
 import { useSchool } from '../../../app/school/SchoolShell';
+import { readPolicyApprover, type PolicyApprover } from './policy-approvers.js';
 import { useUnsavedChanges } from '../../../app/useUnsavedChanges';
 import { PageHeader } from '../../../components/workspace/PageHeader';
 import {
@@ -25,7 +26,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
@@ -57,6 +58,7 @@ interface PolicyDraft {
   lastMinutes: number;
   blockKinds: string[];
   requestSources: string[];
+  approver: PolicyApprover;
   validFrom: string;
   validUntil: string;
 }
@@ -112,6 +114,7 @@ function draftFor(rule: PolicyRule, timeZone: string): PolicyDraft {
     requestSources: Array.isArray(configuration.requestSources)
       ? configuration.requestSources.filter((value): value is string => typeof value === 'string')
       : ['student_web'],
+    approver: readPolicyApprover(configuration),
     validFrom: localDateTime(rule.validFrom, timeZone),
     validUntil: localDateTime(rule.validUntil, timeZone),
   };
@@ -251,7 +254,7 @@ export function Component() {
         : {
             schemaVersion: 1,
             requestSources: draft.requestSources,
-            approver: 'current_section_teacher',
+            approver: draft.approver,
           },
     overrideMode: draft.overrideMode,
     validFrom: instant(draft.validFrom, context.organization.timeZone),
@@ -390,6 +393,29 @@ export function Component() {
                           </NativeSelectOption>
                         ))}
                 </NativeSelect>
+              </Field>
+            )}
+            {rule.ruleType === 'approval_requirement' && (
+              <Field>
+                <FieldLabel htmlFor="policy-detail-approver">Who approves</FieldLabel>
+                <NativeSelect
+                  id="policy-detail-approver"
+                  value={draft.approver}
+                  onChange={(event) => {
+                    setDraft({ ...draft, approver: event.target.value as PolicyApprover });
+                  }}
+                >
+                  <NativeSelectOption value="current_section_teacher">
+                    The student&apos;s current class teacher
+                  </NativeSelectOption>
+                  <NativeSelectOption value="room_responsible_staff">
+                    Staff responsible for the destination room
+                  </NativeSelectOption>
+                </NativeSelect>
+                <FieldDescription>
+                  Independent of where the rule applies: a room rule can still ask the class
+                  teacher.
+                </FieldDescription>
               </Field>
             )}
             {rule.ruleType === 'schedule_boundary' && (

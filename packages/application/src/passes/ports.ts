@@ -116,10 +116,7 @@ export interface PassOutboxInput {
  * is no generic SQL escape hatch.
  */
 export interface PassRepository {
-  loadRoom(
-    context: TenantTransactionContext,
-    roomId: RoomId,
-  ): Promise<PassRoomRecord | null>;
+  loadRoom(context: TenantTransactionContext, roomId: RoomId): Promise<PassRoomRecord | null>;
   loadActiveStudent(
     context: TenantTransactionContext,
     organizationId: OrganizationId,

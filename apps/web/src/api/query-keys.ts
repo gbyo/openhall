@@ -9,6 +9,7 @@ export const queryKeys = {
   selfScheduled: ['self-scheduled'] as const,
   rooms: (organizationId: string) => ['rooms', organizationId] as const,
   studentRoomCatalog: (organizationId: string) => ['student-room-catalog', organizationId] as const,
+  roomContexts: (organizationId: string) => ['room-contexts', organizationId] as const,
   roomCategories: (organizationId: string) => ['room-categories', organizationId] as const,
   room: (roomId: string) => ['room', roomId] as const,
   queueStatus: (passId: string) => ['queue-status', passId] as const,

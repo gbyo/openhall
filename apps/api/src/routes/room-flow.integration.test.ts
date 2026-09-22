@@ -382,9 +382,7 @@ describe('allocator capacity and queueing', () => {
         makeStudent(tenantA, schoolA, `Crowd${String(index)}`),
       ),
     );
-    const results = await Promise.all(
-      students.map((student) => requestPass(student, roomId)),
-    );
+    const results = await Promise.all(students.map((student) => requestPass(student, roomId)));
     expect(results.every((result) => result.status === 201)).toBe(true);
     const states = results.map((result) => result.pass.lifecycleState);
     expect(states.filter((state) => state === 'ready')).toHaveLength(1);
@@ -987,9 +985,7 @@ describe('allocator unlimited capacity', () => {
         makeStudent(tenantA, schoolA, `Open${String(index)}`),
       ),
     );
-    const results = await Promise.all(
-      students.map((student) => requestPass(student, roomId)),
-    );
+    const results = await Promise.all(students.map((student) => requestPass(student, roomId)));
     expect(results.every((result) => result.pass.lifecycleState === 'ready')).toBe(true);
     // A reservation still exists for ready-lease and movement provenance.
     const reservations = (

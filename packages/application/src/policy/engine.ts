@@ -147,7 +147,10 @@ function deniedOverrideFor(
 function applyOverrideEvidence(
   rule: PolicyRuleInput,
   context: PolicyEvaluationContext,
-  requirement: { readonly requiredSectionId: string | null; readonly requiredRoomId: string | null },
+  requirement: {
+    readonly requiredSectionId: string | null;
+    readonly requiredRoomId: string | null;
+  },
 ): PolicyRuleEvaluation | null {
   const base = {
     ruleId: rule.id,
@@ -246,7 +249,8 @@ function approvedApprovalFor(
   binding: ApprovalBinding,
 ): boolean {
   return approvals.some(
-    (entry) => approvalMatches(entry, ruleId, ruleRevision, binding) && entry.decision === 'approved',
+    (entry) =>
+      approvalMatches(entry, ruleId, ruleRevision, binding) && entry.decision === 'approved',
   );
 }
 
@@ -264,16 +268,20 @@ function deniedApprovalFor(
 function evaluateApprovalRequirement(
   rule: PolicyRuleInput,
   context: PolicyEvaluationContext,
-  config: { readonly requestSources: readonly string[] },
+  config: {
+    readonly requestSources: readonly string[];
+    readonly approver: 'current_section_teacher' | 'room_responsible_staff';
+  },
 ): PolicyRuleEvaluation {
   if (!config.requestSources.includes(context.pass.requestSource)) return notApplicable(rule);
-  // Room and room-category scopes bind the destination room's responsible
-  // staff; every other scope binds the current section teacher. Room
-  // approvals always require an explicit decision: scheduled preapprovals
-  // never satisfy them.
-  const roomScoped = rule.scopeKind === 'room' || rule.scopeKind === 'room_category';
+  // The configured approver decides who must approve — never the scope.
+  // A room-scoped rule may still require the current section teacher, and
+  // an organization-scoped rule may require the destination room's
+  // responsible staff. Room approvals always require an explicit decision:
+  // scheduled preapprovals never satisfy them.
+  const roomApprover = config.approver === 'room_responsible_staff';
   const placement = context.currentPlacement;
-  if (!roomScoped && placement.kind !== 'resolved') {
+  if (!roomApprover && placement.kind !== 'resolved') {
     const base = {
       ruleId: rule.id,
       ruleRevision: rule.revision,
@@ -297,7 +305,7 @@ function evaluateApprovalRequirement(
     };
   }
   const binding: ApprovalBinding =
-    roomScoped || placement.kind !== 'resolved'
+    roomApprover || placement.kind !== 'resolved'
       ? {
           approverKind: 'room_responsible_staff',
           requiredSectionId: null,

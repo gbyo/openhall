@@ -270,7 +270,18 @@ export function Component() {
       })) ?? [],
     [rooms.data],
   );
-  const originRoomOptions = destinationRoomOptions;
+  // Only rooms the school marked origin-selectable can be picked manually;
+  // the `expected` strategy keeps using the schedule regardless.
+  const originRoomOptions = useMemo<Option[]>(
+    () =>
+      rooms.data?.rooms
+        .filter((item) => item.originSelectable)
+        .map((item) => ({
+          value: item.id,
+          label: [item.name, item.code].filter((part) => part).join(' · '),
+        })) ?? [],
+    [rooms.data],
+  );
   const selectedStudent = studentOptions.find((option) => option.value === studentId) ?? null;
   const selectedDestination =
     destinationRoomOptions.find((option) => option.value === destinationRoomId) ?? null;
@@ -616,7 +627,10 @@ export function Component() {
                           item.label.toLowerCase().includes(query.toLowerCase())
                         }
                       >
-                        <ComboboxInput id="scheduled-origin-room" placeholder="Search open rooms" />
+                        <ComboboxInput
+                          id="scheduled-origin-room"
+                          placeholder="Search selectable origin rooms"
+                        />
                         <ComboboxContent>
                           <ComboboxList>
                             {(item: Option) => (
@@ -628,6 +642,10 @@ export function Component() {
                           <ComboboxEmpty>No matching room.</ComboboxEmpty>
                         </ComboboxContent>
                       </Combobox>
+                      <FieldDescription>
+                        Only rooms marked &ldquo;Show as manually selectable origin&rdquo; appear
+                        here.
+                      </FieldDescription>
                     </Field>
                   )}
                 </FieldSet>

@@ -187,16 +187,17 @@ export function RoomsPage() {
       ),
     enabled: canReadGrants,
   });
-  const canReadStudentCatalog = context.capabilities.includes('pass.request.self');
-  const studentCatalogQuery = useQuery({
-    queryKey: queryKeys.studentRoomCatalog(organizationId),
+  // Teacher/class search context for *every* room, from the admin-authorized
+  // source rather than the student catalog (which only returns open,
+  // student-requestable rooms and needs `pass.request.self`).
+  const roomContextsQuery = useQuery({
+    queryKey: queryKeys.roomContexts(organizationId),
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/me/organizations/{organizationId}/student-room-catalog', {
+        api.GET('/api/v1/organizations/{organizationId}/room-contexts', {
           params: { path: { organizationId } },
         }),
       ),
-    enabled: canReadStudentCatalog,
   });
 
   const categories = useMemo(
@@ -224,18 +225,16 @@ export function RoomsPage() {
     }
     return names;
   }, [grantsQuery.data]);
-  const catalogContextByRoom = useMemo(() => {
-    const contexts = new Map<string, { teachers: string[]; sections: string[] }>();
-    for (const category of studentCatalogQuery.data?.categories ?? []) {
-      for (const room of category.rooms) {
-        contexts.set(room.id, {
-          teachers: room.searchContext.teacherNames,
-          sections: room.searchContext.sectionLabels,
-        });
-      }
-    }
-    return contexts;
-  }, [studentCatalogQuery.data]);
+  const scheduleContextByRoom = useMemo(
+    () =>
+      new Map(
+        (roomContextsQuery.data?.rooms ?? []).map((entry) => [
+          entry.roomId,
+          { teachers: entry.teacherNames, sections: entry.sectionLabels },
+        ]),
+      ),
+    [roomContextsQuery.data],
+  );
 
   const rows = useMemo<RoomRow[]>(() => {
     const rooms = [...(roomsQuery.data?.rooms ?? [])].sort((a, b) => a.name.localeCompare(b.name));
@@ -256,9 +255,9 @@ export function RoomsPage() {
         const category = room.categoryId !== null ? categoryById.get(room.categoryId) : undefined;
         const groupKey = category?.status === 'active' ? category.id : UNCATEGORIZED_KEY;
         const staffNames = staffNamesByRoom.get(room.id) ?? [];
-        const catalogContext = catalogContextByRoom.get(room.id);
-        const teacherNames = catalogContext?.teachers ?? [];
-        const sectionLabels = catalogContext?.sections ?? [];
+        const scheduleContext = scheduleContextByRoom.get(room.id);
+        const teacherNames = scheduleContext?.teachers ?? [];
+        const sectionLabels = scheduleContext?.sections ?? [];
         const staffClassNames = [...staffNames, ...teacherNames];
         const haystack = [
           room.name,
@@ -294,7 +293,7 @@ export function RoomsPage() {
     categoryById,
     activeCategories,
     staffNamesByRoom,
-    catalogContextByRoom,
+    scheduleContextByRoom,
   ]);
 
   const groupMeta = useMemo(() => {
@@ -527,6 +526,7 @@ export function RoomsPage() {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.rooms(organizationId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.roomCategories(organizationId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.roomContexts(organizationId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.studentRoomCatalog(organizationId) });
   };
 
@@ -603,59 +603,30 @@ export function RoomsPage() {
     },
   });
 
+  // One transactional server command: the whole selection lands or none of
+  // it does, so a mid-run failure can never leave the school half
+  // reconfigured.
   const bulk = useMutation({
-    mutationFn: async (
+    mutationFn: (
       input:
         | { kind: 'category'; categoryId: string }
         | { kind: 'request'; on: boolean }
         | { kind: 'state'; open: boolean },
     ) => {
-      const failures: string[] = [];
-      for (const id of selectedIds) {
-        try {
-          if (input.kind === 'state') {
-            await setRoomState(id, input.open);
-          } else {
-            const { room, etag } = await fetchRoomEtag(id);
-            const key = crypto.randomUUID();
-            const nextCategory = input.kind === 'category' ? input.categoryId : room.categoryId;
-            const nextRequestable =
-              input.kind === 'request' ? input.on : room.studentSelfRequestable;
-            if (nextRequestable && nextCategory === null) {
-              failures.push(id);
-              continue;
-            }
-            await confirmed(
-              api.PUT('/api/v1/rooms/{roomId}', {
-                params: {
-                  path: { roomId: id },
-                  header: { 'idempotency-key': key, 'if-match': etag },
-                },
-                headers: authedHeaders(key, etag),
-                body: {
-                  categoryId: nextCategory,
-                  name: room.name,
-                  code: room.code,
-                  floorLabel: room.floorLabel,
-                  studentSelfRequestable: nextRequestable,
-                  originSelectable: room.originSelectable,
-                  capacity: room.capacity,
-                  queueEnabled: room.queueEnabled,
-                  checkInMode: room.checkInMode,
-                  defaultDurationSeconds: room.defaultDurationSeconds,
-                  maxDurationSeconds: room.maxDurationSeconds,
-                  readyClaimTimeoutSeconds: room.readyClaimTimeoutSeconds,
-                  queueTimeoutSeconds: room.queueTimeoutSeconds,
-                },
-              }),
-            );
-          }
-        } catch {
-          failures.push(id);
-        }
-      }
-      if (failures.length > 0)
-        throw new Error(`${String(failures.length)} room(s) could not be updated.`);
+      const key = crypto.randomUUID();
+      const change =
+        input.kind === 'category'
+          ? ({ kind: 'category', categoryId: input.categoryId } as const)
+          : input.kind === 'request'
+            ? ({ kind: 'student_requestable', studentSelfRequestable: input.on } as const)
+            : ({ kind: 'status', status: input.open ? 'open' : 'closed' } as const);
+      return confirmed(
+        api.POST('/api/v1/organizations/{organizationId}/rooms/bulk', {
+          params: { path: { organizationId }, header: { 'idempotency-key': key } },
+          headers: authedHeaders(key),
+          body: { roomIds: selectedIds, change },
+        }),
+      );
     },
     onSuccess: () => {
       setRowSelection({});

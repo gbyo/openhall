@@ -26,19 +26,14 @@ export interface StudentCategory {
 }
 
 export function toStudentCategory(category: StudentCatalogCategory): StudentCategory {
-  // Spec §30 includes `studentSurface` on catalog categories so the launcher
-  // can split Primary/More. The codegen'd contract omits it today (backend
-  // gap): honor it when present, default to primary when absent.
-  const surface =
-    (category as Partial<Record<'studentSurface', unknown>>).studentSurface === 'secondary'
-      ? 'secondary'
-      : 'primary';
   return {
     id: category.id,
     name: category.name,
     icon: iconForCategoryKey(category.iconKey),
     tone: toneForCategoryKey(category.toneKey),
-    surface,
+    // The catalog carries the configured placement; hidden categories never
+    // reach it, so the launcher only splits Primary from More.
+    surface: category.studentSurface,
     picker: resolveRoomPickerMode(category.pickerMode, category.rooms.length),
     rooms: [...category.rooms],
   };

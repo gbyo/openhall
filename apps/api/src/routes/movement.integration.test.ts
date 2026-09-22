@@ -1375,10 +1375,7 @@ describe('scheduling alignment', () => {
     const alignedOffice = await makeOfficeStation(officeStaff);
     const { pass } = await requestReadyPass(student, alignedOffice);
     const row = (
-      await pool.query<{ name: string }>(
-        `SELECT name FROM room WHERE id = $1`,
-        [alignedOffice],
-      )
+      await pool.query<{ name: string }>(`SELECT name FROM room WHERE id = $1`, [alignedOffice])
     ).rows[0];
     expect(pass.destination).toMatchObject({
       id: alignedOffice,
@@ -1470,7 +1467,6 @@ describe('movement regression coverage', () => {
 
   it('snapshots expected return at departure and ignores later config edits', async () => {
     const timed = await makeDestination({
-      
       capacity: 2,
       queueEnabled: false,
       checkInMode: 'none',
@@ -1504,9 +1500,7 @@ describe('movement regression coverage', () => {
     expect(spanSeconds).toBe(300);
     const snapshotted = expectedReturnAt.toISOString();
     // Later destination edits must not reinterpret history.
-    await pool.query(`UPDATE room SET default_duration_seconds = 3600 WHERE id = $1`, [
-      timed,
-    ]);
+    await pool.query(`UPDATE room SET default_duration_seconds = 3600 WHERE id = $1`, [timed]);
     const reread = (
       await pool.query<{ expected_return_at: Date | null }>(
         `SELECT expected_return_at FROM pass WHERE id = $1`,
@@ -1567,8 +1561,6 @@ describe('station display', () => {
       headers: { cookie: `openhall_session_dev=${officeStaff.cookie}` },
     });
     expect(view.statusCode).toBe(200);
-    expect(
-      view.json<{ room: { name: string } }>().room,
-     ).toMatchObject({ name: 'Fallback Office' });
+    expect(view.json<{ room: { name: string } }>().room).toMatchObject({ name: 'Fallback Office' });
   });
 });

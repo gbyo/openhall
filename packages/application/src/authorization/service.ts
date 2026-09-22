@@ -213,8 +213,7 @@ function hasStaffBackedGrant(
   for (const grant of actor.grants) {
     if (!isExplicitRole(grant.role) || grant.role !== role) continue;
     if (role === 'room_staff') {
-      if (grant.scopeKind !== 'room' || grant.roomId !== (roomId ?? null))
-        continue;
+      if (grant.scopeKind !== 'room' || grant.roomId !== (roomId ?? null)) continue;
       // Staff membership is checked at the room's school by the caller;
       // here we only verify the grant shape.
       return grant;
@@ -981,9 +980,7 @@ export class RelationshipAuthorizationService {
     }
     const staffGrant = actor.grants.find(
       (grant) =>
-        grant.role === 'room_staff' &&
-        grant.scopeKind === 'room' &&
-        grant.roomId === room.id,
+        grant.role === 'room_staff' && grant.scopeKind === 'room' && grant.roomId === room.id,
     );
     if (staffGrant !== undefined && isActiveStaffAt(actor, organization.id, date)) {
       return {
@@ -1020,11 +1017,7 @@ export class RelationshipAuthorizationService {
     date: Temporal.PlainDate,
   ): Promise<AuthorizationDecision> {
     if (!isActiveStaffAt(actor, organization.id, date)) return deny('staff_membership_required');
-    const candidates = await this.repository.listRoomTeachers(
-      context,
-      organization.id,
-      room.id,
-    );
+    const candidates = await this.repository.listRoomTeachers(context, organization.id, room.id);
     const responsible = candidates.some(
       (candidate) =>
         candidate.personId === principal.personId &&

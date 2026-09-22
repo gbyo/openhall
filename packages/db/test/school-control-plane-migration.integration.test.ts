@@ -105,11 +105,8 @@ async function seedControlPlane(scratch: Pool, tag: string) {
   // The room tables only exist from migration 011 on; legacy-level
   // fixtures (007) use the location/destination model.
   const hasRooms =
-    (
-      await scratch.query<{ reg: string | null }>(
-        `SELECT to_regclass('room') AS reg`,
-      )
-    ).rows[0]?.reg !== null;
+    (await scratch.query<{ reg: string | null }>(`SELECT to_regclass('room') AS reg`)).rows[0]
+      ?.reg !== null;
   if (!hasRooms) {
     const location = idOf(
       await scratch.query(
@@ -123,7 +120,16 @@ async function seedControlPlane(scratch: Pool, tag: string) {
         [tenantId, school, location],
       ),
     );
-    return { tenantId, school, district, person, account, provider, room: destination, destination };
+    return {
+      tenantId,
+      school,
+      district,
+      person,
+      account,
+      provider,
+      room: destination,
+      destination,
+    };
   }
   const category = idOf(
     await scratch.query(

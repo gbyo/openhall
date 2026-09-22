@@ -1465,6 +1465,8 @@ export const RoomCatalogEntrySchema = Type.Object(
     floorLabel: Type.Union([Type.String(), Type.Null()]),
     categoryId: Type.Union([UuidSchema, Type.Null()]),
     checkInMode: CheckInModeSchema,
+    /** Whether staff may pick this room as an explicit origin. */
+    originSelectable: Type.Boolean(),
   },
   { additionalProperties: false },
 );
@@ -1553,6 +1555,9 @@ export const StudentRoomCatalogCategorySchema = Type.Object(
     name: Type.String(),
     iconKey: Type.String(),
     toneKey: Type.String(),
+    // Hidden categories never reach the catalog, so the launcher only ever
+    // sees the two placements it renders.
+    studentSurface: Type.Union([Type.Literal('primary'), Type.Literal('secondary')]),
     pickerMode: RoomCategoryPickerModeSchema,
     sortOrder: Type.Integer({ minimum: 0 }),
     rooms: Type.Array(StudentRoomCatalogRoomSchema),
@@ -1568,6 +1573,67 @@ export const StudentRoomCatalogSchema = Type.Object(
 export const RoomCatalogSchema = Type.Object(
   { rooms: Type.Array(RoomCatalogEntrySchema) },
   { $id: 'RoomCatalog', additionalProperties: false },
+);
+
+/**
+ * One bulk room change. Exactly one change kind per request: the whole
+ * selection moves together or not at all.
+ */
+export const RoomBulkChangeSchema = Type.Union([
+  Type.Object(
+    {
+      kind: Type.Literal('category'),
+      categoryId: Type.Union([UuidSchema, Type.Null()]),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      kind: Type.Literal('student_requestable'),
+      studentSelfRequestable: Type.Boolean(),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      kind: Type.Literal('status'),
+      status: Type.Union([Type.Literal('open'), Type.Literal('closed')]),
+    },
+    { additionalProperties: false },
+  ),
+]);
+
+export const RoomBulkWriteBodySchema = Type.Object(
+  {
+    roomIds: Type.Array(UuidSchema, { minItems: 1, maxItems: 500 }),
+    change: RoomBulkChangeSchema,
+  },
+  { $id: 'RoomBulkWriteBody', additionalProperties: false },
+);
+
+export const RoomBulkResponseSchema = Type.Object(
+  { rooms: Type.Array(RoomSchema) },
+  { $id: 'RoomBulkResponse', additionalProperties: false },
+);
+
+/**
+ * Administrator view of schedule/staffing context per room. Covers every
+ * room in the school, including closed, uncategorized, and staff-only
+ * rooms the student catalog never returns.
+ */
+export const RoomContextEntrySchema = Type.Object(
+  {
+    roomId: UuidSchema,
+    teacherNames: Type.Array(Type.String()),
+    sectionLabels: Type.Array(Type.String()),
+    roomStaffNames: Type.Array(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+export const RoomContextListSchema = Type.Object(
+  { rooms: Type.Array(RoomContextEntrySchema) },
+  { $id: 'RoomContextList', additionalProperties: false },
 );
 
 /**
