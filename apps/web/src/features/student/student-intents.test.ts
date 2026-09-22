@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { splitStudentCatalog, toStudentCategory } from './student-intents.js';
+import { pickerForCategory, splitStudentCatalog, toStudentCategory } from './student-intents.js';
 import type { StudentCatalogCategory } from './student-intents.js';
 
 function category(
@@ -12,6 +12,7 @@ function category(
     iconKey: 'generic',
     toneKey: 'neutral',
     studentSurface: 'primary',
+    pickerMode: 'auto',
     sortOrder: 0,
     destinations: [],
     ...overrides,
@@ -64,5 +65,35 @@ describe('server-defined student catalog', () => {
 
   it('returns empty lists for an empty catalog', () => {
     expect(splitStudentCatalog([])).toEqual({ primary: [], secondary: [] });
+  });
+});
+
+describe('generic destination picker mode', () => {
+  function destinations(count: number) {
+    return Array.from({ length: count }, (_, index) => ({
+      id: `d${String(index)}`,
+      displayName: `Room ${String(index)}`,
+      location: { id: `l${String(index)}`, name: `Room ${String(index)}` },
+      checkInMode: 'none' as const,
+    }));
+  }
+
+  it('forces list and search modes regardless of destination count', () => {
+    const base = category('x', { destinations: destinations(20) });
+    expect(pickerForCategory(toStudentCategory({ ...base, pickerMode: 'list' }))).toBe('list');
+    expect(pickerForCategory(toStudentCategory({ ...base, pickerMode: 'search' }))).toBe('search');
+  });
+
+  it('resolves auto to list for a few choices and search for larger sets', () => {
+    const small = toStudentCategory(category('s', { destinations: destinations(7) }));
+    const large = toStudentCategory(category('l', { destinations: destinations(8) }));
+    expect(pickerForCategory(small)).toBe('list');
+    expect(pickerForCategory(large)).toBe('search');
+  });
+
+  it('defaults unknown picker values to auto without name branching', () => {
+    const converted = toStudentCategory(category('Room visits', { destinations: destinations(2) }));
+    expect(converted.pickerMode).toBe('auto');
+    expect(pickerForCategory(converted)).toBe('list');
   });
 });

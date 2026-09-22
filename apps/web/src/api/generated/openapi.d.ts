@@ -9165,6 +9165,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9248,6 +9249,7 @@ export interface operations {
                     iconKey: string;
                     toneKey: string;
                     studentSurface: "primary" | "secondary" | "hidden";
+                    pickerMode?: "auto" | "list" | "search";
                     sortOrder: number;
                 };
             };
@@ -9269,6 +9271,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9433,6 +9436,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9517,6 +9521,7 @@ export interface operations {
                     iconKey: string;
                     toneKey: string;
                     studentSurface: "primary" | "secondary" | "hidden";
+                    pickerMode?: "auto" | "list" | "search";
                     sortOrder: number;
                 };
             };
@@ -9538,6 +9543,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9705,6 +9711,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9867,6 +9874,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             destinations: {
                                 /** Format: uuid */

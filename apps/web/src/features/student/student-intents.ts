@@ -1,7 +1,9 @@
 import type { CategoryIcon } from '../../lib/destination-category-presentation.js';
 import {
   iconForCategoryKey,
+  resolveCategoryPicker,
   toneForCategoryKey,
+  type CategoryPickerMode,
 } from '../../lib/destination-category-presentation.js';
 import type { StudentDestinationCatalog } from '../../api/types.js';
 
@@ -19,6 +21,7 @@ export interface StudentCategory {
   icon: CategoryIcon;
   tone: 'aqua' | 'rose' | 'violet' | 'amber' | 'blue' | 'green' | 'slate' | 'neutral';
   surface: 'primary' | 'secondary';
+  pickerMode: CategoryPickerMode;
   destinations: StudentCatalogDestination[];
 }
 
@@ -29,8 +32,21 @@ export function toStudentCategory(category: StudentCatalogCategory): StudentCate
     icon: iconForCategoryKey(category.iconKey),
     tone: toneForCategoryKey(category.toneKey),
     surface: category.studentSurface,
+    pickerMode:
+      category.pickerMode === 'list' || category.pickerMode === 'search'
+        ? category.pickerMode
+        : 'auto',
     destinations: [...category.destinations],
   };
+}
+
+/**
+ * Resolves how a category's destinations are presented once a choice is
+ * required (2+ destinations; a single destination skips the picker
+ * entirely regardless of mode). Never branches on category names.
+ */
+export function pickerForCategory(category: StudentCategory): 'list' | 'search' {
+  return resolveCategoryPicker(category.pickerMode, category.destinations.length);
 }
 
 /**
