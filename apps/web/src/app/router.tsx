@@ -34,8 +34,10 @@ import { ClassPage } from '../features/teacher/ClassPage';
 import { LiveMovementPage } from '../features/movement/LiveMovementPage';
 import { StationPage } from '../features/station/StationPage';
 import { AdminIndex, AdminLayout } from '../features/admin/AdminLayout';
-import { DestinationWorkspace } from '../features/admin/destinations/DestinationWorkspace';
+import { DestinationCategories } from '../features/admin/destinations/DestinationCategories';
 import { DestinationDetailPage } from '../features/admin/destinations/DestinationDetailPage';
+import { PlaceDetailPage } from '../features/admin/places/PlaceDetailPage';
+import { PlacesPage } from '../features/admin/places/PlacesPage';
 import { DemoPage, demoLoader, type DemoInfo } from '../features/demo/DemoPage';
 
 function DemoRoute() {
@@ -120,9 +122,12 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminIndex /> },
           { path: 'live', element: <Navigate replace to="../../movement" /> },
-          { path: 'destinations', element: <DestinationWorkspace /> },
+          { path: 'places', element: <PlacesPage /> },
+          { path: 'places/categories', element: <DestinationCategories /> },
+          { path: 'places/:locationId', element: <PlaceDetailPage /> },
+          { path: 'destinations', element: <Navigate replace to="../places" /> },
           { path: 'destinations/:destinationId', element: <DestinationDetailPage /> },
-          { path: 'locations', lazy: () => import('../features/admin/locations/LocationsPage') },
+          { path: 'locations', element: <Navigate replace to="../places" /> },
           { path: 'schedules', lazy: () => import('../features/admin/schedules/SchedulesPage') },
           { path: 'policies', lazy: () => import('../features/admin/policies/PoliciesPage') },
           {

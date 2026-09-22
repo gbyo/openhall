@@ -27,6 +27,7 @@ import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { requireCsrf, requirePrincipal } from '../auth/session-context.js';
 import { registerAuditRoutes } from './control-plane-audit.js';
 import { registerDestinationCategoryRoutes } from './control-plane-destination-categories.js';
+import { registerPlaceRoutes } from './control-plane-places.js';
 import { registerEnrollmentRoutes } from './control-plane-enrollment.js';
 import { registerGrantRoutes } from './control-plane-grants.js';
 import { registerPeopleRoutes } from './control-plane-people.js';
@@ -532,6 +533,7 @@ export function registerControlPlaneRoutes(
   );
 
   registerDestinationCategoryRoutes(typedApp, controlPlane, auth, handle);
+  registerPlaceRoutes(typedApp, controlPlane, auth, handle);
   registerAuditRoutes(typedApp, controlPlane, auth, handle);
   registerScheduleRoutes(typedApp, controlPlane, auth, handle);
   registerPolicyRoutes(typedApp, controlPlane, auth, handle);

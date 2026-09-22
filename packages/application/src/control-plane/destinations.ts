@@ -28,8 +28,9 @@ import type {
   DestinationRepository,
   DestinationStatus,
   LocationRepository,
+  PlacesRepository,
 } from './ports.js';
-import { requireNormalSession, requireOrganizationCapability } from './shared.js';
+import { requireNormalSession, requireOrganizationCapability, schoolDateFor } from './shared.js';
 
 export interface DestinationDependencies {
   readonly clock: Clock;
@@ -38,6 +39,7 @@ export interface DestinationDependencies {
   readonly destinations: DestinationRepository;
   readonly categories: DestinationCategoryRepository;
   readonly locations: LocationRepository;
+  readonly places: PlacesRepository;
   readonly flow: DestinationFlowRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -85,10 +87,21 @@ export interface StudentCatalogCategory {
   readonly destinations: readonly StudentCatalogDestination[];
 }
 
+export interface StudentDestinationSearchContext {
+  readonly staffDisplayNames: readonly string[];
+  readonly sectionLabels: readonly string[];
+}
+
 export interface StudentCatalogDestination {
   readonly id: string;
   readonly displayName: string;
-  readonly location: { readonly id: string; readonly name: string };
+  readonly location: {
+    readonly id: string;
+    readonly name: string;
+    readonly code: string | null;
+    readonly floorLabel: string | null;
+  };
+  readonly searchContext: StudentDestinationSearchContext;
   readonly checkInMode: DestinationCheckInMode;
 }
 
@@ -424,22 +437,37 @@ export async function listMyStudentDestinationCatalog(
       dependencies.destinations.listActiveCatalog(context, organizationId),
       dependencies.locations.listByOrganization(context, organizationId),
     ]);
-    const locationNames = new Map(
+    const timeZone = await dependencies.locations.loadSchoolTimeZone(context, organizationId);
+    const today = timeZone === null ? null : (schoolDateFor(now, timeZone)?.toString() ?? null);
+    const usage =
+      today === null
+        ? []
+        : await dependencies.places.listClassUsageByOrganization(context, organizationId, today);
+    const usageByLocation = new Map(usage.map((entry) => [entry.locationId, entry]));
+    const locationsById = new Map(
       locations
         .filter((location) => location.tenantId === principal.tenantId)
-        .map((location) => [location.id, location.name] as const),
+        .map((location) => [location.id, location] as const),
     );
     const eligibleByCategory = new Map<string, StudentCatalogDestination[]>();
     for (const row of destinations) {
       if (row.tenantId !== principal.tenantId) continue;
       if (row.status !== 'active' || !row.studentSelfRequestable) continue;
       const list = eligibleByCategory.get(row.categoryId);
+      const place = locationsById.get(row.locationId);
+      const used = usageByLocation.get(row.locationId);
       const entry: StudentCatalogDestination = {
         id: row.id,
         displayName: row.displayName ?? row.serviceType,
         location: {
           id: row.locationId,
-          name: locationNames.get(row.locationId) ?? '',
+          name: place?.name ?? '',
+          code: place?.code ?? null,
+          floorLabel: place?.floorLabel ?? null,
+        },
+        searchContext: {
+          staffDisplayNames: used?.teacherNames ?? [],
+          sectionLabels: [...(used?.sectionTitles ?? []), ...(used?.sectionCodes ?? [])],
         },
         checkInMode: row.checkInMode,
       };

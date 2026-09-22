@@ -20,6 +20,7 @@ export const CONTROL_PLANE_COMMANDS = [
   'location.update:v1',
   'location.archive:v1',
   'destination.create:v1',
+  'destination.bulk_create_from_locations:v1',
   'destination.update:v1',
   'destination.open:v1',
   'destination.close:v1',

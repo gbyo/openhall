@@ -96,8 +96,7 @@ export function buildWorkspaceNav(context: OrganizationContext): WorkspaceNavGro
   }
 
   if (has(context, 'destination.manage')) {
-    administration.push({ to: 'admin/destinations', label: 'Destinations' });
-    administration.push({ to: 'admin/locations', label: 'Locations' });
+    administration.push({ to: 'admin/places', label: 'Places' });
   }
   if (has(context, 'schedule.manage')) {
     administration.push({ to: 'admin/schedules', label: 'Schedules' });

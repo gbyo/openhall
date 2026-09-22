@@ -44,7 +44,8 @@ describe('server-defined student catalog', () => {
         {
           id: 'd1',
           displayName: 'Guidance',
-          location: { id: 'l1', name: 'Room 101' },
+          location: { id: 'l1', name: 'Room 101', code: '101', floorLabel: null },
+          searchContext: { staffDisplayNames: [], sectionLabels: [] },
           checkInMode: 'none',
         },
       ],
@@ -73,7 +74,13 @@ describe('generic destination picker mode', () => {
     return Array.from({ length: count }, (_, index) => ({
       id: `d${String(index)}`,
       displayName: `Room ${String(index)}`,
-      location: { id: `l${String(index)}`, name: `Room ${String(index)}` },
+      location: {
+        id: `l${String(index)}`,
+        name: `Room ${String(index)}`,
+        code: String(index),
+        floorLabel: null,
+      },
+      searchContext: { staffDisplayNames: [], sectionLabels: [] },
       checkInMode: 'none' as const,
     }));
   }

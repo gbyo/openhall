@@ -770,6 +770,79 @@ export const LocationResponseSchema = Type.Object(
   { $id: 'LocationResponse', additionalProperties: false },
 );
 
+/**
+ * Purpose-built admin Place projection: LOCATION rows with derived
+ * classroom usage and pass-destination summaries. No private data beyond
+ * what destination.manage administration already sees.
+ */
+export const PlaceClassDetailSchema = Type.Object(
+  {
+    title: Type.String(),
+    code: Type.Union([Type.String(), Type.Null()]),
+    teacherNames: Type.Array(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+export const PlaceClassUsageSchema = Type.Object(
+  {
+    sectionCount: Type.Integer({ minimum: 0 }),
+    teacherNames: Type.Array(Type.String()),
+    classes: Type.Array(PlaceClassDetailSchema),
+  },
+  { additionalProperties: false },
+);
+
+export const PlaceDestinationEntrySchema = Type.Object(
+  {
+    id: UuidSchema,
+    displayName: Type.String(),
+    categoryId: UuidSchema,
+    status: Type.Union([Type.Literal('active'), Type.Literal('closed'), Type.Literal('archived')]),
+    studentSelfRequestable: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+
+export const PlaceAdminViewSchema = Type.Object(
+  {
+    id: UuidSchema,
+    organizationId: UuidSchema,
+    name: Type.String({ minLength: 1, maxLength: 200 }),
+    kind: Type.String({ minLength: 1, maxLength: 100 }),
+    code: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
+    floorLabel: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
+    parentLocationId: Type.Union([UuidSchema, Type.Null()]),
+    parentName: Type.Union([Type.String(), Type.Null()]),
+    status: Type.Union([
+      Type.Literal('active'),
+      Type.Literal('inactive'),
+      Type.Literal('archived'),
+    ]),
+    classUsage: PlaceClassUsageSchema,
+    destinationSummary: Type.Object(
+      {
+        count: Type.Integer({ minimum: 0 }),
+        destinations: Type.Array(PlaceDestinationEntrySchema),
+      },
+      { additionalProperties: false },
+    ),
+    revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+    updatedAt: InstantSchema,
+  },
+  { $id: 'PlaceAdminView', additionalProperties: false },
+);
+
+export const PlaceListSchema = Type.Object(
+  { places: Type.Array(PlaceAdminViewSchema) },
+  { $id: 'PlaceList', additionalProperties: false },
+);
+
+export const PlaceResponseSchema = Type.Object(
+  { place: PlaceAdminViewSchema },
+  { $id: 'PlaceResponse', additionalProperties: false },
+);
+
 export const LocationWriteBodySchema = Type.Object(
   {
     parentLocationId: Type.Union([UuidSchema, Type.Null()]),
@@ -837,6 +910,30 @@ export const DestinationWriteBodySchema = Type.Object(
     queueTimeoutSeconds: Type.Integer({ minimum: 60, maximum: 14400 }),
   },
   { $id: 'DestinationWriteBody', additionalProperties: false },
+);
+/**
+ * Idempotent bulk command: one ordinary destination per selected Place.
+ * A Place already covered by a non-archived destination in the category
+ * is skipped, never duplicated.
+ */
+export const BulkCreateDestinationsBodySchema = Type.Object(
+  {
+    locationIds: Type.Array(UuidSchema, { minItems: 1, maxItems: 500 }),
+    categoryId: UuidSchema,
+    studentSelfRequestable: Type.Boolean(),
+    checkInMode: Type.Optional(CheckInModeSchema),
+    capacity: Type.Optional(Type.Union([Type.Integer({ minimum: 1 }), Type.Null()])),
+    defaultDurationSeconds: Type.Optional(Type.Union([Type.Integer({ minimum: 1 }), Type.Null()])),
+  },
+  { $id: 'BulkCreateDestinationsBody', additionalProperties: false },
+);
+
+export const BulkCreateDestinationsResponseSchema = Type.Object(
+  {
+    created: Type.Array(DestinationSchema),
+    skippedLocationIds: Type.Array(UuidSchema),
+  },
+  { $id: 'BulkCreateDestinationsResponse', additionalProperties: false },
 );
 
 export const BlockKindSchema = Type.Union([
@@ -1556,11 +1653,33 @@ export const DestinationCategoryWriteBodySchema = Type.Object(
  * categories with their eligible destinations. Hidden/archived categories,
  * non-requestable destinations, and empty categories never appear.
  */
+/**
+ * Safe picker context for destination search: staff display names and
+ * section labels only. No staff account IDs, grants, rosters, or private
+ * schedule data.
+ */
+export const StudentDestinationSearchContextSchema = Type.Object(
+  {
+    staffDisplayNames: Type.Array(Type.String()),
+    sectionLabels: Type.Array(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
 export const StudentDestinationCatalogDestinationSchema = Type.Object(
   {
     id: UuidSchema,
     displayName: Type.String(),
-    location: Type.Object({ id: UuidSchema, name: Type.String() }, { additionalProperties: false }),
+    location: Type.Object(
+      {
+        id: UuidSchema,
+        name: Type.String(),
+        code: Type.Union([Type.String(), Type.Null()]),
+        floorLabel: Type.Union([Type.String(), Type.Null()]),
+      },
+      { additionalProperties: false },
+    ),
+    searchContext: StudentDestinationSearchContextSchema,
     checkInMode: CheckInModeSchema,
   },
   { additionalProperties: false },

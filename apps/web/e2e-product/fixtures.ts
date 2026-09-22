@@ -426,3 +426,43 @@ export function orgLocations() {
     ],
   };
 }
+
+export function orgPlaces() {
+  return {
+    places: [
+      {
+        id: LOCATION,
+        organizationId: ORG,
+        name: 'Room 214',
+        kind: 'classroom',
+        code: '214',
+        floorLabel: '2nd floor',
+        parentLocationId: null,
+        parentName: null,
+        status: 'active',
+        classUsage: {
+          sectionCount: 1,
+          teacherNames: ['Ms. Smith'],
+          classes: [],
+        },
+        destinationSummary: { count: 0, destinations: [] },
+        revision: '1',
+        updatedAt: '2026-09-21T14:00:00Z',
+      },
+    ],
+  };
+}
+
+export function placeDetail() {
+  const [place] = orgPlaces().places;
+  return {
+    place: {
+      ...place,
+      classUsage: {
+        sectionCount: 1,
+        teacherNames: ['Ms. Smith'],
+        classes: [{ title: 'Algebra II', code: 'ALG-2', teacherNames: ['Ms. Smith'] }],
+      },
+    },
+  };
+}

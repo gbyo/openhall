@@ -102,6 +102,47 @@ export interface LocationRepository {
   ): Promise<number>;
 }
 
+/**
+ * Derived classroom usage for one Place, computed from current school
+ * academic records (never persisted): active sections through applicable
+ * section meetings at the location to active teacher memberships. Distinct
+ * people; tenant/school/date bounded.
+ */
+export interface PlaceClassUsageRow {
+  readonly locationId: string;
+  readonly sectionCount: number;
+  readonly teacherNames: readonly string[];
+  readonly sectionTitles: readonly string[];
+  readonly sectionCodes: readonly string[];
+}
+
+/**
+ * Purpose-built Places read port. One batched query per call; no N+1.
+ * No generic SQL escape hatch.
+ */
+export interface PlacesRepository {
+  /** Classroom usage for every location of one school with any usage. */
+  listClassUsageByOrganization(
+    context: TenantTransactionContext,
+    organizationId: string,
+    today: string,
+  ): Promise<readonly PlaceClassUsageRow[]>;
+  /** Per-class detail for one Place: title, code, and distinct teachers. */
+  listClassDetailsByLocation(
+    context: TenantTransactionContext,
+    organizationId: string,
+    locationId: string,
+    today: string,
+  ): Promise<readonly PlaceClassDetailRow[]>;
+}
+
+/** One class (section) using a Place with its distinct teacher names. */
+export interface PlaceClassDetailRow {
+  readonly title: string;
+  readonly code: string | null;
+  readonly teacherNames: readonly string[];
+}
+
 export type DestinationStatus = 'active' | 'closed' | 'archived';
 export type { DestinationCheckInMode };
 
