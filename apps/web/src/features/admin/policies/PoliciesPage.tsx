@@ -8,6 +8,7 @@ import { queryKeys } from '../../../api/query-keys';
 import { getCsrfToken } from '../../../api/session';
 import { formString, formStrings } from '../../../api/forms';
 import { useSchool } from '../../../app/school/SchoolShell';
+import type { PolicyApprover } from './policy-approvers.js';
 import { PageHeader } from '../../../components/workspace/PageHeader';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,10 +40,11 @@ interface PolicyBody {
   name: string;
   ruleType: 'schedule_boundary' | 'approval_requirement';
   scope: {
-    kind: 'organization' | 'section' | 'destination';
+    kind: 'organization' | 'section' | 'room' | 'room_category';
     organizationId: string | null;
     sectionId: string | null;
-    destinationId: string | null;
+    roomId: string | null;
+    roomCategoryId: string | null;
   };
   priority: number;
   configuration: Record<string, unknown>;
@@ -67,8 +69,10 @@ function scopeLabel(kind: string): string {
   switch (kind) {
     case 'section':
       return 'One class';
-    case 'destination':
-      return 'One destination';
+    case 'room':
+      return 'One room';
+    case 'room_category':
+      return 'One room category';
     default:
       return 'Whole school';
   }
@@ -86,6 +90,7 @@ export function Component() {
   const [creating, setCreating] = useState(false);
   const [ruleType, setRuleType] = useState<PolicyBody['ruleType']>('schedule_boundary');
   const [scopeKind, setScopeKind] = useState<PolicyBody['scope']['kind']>('organization');
+  const [approver, setApprover] = useState<PolicyApprover>('current_section_teacher');
   const policies = useQuery({
     queryKey: queryKeys.policies(organizationId),
     queryFn: () =>
@@ -95,12 +100,22 @@ export function Component() {
         }),
       ),
   });
-  const destinations = useQuery({
-    queryKey: queryKeys.destinations(organizationId),
-    enabled: creating && scopeKind === 'destination',
+  const rooms = useQuery({
+    queryKey: queryKeys.rooms(organizationId),
+    enabled: creating && scopeKind === 'room',
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/organizations/{organizationId}/destinations', {
+        api.GET('/api/v1/organizations/{organizationId}/rooms', {
+          params: { path: { organizationId } },
+        }),
+      ),
+  });
+  const roomCategories = useQuery({
+    queryKey: queryKeys.roomCategories(organizationId),
+    enabled: creating && scopeKind === 'room_category',
+    queryFn: () =>
+      confirmed(
+        api.GET('/api/v1/organizations/{organizationId}/room-categories', {
           params: { path: { organizationId } },
         }),
       ),
@@ -144,7 +159,8 @@ export function Component() {
           kind: scopeKind,
           organizationId: scopeKind === 'organization' ? organizationId : null,
           sectionId: scopeKind === 'section' ? scopeId : null,
-          destinationId: scopeKind === 'destination' ? scopeId : null,
+          roomId: scopeKind === 'room' ? scopeId : null,
+          roomCategoryId: scopeKind === 'room_category' ? scopeId : null,
         },
         priority: Number(data.get('priority')),
         configuration:
@@ -156,11 +172,7 @@ export function Component() {
                 blockKinds: formStrings(data, 'blockKinds'),
                 requestSources: sources,
               }
-            : {
-                schemaVersion: 1,
-                requestSources: sources,
-                approver: 'current_section_teacher',
-              },
+            : { schemaVersion: 1, requestSources: sources, approver },
         overrideMode: formString(data, 'overrideMode') as PolicyBody['overrideMode'],
         validFrom: optionalInstant(formString(data, 'validFrom'), context.organization.timeZone),
         validUntil: optionalInstant(formString(data, 'validUntil'), context.organization.timeZone),
@@ -282,7 +294,7 @@ export function Component() {
                     Protect the beginning and end of class
                   </NativeSelectOption>
                   <NativeSelectOption value="approval_requirement">
-                    Require classroom teacher approval
+                    Require approval before the pass starts
                   </NativeSelectOption>
                 </NativeSelect>
               </Field>
@@ -298,14 +310,19 @@ export function Component() {
                 >
                   <NativeSelectOption value="organization">Whole school</NativeSelectOption>
                   <NativeSelectOption value="section">One class</NativeSelectOption>
-                  <NativeSelectOption value="destination">One destination</NativeSelectOption>
+                  <NativeSelectOption value="room">One room</NativeSelectOption>
+                  <NativeSelectOption value="room_category">One room category</NativeSelectOption>
                 </NativeSelect>
               </Field>
             </div>
             {scopeKind !== 'organization' && (
               <Field>
                 <FieldLabel htmlFor="policy-scope-id">
-                  {scopeKind === 'section' ? 'Class' : 'Destination'}
+                  {scopeKind === 'section'
+                    ? 'Class'
+                    : scopeKind === 'room_category'
+                      ? 'Room category'
+                      : 'Room'}
                 </FieldLabel>
                 <NativeSelect id="policy-scope-id" name="scopeId" required>
                   {scopeKind === 'section'
@@ -314,12 +331,42 @@ export function Component() {
                           {section.title}
                         </NativeSelectOption>
                       ))
-                    : destinations.data?.destinations.map((destination) => (
-                        <NativeSelectOption key={destination.id} value={destination.id}>
-                          {destination.displayName ?? destination.serviceType}
-                        </NativeSelectOption>
-                      ))}
+                    : scopeKind === 'room_category'
+                      ? roomCategories.data?.categories.map((category) => (
+                          <NativeSelectOption key={category.id} value={category.id}>
+                            {category.name}
+                          </NativeSelectOption>
+                        ))
+                      : rooms.data?.rooms.map((room) => (
+                          <NativeSelectOption key={room.id} value={room.id}>
+                            {room.name}
+                          </NativeSelectOption>
+                        ))}
                 </NativeSelect>
+              </Field>
+            )}
+            {ruleType === 'approval_requirement' && (
+              <Field>
+                <FieldLabel htmlFor="policy-approver">Who approves</FieldLabel>
+                <NativeSelect
+                  id="policy-approver"
+                  name="approver"
+                  value={approver}
+                  onChange={(event) => {
+                    setApprover(event.target.value as PolicyApprover);
+                  }}
+                >
+                  <NativeSelectOption value="current_section_teacher">
+                    The student&apos;s current class teacher
+                  </NativeSelectOption>
+                  <NativeSelectOption value="room_responsible_staff">
+                    Staff responsible for the destination room
+                  </NativeSelectOption>
+                </NativeSelect>
+                <FieldDescription>
+                  Independent of where the rule applies: a room rule can still ask the class
+                  teacher.
+                </FieldDescription>
               </Field>
             )}
             {ruleType === 'schedule_boundary' && (

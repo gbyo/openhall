@@ -45,7 +45,7 @@ import {
 } from '@/components/ui/table';
 
 const roleLabel = {
-  destination_staff: 'Destination staff',
+  room_staff: 'Room staff',
   counselor: 'Counselor',
   office_staff: 'Office staff',
   school_admin: 'School administrator',
@@ -55,7 +55,7 @@ interface Grant {
   id: string;
   role: keyof typeof roleLabel;
   person: { displayName: string | null };
-  destination: { displayName: string | null } | null;
+  room: { name: string | null } | null;
   status: string;
 }
 
@@ -68,7 +68,7 @@ function optionalInstant(local: string, timeZone: string): string | null {
 export function Component() {
   const { organizationId, context } = useSchool();
   const queryClient = useQueryClient();
-  const [role, setRole] = useState<keyof typeof roleLabel>('destination_staff');
+  const [role, setRole] = useState<keyof typeof roleLabel>('room_staff');
   const [granting, setGranting] = useState(false);
   const [confirmingRevoke, setConfirmingRevoke] = useState<Grant | null>(null);
   const grants = useQuery({
@@ -89,11 +89,11 @@ export function Component() {
         }),
       ),
   });
-  const destinations = useQuery({
-    queryKey: queryKeys.destinations(organizationId),
+  const rooms = useQuery({
+    queryKey: queryKeys.rooms(organizationId),
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/organizations/{organizationId}/destinations', {
+        api.GET('/api/v1/organizations/{organizationId}/rooms', {
           params: { path: { organizationId } },
         }),
       ),
@@ -106,7 +106,7 @@ export function Component() {
       body: {
         personId: string;
         role: keyof typeof roleLabel;
-        destinationId: string | null;
+        roomId: string | null;
         validFrom: string | null;
         validUntil: string | null;
       };
@@ -158,14 +158,14 @@ export function Component() {
       body: {
         personId: formString(data, 'personId'),
         role,
-        destinationId: role === 'destination_staff' ? formString(data, 'destinationId') : null,
+        roomId: role === 'room_staff' ? formString(data, 'roomId') : null,
         validFrom: optionalInstant(formString(data, 'validFrom'), context.organization.timeZone),
         validUntil: optionalInstant(formString(data, 'validUntil'), context.organization.timeZone),
       },
     });
   }
   const list = (grants.data?.grants ?? []) as Grant[];
-  const revokeScope = confirmingRevoke?.destination?.displayName ?? context.organization.name;
+  const revokeScope = confirmingRevoke?.room?.name ?? context.organization.name;
   return (
     <section className="grid gap-6">
       <PageHeader
@@ -256,15 +256,15 @@ export function Component() {
                 ))}
               </NativeSelect>
             </Field>
-            {role === 'destination_staff' && (
+            {role === 'room_staff' && (
               <Field>
-                <FieldLabel htmlFor="grant-destination">Destination</FieldLabel>
-                <NativeSelect id="grant-destination" name="destinationId" required>
-                  {destinations.data?.destinations
-                    .filter((destination) => destination.status !== 'archived')
-                    .map((destination) => (
-                      <NativeSelectOption key={destination.id} value={destination.id}>
-                        {destination.displayName ?? destination.serviceType}
+                <FieldLabel htmlFor="grant-room">Room</FieldLabel>
+                <NativeSelect id="grant-room" name="roomId" required>
+                  {rooms.data?.rooms
+                    .filter((room) => room.status !== 'archived')
+                    .map((room) => (
+                      <NativeSelectOption key={room.id} value={room.id}>
+                        {room.name}
                       </NativeSelectOption>
                     ))}
                 </NativeSelect>
@@ -298,9 +298,7 @@ export function Component() {
         <Empty>
           <EmptyHeader>
             <EmptyTitle>No extra duties assigned</EmptyTitle>
-            <EmptyDescription>
-              Grant destination or office duties to staff who need them.
-            </EmptyDescription>
+            <EmptyDescription>Grant room or office duties to staff who need them.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
@@ -322,7 +320,7 @@ export function Component() {
                 <TableRow key={grant.id}>
                   <TableCell className="font-medium">{grant.person.displayName}</TableCell>
                   <TableCell>{roleLabel[grant.role]}</TableCell>
-                  <TableCell>{grant.destination?.displayName ?? 'Whole school'}</TableCell>
+                  <TableCell>{grant.room?.name ?? 'Whole school'}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">
                       {grant.status === 'active' ? 'Active' : 'Revoked'}

@@ -1,34 +1,32 @@
 import type { Temporal } from '@js-temporal/polyfill';
-import type { DestinationId, OrganizationId, PassId, PersonId, TenantId } from '@openhall/domain';
+import type { RoomId, OrganizationId, PassId, PersonId, TenantId } from '@openhall/domain';
 import type { TenantTransactionContext } from '../persistence.js';
 
-export type DestinationCheckInMode = 'none' | 'optional' | 'required';
+export type RoomCheckInMode = 'none' | 'optional' | 'required';
 
-export interface PassDestinationRecord {
-  readonly id: DestinationId;
+export interface PassRoomRecord {
+  readonly id: RoomId;
   readonly tenantId: TenantId;
   readonly organizationId: OrganizationId;
-  readonly locationId: string;
-  readonly categoryId: string;
+  readonly categoryId: string | null;
   readonly studentSelfRequestable: boolean;
-  /** Active/archived state of the destination's category at read time. */
+  /** Active/archived state of the room's category at read time. */
   readonly categoryStatus: 'active' | 'archived';
-  /** Student launcher surface of the destination's category at read time. */
+  /** Student launcher surface of the room's category at read time. */
   readonly categorySurface: 'primary' | 'secondary' | 'hidden';
   /**
    * Current category presentation (joined, never snapshotted). Null when the
-   * category row is missing; reads fall back to destination-only display.
+   * room has no category; reads fall back to room-only display.
    */
   readonly categoryPresentation: {
     readonly name: string;
     readonly iconKey: string;
     readonly toneKey: string;
   } | null;
-  readonly serviceType: string;
-  readonly displayName: string;
-  readonly status: 'active' | 'closed' | 'archived';
+  readonly name: string;
+  readonly status: 'open' | 'closed' | 'archived';
   readonly revision: bigint;
-  readonly checkInMode: DestinationCheckInMode;
+  readonly checkInMode: RoomCheckInMode;
   readonly capacity: number | null;
   readonly queueEnabled: boolean;
   readonly readyClaimTimeoutSeconds: number;
@@ -47,11 +45,11 @@ export interface PassRow {
   readonly tenantId: TenantId;
   readonly organizationId: OrganizationId;
   readonly studentId: PersonId;
-  readonly originLocationId: string | null;
+  readonly originRoomId: string | null;
   readonly originSectionId: string | null;
   readonly originScheduleBlockId: string | null;
-  readonly destinationId: DestinationId;
-  readonly returnLocationId: string | null;
+  readonly destinationRoomId: RoomId;
+  readonly returnRoomId: string | null;
   readonly requestSource: string;
   readonly requestedByPersonId: PersonId | null;
   readonly requestedAt: Temporal.Instant;
@@ -60,17 +58,16 @@ export interface PassRow {
   readonly scheduledAuthorizationId: string | null;
   readonly revision: bigint;
   /** Departure-time check-in snapshot; null for passes that departed before Phase 8. */
-  readonly departureCheckInMode: DestinationCheckInMode | null;
+  readonly departureCheckInMode: RoomCheckInMode | null;
   readonly departureDestinationRevision: bigint | null;
-  readonly destinationDisplayName: string;
-  readonly destinationServiceType: string;
-  readonly destinationCheckInMode: DestinationCheckInMode;
+  readonly destinationRoomName: string;
+  readonly destinationCheckInMode: RoomCheckInMode;
   /**
    * Current category presentation for the destination (joined, never
    * snapshotted into the pass row). Null when the category is missing,
    * which reads handle by falling back to destination-only display.
    */
-  readonly destinationCategory: {
+  readonly roomCategory: {
     readonly id: string;
     readonly name: string;
     readonly iconKey: string;
@@ -78,17 +75,17 @@ export interface PassRow {
   } | null;
   readonly originBlock: { id: string; code: string; displayName: string } | null;
   readonly originSection: { id: string; code: string | null; title: string } | null;
-  readonly originLocation: { id: string; name: string } | null;
+  readonly originRoom: { id: string; name: string } | null;
 }
 
 export interface NewPassRow {
   readonly id: PassId;
   readonly organizationId: OrganizationId;
   readonly studentId: PersonId;
-  readonly originLocationId: string | null;
+  readonly originRoomId: string | null;
   readonly originSectionId: string | null;
   readonly originScheduleBlockId: string | null;
-  readonly destinationId: DestinationId;
+  readonly destinationRoomId: RoomId;
   readonly requestSource: 'student_web' | 'staff_web' | 'scheduled';
   readonly scheduledAuthorizationId: string | null;
   readonly requestedByPersonId: PersonId;
@@ -119,10 +116,7 @@ export interface PassOutboxInput {
  * is no generic SQL escape hatch.
  */
 export interface PassRepository {
-  loadDestination(
-    context: TenantTransactionContext,
-    destinationId: DestinationId,
-  ): Promise<PassDestinationRecord | null>;
+  loadRoom(context: TenantTransactionContext, roomId: RoomId): Promise<PassRoomRecord | null>;
   loadActiveStudent(
     context: TenantTransactionContext,
     organizationId: OrganizationId,
@@ -200,7 +194,7 @@ export interface PassRepository {
     at: Temporal.Instant,
     expectedReturnAt: Temporal.Instant | null,
     departure: {
-      readonly checkInMode: DestinationCheckInMode;
+      readonly checkInMode: RoomCheckInMode;
       readonly destinationRevision: bigint;
     },
   ): Promise<PassRow | null>;
@@ -215,7 +209,7 @@ export interface PassRepository {
     passId: PassId,
     expectedRevision: bigint,
     at: Temporal.Instant,
-    returnLocationId: string | null,
+    returnRoomId: string | null,
   ): Promise<PassRow | null>;
   updatePassToCompleted(
     context: TenantTransactionContext,

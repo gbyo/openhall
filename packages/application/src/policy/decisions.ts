@@ -24,6 +24,8 @@ export interface PolicyRuleEvaluation {
   readonly reasonCode: PolicyReasonCode;
   /** Present when an approval requirement names an exact section. */
   readonly requiredSectionId: string | null;
+  /** Present when an approval requirement names an exact room. */
+  readonly requiredRoomId: string | null;
 }
 
 /**

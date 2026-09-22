@@ -99,28 +99,27 @@ export class PostgresOperationalReadRepository implements OperationalReadReposit
           .onRef('person.tenant_id', '=', 'pass.tenant_id')
           .onRef('person.id', '=', 'pass.student_id'),
       )
-      .innerJoin('destination', (join) =>
+      .innerJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'pass.tenant_id')
-          .onRef('destination.id', '=', 'pass.destination_id'),
+          .onRef('room.tenant_id', '=', 'pass.tenant_id')
+          .onRef('room.id', '=', 'pass.destination_room_id'),
       )
-      .leftJoin('destination_reservation', (join) =>
+      .leftJoin('room_reservation', (join) =>
         join
-          .onRef('destination_reservation.tenant_id', '=', 'pass.tenant_id')
-          .onRef('destination_reservation.pass_id', '=', 'pass.id')
-          .on('destination_reservation.released_at', 'is', null),
+          .onRef('room_reservation.tenant_id', '=', 'pass.tenant_id')
+          .onRef('room_reservation.pass_id', '=', 'pass.id')
+          .on('room_reservation.released_at', 'is', null),
       )
       .select([
         'pass.id as pass_id',
         'pass.revision as pass_revision',
         'pass.student_id as student_id',
         'person.display_name as student_display_name',
-        'pass.destination_id as destination_id',
-        'destination.display_name as destination_display_name',
-        'destination.service_type as destination_service_type',
+        'pass.destination_room_id as destination_room_id',
+        'room.name as destination_room_name',
         'pass.lifecycle_state as lifecycle_state',
         'pass.requested_at as requested_at',
-        'destination_reservation.ready_expires_at as ready_until',
+        'room_reservation.ready_expires_at as ready_until',
         'pass.expected_return_at as expected_return_at',
         'pass.origin_section_id as origin_section_id',
       ])
@@ -136,9 +135,8 @@ export class PostgresOperationalReadRepository implements OperationalReadReposit
       passRevision: toBigInt(row.pass_revision),
       studentId: row.student_id,
       studentDisplayName: row.student_display_name,
-      destinationId: row.destination_id,
-      destinationDisplayName: row.destination_display_name ?? row.destination_service_type,
-      destinationServiceType: row.destination_service_type,
+      destinationRoomId: row.destination_room_id,
+      destinationRoomName: row.destination_room_name,
       lifecycleState: row.lifecycle_state as OperationalLivePassRow['lifecycleState'],
       requestedAt: fromDatabaseInstant(row.requested_at),
       readyUntil: row.ready_until === null ? null : fromDatabaseInstant(row.ready_until),

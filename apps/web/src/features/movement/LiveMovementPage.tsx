@@ -66,7 +66,7 @@ import {
 interface LivePass {
   passId: string;
   student: { displayName: string };
-  destination: { id: string; displayName: string };
+  destination: { id: string; name: string };
   lifecycleState: string;
   requestedAt: string;
   movement: { expectedReturnAt: string | null };
@@ -110,11 +110,11 @@ export function LiveMovementPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [stateFilter, setStateFilter] = useState('all');
-  const [destinationFilter, setDestinationFilter] = useState('all');
+  const [roomFilter, setRoomFilter] = useState('all');
   const [sorting, setSorting] = useState<SortingState>([]);
   const [creating, setCreating] = useState(false);
   const [studentId, setStudentId] = useState<string | null>(null);
-  const [destinationId, setDestinationId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
   const canCreate =
     context.capabilities.includes('pass.create.student') &&
     context.capabilities.includes('scheduled_authorization.manage');
@@ -133,10 +133,10 @@ export function LiveMovementPage() {
     () => [...new Set(passes.map((pass) => pass.lifecycleState))].sort(),
     [passes],
   );
-  const destinationOptions = useMemo(
+  const roomOptions = useMemo(
     () =>
       [...new Map(passes.map((pass) => [pass.destination.id, pass.destination])).values()].sort(
-        (a, b) => a.displayName.localeCompare(b.displayName),
+        (a, b) => a.name.localeCompare(b.name),
       ),
     [passes],
   );
@@ -145,14 +145,14 @@ export function LiveMovementPage() {
     return passes.filter((pass) => {
       if (
         query.length > 0 &&
-        !`${pass.student.displayName} ${pass.destination.displayName}`.toLowerCase().includes(query)
+        !`${pass.student.displayName} ${pass.destination.name}`.toLowerCase().includes(query)
       )
         return false;
       if (stateFilter !== 'all' && pass.lifecycleState !== stateFilter) return false;
-      if (destinationFilter !== 'all' && pass.destination.id !== destinationFilter) return false;
+      if (roomFilter !== 'all' && pass.destination.id !== roomFilter) return false;
       return true;
     });
-  }, [passes, search, stateFilter, destinationFilter]);
+  }, [passes, search, stateFilter, roomFilter]);
   const columns = useMemo(
     () => [
       columnHelper.accessor('student.displayName', {
@@ -160,7 +160,7 @@ export function LiveMovementPage() {
         header: 'Student',
         cell: (info) => info.getValue(),
       }),
-      columnHelper.accessor('destination.displayName', {
+      columnHelper.accessor('destination.name', {
         id: 'destination',
         header: 'Destination',
         cell: (info) => info.getValue(),
@@ -205,12 +205,14 @@ export function LiveMovementPage() {
         }),
       ),
   });
-  const destinations = useQuery({
-    queryKey: queryKeys.destinations(organizationId),
+  // Staff pick from the flat safe catalog of open rooms. Staff are NOT
+  // limited by studentSelfRequestable — that flag is student-only.
+  const rooms = useQuery({
+    queryKey: queryKeys.rooms(organizationId),
     enabled: creating && canCreate,
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/me/organizations/{organizationId}/destinations', {
+        api.GET('/api/v1/me/organizations/{organizationId}/rooms', {
           params: { path: { organizationId } },
         }),
       ),
@@ -223,19 +225,18 @@ export function LiveMovementPage() {
       })) ?? [],
     [students.data],
   );
-  const createDestinationOptions = useMemo<Option[]>(
+  const createRoomOptions = useMemo<Option[]>(
     () =>
-      destinations.data?.destinations.map((destination) => ({
-        value: destination.id,
-        label: destination.displayName,
+      rooms.data?.rooms.map((room) => ({
+        value: room.id,
+        label: [room.name, room.code].filter((part) => part).join(' · '),
       })) ?? [],
-    [destinations.data],
+    [rooms.data],
   );
   const selectedStudent = studentOptions.find((option) => option.value === studentId) ?? null;
-  const selectedDestination =
-    createDestinationOptions.find((option) => option.value === destinationId) ?? null;
+  const selectedRoom = createRoomOptions.find((option) => option.value === roomId) ?? null;
   const create = useMutation({
-    mutationFn: (input: { studentId: string; destinationId: string; idempotencyKey: string }) =>
+    mutationFn: (input: { studentId: string; roomId: string; idempotencyKey: string }) =>
       confirmed(
         api.POST('/api/v1/students/{studentId}/passes', {
           params: {
@@ -246,13 +247,13 @@ export function LiveMovementPage() {
             'X-CSRF-Token': getCsrfToken(),
             'Idempotency-Key': input.idempotencyKey,
           },
-          body: { destinationId: input.destinationId },
+          body: { destinationRoomId: input.roomId },
         }),
       ),
     onSuccess: () => {
       setCreating(false);
       setStudentId(null);
-      setDestinationId(null);
+      setRoomId(null);
       void queryClient.invalidateQueries({ queryKey: queryKeys.schoolLive(organizationId) });
     },
   });
@@ -261,7 +262,7 @@ export function LiveMovementPage() {
     if (create.isPending) return;
     setCreating(false);
     setStudentId(null);
-    setDestinationId(null);
+    setRoomId(null);
     create.reset();
   }
 
@@ -276,7 +277,7 @@ export function LiveMovementPage() {
               onClick={() => {
                 create.reset();
                 setStudentId(null);
-                setDestinationId(null);
+                setRoomId(null);
                 setCreating(true);
               }}
             >
@@ -295,7 +296,7 @@ export function LiveMovementPage() {
             </InputGroupAddon>
             <InputGroupInput
               aria-label="Search live movement"
-              placeholder="Search students or destinations"
+              placeholder="Search students or rooms"
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -325,21 +326,21 @@ export function LiveMovementPage() {
           </Select>
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="movement-destination-filter">Destination</Label>
+          <Label htmlFor="movement-room-filter">Room</Label>
           <Select
-            value={destinationFilter}
+            value={roomFilter}
             onValueChange={(value) => {
-              setDestinationFilter(value ?? 'all');
+              setRoomFilter(value ?? 'all');
             }}
           >
-            <SelectTrigger id="movement-destination-filter" className="w-44">
+            <SelectTrigger id="movement-room-filter" className="w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All destinations</SelectItem>
-              {destinationOptions.map((destination) => (
-                <SelectItem key={destination.id} value={destination.id}>
-                  {destination.displayName}
+              <SelectItem value="all">All rooms</SelectItem>
+              {roomOptions.map((room) => (
+                <SelectItem key={room.id} value={room.id}>
+                  {room.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -359,7 +360,7 @@ export function LiveMovementPage() {
           <EmptyHeader>
             <EmptyTitle>No live movement right now.</EmptyTitle>
             <EmptyDescription>
-              {search.trim().length > 0 || stateFilter !== 'all' || destinationFilter !== 'all'
+              {search.trim().length > 0 || stateFilter !== 'all' || roomFilter !== 'all'
                 ? 'Try a different search or filter.'
                 : 'Confirmed passes will appear here as students move.'}
             </EmptyDescription>
@@ -449,11 +450,11 @@ export function LiveMovementPage() {
               Start a pass for a student. The movement list updates after confirmation.
             </DialogDescription>
           </DialogHeader>
-          {destinations.isPending || students.isPending ? (
+          {rooms.isPending || students.isPending ? (
             <div role="status" aria-label="Loading pass options" className="flex flex-col gap-2">
               <Skeleton className="h-9 w-full" />
               <Skeleton className="h-9 w-full" />
-              <span className="sr-only">Loading students and destinations…</span>
+              <span className="sr-only">Loading students and rooms…</span>
             </div>
           ) : (
             <>
@@ -483,18 +484,18 @@ export function LiveMovementPage() {
                 </Combobox>
               </Field>
               <Field>
-                <FieldLabel htmlFor="movement-destination">Destination</FieldLabel>
+                <FieldLabel htmlFor="movement-room">Room</FieldLabel>
                 <Combobox
-                  items={createDestinationOptions}
-                  value={selectedDestination}
+                  items={createRoomOptions}
+                  value={selectedRoom}
                   onValueChange={(option: Option | null) => {
-                    setDestinationId(option?.value ?? null);
+                    setRoomId(option?.value ?? null);
                   }}
                   filter={(item: Option, query: string) =>
                     item.label.toLowerCase().includes(query.toLowerCase())
                   }
                 >
-                  <ComboboxInput id="movement-destination" placeholder="Search destinations" />
+                  <ComboboxInput id="movement-room" placeholder="Search open rooms" />
                   <ComboboxContent>
                     <ComboboxList>
                       {(item: Option) => (
@@ -503,11 +504,11 @@ export function LiveMovementPage() {
                         </ComboboxItem>
                       )}
                     </ComboboxList>
-                    <ComboboxEmpty>No matching destination.</ComboboxEmpty>
+                    <ComboboxEmpty>No matching room.</ComboboxEmpty>
                   </ComboboxContent>
                 </Combobox>
-                {(students.isError || destinations.isError) && (
-                  <FieldError>Students or destinations could not be loaded. Try again.</FieldError>
+                {(students.isError || rooms.isError) && (
+                  <FieldError>Students or rooms could not be loaded. Try again.</FieldError>
                 )}
               </Field>
             </>
@@ -534,13 +535,13 @@ export function LiveMovementPage() {
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
             <Button
-              disabled={create.isPending || studentId === null || destinationId === null}
+              disabled={create.isPending || studentId === null || roomId === null}
               aria-busy={create.isPending}
               onClick={() => {
-                if (studentId && destinationId) {
+                if (studentId && roomId) {
                   create.mutate({
                     studentId,
-                    destinationId,
+                    roomId,
                     idempotencyKey: crypto.randomUUID(),
                   });
                 }

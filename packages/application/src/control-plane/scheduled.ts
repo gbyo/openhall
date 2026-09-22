@@ -38,19 +38,18 @@ export interface ScheduledAuthView {
     readonly displayName: string;
     readonly gradeLevel: string | null;
   };
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
   readonly destination: {
     readonly id: string;
-    readonly displayName: string;
-    readonly serviceType: string;
+    readonly name: string;
   };
   readonly validFrom: string;
   readonly validUntil: string;
   readonly status: string;
   readonly approvalMode: string;
   readonly originStrategy: string;
-  readonly originLocationId: string | null;
-  readonly originLocation: { readonly id: string; readonly name: string } | null;
+  readonly originRoomId: string | null;
+  readonly originRoom: { readonly id: string; readonly name: string } | null;
   readonly revision: string;
   readonly createdByAccountId: string | null;
   readonly createdAt: string;
@@ -74,8 +73,7 @@ export interface ScheduledAuthStudentView {
   readonly authorizationEtag: string;
   readonly destination: {
     readonly id: string;
-    readonly displayName: string;
-    readonly serviceType: string;
+    readonly name: string;
     readonly category: {
       readonly id: string;
       readonly name: string;
@@ -83,7 +81,7 @@ export interface ScheduledAuthStudentView {
       readonly toneKey: string;
     } | null;
   };
-  readonly originLocation: {
+  readonly originRoom: {
     readonly id: string;
     readonly name: string;
   } | null;
@@ -103,22 +101,21 @@ export function toScheduledAuthView(row: ScheduledAuthRecord): ScheduledAuthView
       displayName: row.studentDisplayName,
       gradeLevel: row.studentGradeLevel,
     },
-    destinationId: row.destinationId,
+    destinationRoomId: row.destinationRoomId,
     destination: {
-      id: row.destinationId,
-      displayName: row.destinationDisplayName,
-      serviceType: row.destinationServiceType,
+      id: row.destinationRoomId,
+      name: row.destinationRoomName,
     },
     validFrom: row.validFrom.toString(),
     validUntil: row.validUntil.toString(),
     status: row.status,
     approvalMode: row.approvalMode,
     originStrategy: row.originStrategy,
-    originLocationId: row.originLocationId,
-    originLocation:
-      row.originLocationId === null
+    originRoomId: row.originRoomId,
+    originRoom:
+      row.originRoomId === null
         ? null
-        : { id: row.originLocationId, name: row.originLocationName ?? 'Location' },
+        : { id: row.originRoomId, name: row.originRoomName ?? 'Room' },
     revision: row.revision.toString(10),
     createdByAccountId: row.createdByAccountId,
     createdAt: row.createdAt.toString(),
@@ -149,29 +146,29 @@ function cleanInstant(value: string | null, field: string): Temporal.Instant {
 
 export interface ScheduledAuthCreateBody {
   readonly studentId: unknown;
-  readonly destinationId: unknown;
+  readonly destinationRoomId: unknown;
   readonly validFrom: string | null;
   readonly validUntil: string | null;
   readonly approvalMode: unknown;
   readonly originStrategy: unknown;
-  readonly originLocationId: unknown;
+  readonly originRoomId: unknown;
 }
 
 interface CanonicalScheduledAuthCreate {
   readonly studentId: string;
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
   readonly validFrom: Temporal.Instant;
   readonly validUntil: Temporal.Instant;
   readonly approvalMode: 'preapproved' | 'approval_required';
   readonly originStrategy: 'expected' | 'specific';
-  readonly originLocationId: string | null;
+  readonly originRoomId: string | null;
 }
 
 function canonicalCreate(body: ScheduledAuthCreateBody): CanonicalScheduledAuthCreate {
   if (typeof body.studentId !== 'string' || body.studentId.length === 0) {
     throw new ControlPlaneError('invalid_scheduled_authorization_state', 'Invalid student.');
   }
-  if (typeof body.destinationId !== 'string' || body.destinationId.length === 0) {
+  if (typeof body.destinationRoomId !== 'string' || body.destinationRoomId.length === 0) {
     throw new ControlPlaneError('invalid_scheduled_authorization_state', 'Invalid destination.');
   }
   if (body.approvalMode !== 'preapproved' && body.approvalMode !== 'approval_required') {
@@ -183,16 +180,16 @@ function canonicalCreate(body: ScheduledAuthCreateBody): CanonicalScheduledAuthC
       'Invalid origin strategy.',
     );
   }
-  let originLocationId: string | null = null;
+  let originRoomId: string | null = null;
   if (body.originStrategy === 'specific') {
-    if (typeof body.originLocationId !== 'string' || body.originLocationId.length === 0) {
+    if (typeof body.originRoomId !== 'string' || body.originRoomId.length === 0) {
       throw new ControlPlaneError(
         'invalid_scheduled_authorization_state',
         'A specific origin requires a location.',
       );
     }
-    originLocationId = body.originLocationId;
-  } else if (body.originLocationId !== null && body.originLocationId !== undefined) {
+    originRoomId = body.originRoomId;
+  } else if (body.originRoomId !== null && body.originRoomId !== undefined) {
     throw new ControlPlaneError(
       'invalid_scheduled_authorization_state',
       'An expected origin rejects a location.',
@@ -200,12 +197,12 @@ function canonicalCreate(body: ScheduledAuthCreateBody): CanonicalScheduledAuthC
   }
   return {
     studentId: body.studentId,
-    destinationId: body.destinationId,
+    destinationRoomId: body.destinationRoomId,
     validFrom: cleanInstant(body.validFrom, 'validFrom'),
     validUntil: cleanInstant(body.validUntil, 'validUntil'),
     approvalMode: body.approvalMode,
     originStrategy: body.originStrategy,
-    originLocationId,
+    originRoomId,
   };
 }
 
@@ -266,11 +263,11 @@ async function requireCanonicalDestination(
   dependencies: ScheduledDependencies,
   principal: Principal,
   organizationId: string,
-  destinationId: string,
+  destinationRoomId: string,
 ): Promise<void> {
-  const destination = await dependencies.requestPass.passes.loadDestination(context, destinationId);
+  const destination = await dependencies.requestPass.passes.loadRoom(context, destinationRoomId);
   if (destination?.tenantId !== principal.tenantId) {
-    throw new ControlPlaneError('destination_not_found', 'Destination not found.');
+    throw new ControlPlaneError('room_not_found', 'Destination not found.');
   }
   if (destination.organizationId !== organizationId || destination.status === 'archived') {
     throw new ControlPlaneError(
@@ -331,7 +328,7 @@ async function appendScheduledOutbox(
       organizationId: row.organizationId,
       scheduledAuthorizationId: row.id,
       studentId: row.studentId,
-      destinationId: row.destinationId,
+      destinationRoomId: row.destinationRoomId,
       passId,
       status: row.status,
       revision: row.revision.toString(10),
@@ -378,12 +375,12 @@ export async function createScheduledAuthorization(
   const fingerprint = fingerprintControlPlane('scheduled_authorization.create:v1', [
     input.organizationId,
     create.studentId,
-    create.destinationId,
+    create.destinationRoomId,
     create.validFrom.toString(),
     create.validUntil.toString(),
     create.approvalMode,
     create.originStrategy,
-    create.originLocationId ?? '',
+    create.originRoomId ?? '',
   ]);
   const outcome = await runControlPlaneCommand(
     passRunnerOf(dependencies),
@@ -442,32 +439,35 @@ export async function createScheduledAuthorization(
           dependencies,
           input.principal,
           input.organizationId,
-          create.destinationId,
+          create.destinationRoomId,
         );
-        if (create.originLocationId !== null) {
-          const location = await dependencies.scheduled.loadActiveLocation(
+        if (create.originRoomId !== null) {
+          const originRoom = await dependencies.scheduled.loadActiveRoom(
             context,
             input.organizationId,
-            create.originLocationId,
+            create.originRoomId,
           );
-          if (location === null) {
+          // A manually chosen origin must be a room the school marked
+          // origin-selectable. Schedule-derived origins (`expected`) never
+          // reach here and stay governed by the schedule alone.
+          if (!originRoom?.originSelectable) {
             throw new ControlPlaneError(
               'invalid_scheduled_authorization_state',
-              'The origin location is not usable.',
+              'The origin room is not usable.',
             );
           }
         }
         const entry: NewScheduledAuth = {
           organizationId: input.organizationId,
           studentId: create.studentId,
-          destinationId: create.destinationId,
+          destinationRoomId: create.destinationRoomId,
           createdByPersonId: input.principal.personId,
           createdByAccountId: input.principal.accountId,
           validFrom: create.validFrom,
           validUntil: create.validUntil,
           approvalMode: create.approvalMode,
           originStrategy: create.originStrategy,
-          originLocationId: create.originLocationId,
+          originRoomId: create.originRoomId,
         };
         const row = await dependencies.scheduled.insert(context, entry);
         await appendScheduledAudit(
@@ -772,20 +772,20 @@ async function toStudentViews(
 ): Promise<ScheduledAuthStudentView[]> {
   const views: ScheduledAuthStudentView[] = [];
   for (const row of rows) {
-    const destination = await dependencies.requestPass.passes.loadDestination(
+    const destination = await dependencies.requestPass.passes.loadRoom(
       context,
-      row.destinationId,
+      row.destinationRoomId,
     );
     if (destination === null) continue;
-    let originLocation: { readonly id: string; readonly name: string } | null = null;
-    if (row.originLocationId !== null) {
-      const location = await dependencies.scheduled.loadActiveLocation(
+    let originRoom: { readonly id: string; readonly name: string } | null = null;
+    if (row.originRoomId !== null) {
+      const location = await dependencies.scheduled.loadActiveRoom(
         context,
         row.organizationId,
-        row.originLocationId,
+        row.originRoomId,
       );
       if (location !== null) {
-        originLocation = { id: location.id, name: location.name };
+        originRoom = { id: location.id, name: location.name };
       }
     }
     views.push({
@@ -801,10 +801,9 @@ async function toStudentViews(
       authorizationEtag: etagForScheduledAuth(row.id, row.revision),
       destination: {
         id: destination.id,
-        displayName: destination.displayName,
-        serviceType: destination.serviceType,
+        name: destination.name,
         category:
-          destination.categoryPresentation === null
+          destination.categoryId === null || destination.categoryPresentation === null
             ? null
             : {
                 id: destination.categoryId,
@@ -813,7 +812,7 @@ async function toStudentViews(
                 toneKey: destination.categoryPresentation.toneKey,
               },
       },
-      originLocation,
+      originRoom,
     });
   }
   return views;
@@ -916,7 +915,7 @@ export async function startMyScheduledAuthorization(
         dependencies,
         input.principal,
         current.organizationId,
-        current.destinationId,
+        current.destinationRoomId,
       );
       const placement = await requestPass.placement.resolve({
         tenantId: input.principal.tenantId,
@@ -929,7 +928,7 @@ export async function startMyScheduledAuthorization(
         {
           principal: input.principal,
           targetStudentId: current.studentId,
-          destinationId: current.destinationId,
+          destinationRoomId: current.destinationRoomId,
           requestSource: 'scheduled',
           requestId: input.requestId,
           now,
@@ -939,14 +938,14 @@ export async function startMyScheduledAuthorization(
           scheduled: {
             scheduledAuthorizationId: current.id,
             originLocationOverride:
-              current.originStrategy === 'specific' ? current.originLocationId : null,
+              current.originStrategy === 'specific' ? current.originRoomId : null,
             scheduledPreapprovals:
               current.approvalMode === 'preapproved'
                 ? [
                     {
                       scheduledAuthorizationId: current.id,
                       studentId: current.studentId,
-                      destinationId: current.destinationId,
+                      destinationRoomId: current.destinationRoomId,
                     },
                   ]
                 : [],

@@ -132,9 +132,9 @@ describe('Phase 5 pass OpenAPI surface', () => {
         '/api/v1/passes/{passId}/overrides',
         '/api/v1/sections/{sectionId}/passes/live',
         '/api/v1/students/{studentId}/passes',
-        '/api/v1/destinations/{destinationId}/passes/{passId}/check-in',
-        '/api/v1/destinations/{destinationId}/passes/{passId}/begin-return',
-        '/api/v1/destinations/{destinationId}/passes/{passId}/complete',
+        '/api/v1/rooms/{roomId}/passes/{passId}/check-in',
+        '/api/v1/rooms/{roomId}/passes/{passId}/begin-return',
+        '/api/v1/rooms/{roomId}/passes/{passId}/complete',
       ].sort(),
     );
   });
@@ -181,16 +181,16 @@ describe('Phase 6 policy workflow OpenAPI surface', () => {
   });
 });
 
-describe('Phase 7 destination flow and movement OpenAPI surface', () => {
+describe('Phase 7 room flow and movement OpenAPI surface', () => {
   const movementPosts = [
     '/api/v1/me/passes/{passId}/depart',
     '/api/v1/passes/{passId}/depart',
     '/api/v1/me/passes/{passId}/arrive',
     '/api/v1/me/passes/{passId}/return',
     '/api/v1/me/passes/{passId}/complete',
-    '/api/v1/destinations/{destinationId}/passes/{passId}/check-in',
-    '/api/v1/destinations/{destinationId}/passes/{passId}/begin-return',
-    '/api/v1/destinations/{destinationId}/passes/{passId}/complete',
+    '/api/v1/rooms/{roomId}/passes/{passId}/check-in',
+    '/api/v1/rooms/{roomId}/passes/{passId}/begin-return',
+    '/api/v1/rooms/{roomId}/passes/{passId}/complete',
   ] as const;
 
   it('exposes stable movement operation IDs', async () => {
@@ -211,21 +211,18 @@ describe('Phase 7 destination flow and movement OpenAPI surface', () => {
       'completeMyPass',
     );
     expect(
-      operation(doc, '/api/v1/destinations/{destinationId}/passes/{passId}/check-in', 'post')
-        .operationId,
+      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/check-in', 'post').operationId,
     ).toBe('stationCheckInPass');
     expect(
-      operation(doc, '/api/v1/destinations/{destinationId}/passes/{passId}/begin-return', 'post')
-        .operationId,
+      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/begin-return', 'post').operationId,
     ).toBe('stationBeginReturnPass');
     expect(
-      operation(doc, '/api/v1/destinations/{destinationId}/passes/{passId}/complete', 'post')
-        .operationId,
+      operation(doc, '/api/v1/rooms/{roomId}/passes/{passId}/complete', 'post').operationId,
     ).toBe('stationCompletePass');
     expect(operation(doc, '/api/v1/me/passes/{passId}/queue-status', 'get').operationId).toBe(
       'getMyPassQueueStatus',
     );
-    expect(operation(doc, '/api/v1/destinations/{destinationId}/station', 'get').operationId).toBe(
+    expect(operation(doc, '/api/v1/rooms/{roomId}/station', 'get').operationId).toBe(
       'getDestinationStation',
     );
   });
@@ -252,7 +249,7 @@ describe('Phase 7 destination flow and movement OpenAPI surface', () => {
     const doc = await loadDocument();
     for (const [path, method] of [
       ['/api/v1/me/passes/{passId}/queue-status', 'get'],
-      ['/api/v1/destinations/{destinationId}/station', 'get'],
+      ['/api/v1/rooms/{roomId}/station', 'get'],
     ] as const) {
       const op = operation(doc, path, method);
       const schemes = (op.security ?? []).flatMap((entry) => Object.keys(entry));

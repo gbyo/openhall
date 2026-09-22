@@ -63,7 +63,7 @@ afterAll(async () => {
 
 describe('migration 004 authorization relationships', () => {
   it('advances the expected migration marker', () => {
-    expect(EXPECTED_MIGRATION).toBe('010_destination_categories');
+    expect(EXPECTED_MIGRATION).toBe('011_rooms_unification');
   });
 
   it('migrates a blank database 001 -> 004', async () => {
@@ -77,12 +77,13 @@ describe('migration 004 authorization relationships', () => {
       }
       const constraints = (
         await scratch.query<{ name: string }>(
-          `SELECT conname AS name FROM pg_constraint WHERE conname LIKE 'authorization_grant_phase4%' ORDER BY 1`,
+          `SELECT conname AS name FROM pg_constraint WHERE conname LIKE 'authorization_grant_phase1%' ORDER BY 1`,
         )
       ).rows.map((row) => row.name);
       expect(constraints).toEqual([
-        'authorization_grant_phase4_role_check',
-        'authorization_grant_phase4_role_scope_check',
+        'authorization_grant_phase11_role_check',
+        'authorization_grant_phase11_role_scope_check',
+        'authorization_grant_phase11_room_same_school',
       ]);
       const indexes = (
         await scratch.query<{ name: string }>(

@@ -1,12 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import {
-  DESTINATION,
   mockPass,
   ORG,
-  orgDestinations,
+  orgRooms,
   PASS,
   PERSON,
+  ROOM,
   SECTION,
   shell,
   studentApis,
@@ -70,7 +70,7 @@ async function openTeacherRequests(page: Page): Promise<string[]> {
             organizationId: ORG,
             passEtag: '"pass:test:1"',
             student: { id: PERSON, displayName: 'Alex Rivera' },
-            destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+            destination: { id: ROOM, name: 'Nurse' },
             requiredSection: { id: SECTION, title: 'Science 7' },
             requestedAt: '2026-09-21T14:00:00Z',
           },
@@ -108,7 +108,7 @@ test('teacher can approve from the keyboard with a visible focus indicator', asy
       organizationId: ORG,
       passEtag: '"pass:test:1"',
       student: { id: PERSON, displayName: 'Alex Rivera' },
-      destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+      destination: { id: ROOM, name: 'Nurse' },
       requiredSection: { id: SECTION, title: 'Science 7' },
       requestedAt: '2026-09-21T14:00:00Z',
     },
@@ -178,23 +178,21 @@ test('product honors reduced motion on the live-connection banner', async ({ pag
   await shell(page, {
     affiliations: ['staff'],
     capabilities: [],
-    staffedDestinations: [
+    staffedRooms: [
       {
-        id: DESTINATION,
-        displayName: 'Nurse',
-        serviceType: 'nurse',
-        capabilities: ['destination.station.manage'],
+        id: ROOM,
+        name: 'Nurse',
+        capabilities: ['room.station.manage'],
       },
     ],
   });
   await page.route(`**/api/v1/organizations/${ORG}/events`, (route) => route.abort());
-  await page.route(`**/api/v1/destinations/${DESTINATION}/station`, (route) =>
+  await page.route(`**/api/v1/rooms/${ROOM}/station`, (route) =>
     route.fulfill({
       json: {
-        destination: {
-          id: DESTINATION,
-          displayName: 'Nurse',
-          serviceType: 'nurse',
+        room: {
+          id: ROOM,
+          name: 'Nurse',
           checkInMode: 'required',
           capacity: 3,
         },
@@ -207,7 +205,7 @@ test('product honors reduced motion on the live-connection banner', async ({ pag
       },
     }),
   );
-  await page.goto(`/schools/${ORG}/stations/${DESTINATION}`);
+  await page.goto(`/schools/${ORG}/stations/${ROOM}`);
   await expect(page.getByRole('heading', { name: 'Nurse' })).toBeVisible();
   await expect(page.getByRole('status').getByText(/reconnecting/i)).toBeVisible();
   await expect(page.locator('.wf-connection-status__pulse')).toHaveCSS('animation-name', 'none');
@@ -227,22 +225,20 @@ test('station actions stay available in forced colors', async ({ page }) => {
   await shell(page, {
     affiliations: ['staff'],
     capabilities: [],
-    staffedDestinations: [
+    staffedRooms: [
       {
-        id: DESTINATION,
-        displayName: 'Nurse',
-        serviceType: 'nurse',
-        capabilities: ['destination.station.manage'],
+        id: ROOM,
+        name: 'Nurse',
+        capabilities: ['room.station.manage'],
       },
     ],
   });
-  await page.route(`**/api/v1/destinations/${DESTINATION}/station`, (route) =>
+  await page.route(`**/api/v1/rooms/${ROOM}/station`, (route) =>
     route.fulfill({
       json: {
-        destination: {
-          id: DESTINATION,
-          displayName: 'Nurse',
-          serviceType: 'nurse',
+        room: {
+          id: ROOM,
+          name: 'Nurse',
           checkInMode: 'required',
           capacity: 3,
         },
@@ -264,7 +260,7 @@ test('station actions stay available in forced colors', async ({ page }) => {
       },
     }),
   );
-  await page.goto(`/schools/${ORG}/stations/${DESTINATION}`);
+  await page.goto(`/schools/${ORG}/stations/${ROOM}`);
   await expect(page.getByRole('heading', { name: 'Nurse' })).toBeVisible();
   await expect(page.getByText('Alex Rivera')).toBeVisible();
   const checkIn = page.getByRole('button', { name: 'Check in' });
@@ -355,9 +351,9 @@ test('staff access has no serious axe findings', async ({ page }) => {
         grants: [
           {
             id: 'grant-1',
-            role: 'destination_staff',
+            role: 'room_staff',
             person: { id: PERSON, displayName: 'Sam Patel' },
-            destination: { id: DESTINATION, displayName: 'Nurse' },
+            room: { id: ROOM, name: 'Health Office' },
             status: 'active',
           },
         ],
@@ -369,8 +365,8 @@ test('staff access has no serious axe findings', async ({ page }) => {
       json: { people: [{ personId: 'staff-2', displayName: 'Jordan Lee' }] },
     }),
   );
-  await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
-    route.fulfill({ json: orgDestinations() }),
+  await page.route(`**/api/v1/organizations/${ORG}/rooms`, (route) =>
+    route.fulfill({ json: orgRooms() }),
   );
   await page.goto(`/schools/${ORG}/admin/staff-access`);
   await expect(page.getByRole('heading', { name: 'Staff access' })).toBeVisible();

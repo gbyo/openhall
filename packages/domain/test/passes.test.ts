@@ -44,7 +44,7 @@ function requestedAggregate() {
     tenantId: '019abc00-0000-7000-8000-000000000010',
     organizationId: '019abc00-0000-7000-8000-000000000020',
     studentId: '019abc00-0000-7000-8000-000000000030',
-    destinationId: '019abc00-0000-7000-8000-000000000040',
+    destinationRoomId: '019abc00-0000-7000-8000-000000000040',
     requestSource: 'student_web',
     requestedByPersonId: '019abc00-0000-7000-8000-000000000030',
     requestedAt: Temporal.Instant.from('2026-09-20T14:00:00Z'),
@@ -90,7 +90,7 @@ describe('pass aggregate revision invariant', () => {
     expect(aggregate.revision).toBe(1n);
     expect(aggregate.expectedReturnAt).toBeNull();
     expect(aggregate.scheduledAuthorizationId).toBeNull();
-    expect(aggregate.returnLocationId).toBeNull();
+    expect(aggregate.returnRoomId).toBeNull();
   });
 
   it('increments revision exactly once per transition with matching event', () => {

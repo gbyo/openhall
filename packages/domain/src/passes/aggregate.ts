@@ -1,10 +1,9 @@
 import type { Temporal } from '@js-temporal/polyfill';
 import type {
-  DestinationId,
-  LocationId,
   OrganizationId,
   PassId,
   PersonId,
+  RoomId,
   ScheduleBlockId,
   SectionId,
   TenantId,
@@ -29,12 +28,12 @@ export interface PassAggregate {
   readonly organizationId: OrganizationId;
   readonly studentId: PersonId;
 
-  readonly originLocationId: LocationId | null;
+  readonly originRoomId: RoomId | null;
   readonly originSectionId: SectionId | null;
   readonly originScheduleBlockId: ScheduleBlockId | null;
 
-  readonly destinationId: DestinationId;
-  readonly returnLocationId: LocationId | null;
+  readonly destinationRoomId: RoomId;
+  readonly returnRoomId: RoomId | null;
 
   readonly requestSource: PassRequestSource;
   readonly requestedByPersonId: PersonId | null;
@@ -53,10 +52,10 @@ export interface RequestedPassInput {
   readonly tenantId: TenantId;
   readonly organizationId: OrganizationId;
   readonly studentId: PersonId;
-  readonly originLocationId?: LocationId | null;
+  readonly originRoomId?: RoomId | null;
   readonly originSectionId?: SectionId | null;
   readonly originScheduleBlockId?: ScheduleBlockId | null;
-  readonly destinationId: DestinationId;
+  readonly destinationRoomId: RoomId;
   readonly requestSource: PassRequestSource;
   readonly requestedByPersonId?: PersonId | null;
   readonly requestedAt: Temporal.Instant;
@@ -69,11 +68,11 @@ export function createRequestedPass(input: RequestedPassInput): PassAggregate {
     tenantId: input.tenantId,
     organizationId: input.organizationId,
     studentId: input.studentId,
-    originLocationId: input.originLocationId ?? null,
+    originRoomId: input.originRoomId ?? null,
     originSectionId: input.originSectionId ?? null,
     originScheduleBlockId: input.originScheduleBlockId ?? null,
-    destinationId: input.destinationId,
-    returnLocationId: null,
+    destinationRoomId: input.destinationRoomId,
+    returnRoomId: null,
     requestSource: input.requestSource,
     requestedByPersonId: input.requestedByPersonId ?? null,
     requestedAt: input.requestedAt,

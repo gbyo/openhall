@@ -77,7 +77,7 @@ function placement(
       cycleCode,
       effectiveFrom: null,
       effectiveUntil: null,
-      location: { id: 'room-101', name: 'Room 101', code: '101', kind: 'classroom' },
+      room: { id: 'room-101', name: 'Room 101', code: '101' },
     },
   };
 }
@@ -237,7 +237,7 @@ describe('ExpectedPlacementResolver', () => {
   it('resolves a roomless section without inventing a location', async () => {
     const repository = new FakeRepository();
     const record = placement();
-    repository.placements = [{ ...record, meeting: { ...record.meeting, location: null } }];
+    repository.placements = [{ ...record, meeting: { ...record.meeting, room: null } }];
     const result = await new ExpectedPlacementResolver(repository).resolve(request());
     expect(result).toMatchObject({ kind: 'resolved', expectedLocation: null });
   });

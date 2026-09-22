@@ -59,12 +59,12 @@ function hex(components: readonly string[]): string {
 }
 
 /** Deterministic versioned fingerprint over semantic command inputs only. */
-export function fingerprintSelfRequest(destinationId: string): string {
-  return hex(['pass.request.self:v1', destinationId]);
+export function fingerprintSelfRequest(destinationRoomId: string): string {
+  return hex(['pass.request.self:v1', destinationRoomId]);
 }
 
-export function fingerprintStaffRequest(studentId: string, destinationId: string): string {
-  return hex(['pass.request.student:v1', studentId, destinationId]);
+export function fingerprintStaffRequest(studentId: string, destinationRoomId: string): string {
+  return hex(['pass.request.student:v1', studentId, destinationRoomId]);
 }
 
 export function fingerprintScheduledRequest(
@@ -105,32 +105,42 @@ export function fingerprintCompleteSelf(passId: string, expectedRevision: bigint
 }
 
 export function fingerprintStationCheckIn(
-  destinationId: string,
+  destinationRoomId: string,
   passId: string,
   expectedRevision: bigint,
 ): string {
-  return hex(['pass.station.check_in:v1', destinationId, passId, expectedRevision.toString(10)]);
+  return hex([
+    'pass.station.check_in:v1',
+    destinationRoomId,
+    passId,
+    expectedRevision.toString(10),
+  ]);
 }
 
 export function fingerprintStationBeginReturn(
-  destinationId: string,
+  destinationRoomId: string,
   passId: string,
   expectedRevision: bigint,
 ): string {
   return hex([
     'pass.station.begin_return:v1',
-    destinationId,
+    destinationRoomId,
     passId,
     expectedRevision.toString(10),
   ]);
 }
 
 export function fingerprintStationComplete(
-  destinationId: string,
+  destinationRoomId: string,
   passId: string,
   expectedRevision: bigint,
 ): string {
-  return hex(['pass.station.complete:v1', destinationId, passId, expectedRevision.toString(10)]);
+  return hex([
+    'pass.station.complete:v1',
+    destinationRoomId,
+    passId,
+    expectedRevision.toString(10),
+  ]);
 }
 
 export function fingerprintApprovalResolve(

@@ -5,7 +5,7 @@ import { useSchool } from './SchoolShell';
 export function SchoolIndex() {
   const { context } = useSchool();
   const adminCapabilities = [
-    'destination.manage',
+    'room.manage',
     'schedule.manage',
     'policy.manage',
     'authorization.manage',
@@ -22,8 +22,8 @@ export function SchoolIndex() {
     return <Navigate replace to="requests" />;
   if (context.capabilities.includes('pass.view.school_live'))
     return <Navigate replace to="movement" />;
-  if (context.staffedDestinations.length > 0)
-    return <Navigate replace to={`stations/${context.staffedDestinations[0]?.id ?? ''}`} />;
+  if (context.staffedRooms.length > 0)
+    return <Navigate replace to={`stations/${context.staffedRooms[0]?.id ?? ''}`} />;
   if (context.capabilities.includes('scheduled_authorization.manage'))
     return <Navigate replace to="scheduled-passes" />;
   if (adminCapabilities.some((capability) => context.capabilities.includes(capability)))

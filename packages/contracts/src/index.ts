@@ -231,6 +231,7 @@ export const CapabilitySchema = Type.Union(
     Type.Literal('pass.progress.self'),
     Type.Literal('pass.create.student'),
     Type.Literal('pass.approve.section'),
+    Type.Literal('pass.approve.room'),
     Type.Literal('pass.override.request.self'),
     Type.Literal('pass.override.request.student'),
     Type.Literal('pass.override.resolve.section'),
@@ -239,8 +240,8 @@ export const CapabilitySchema = Type.Union(
     Type.Literal('pass.view.school_live'),
     Type.Literal('pass.view.school_history'),
     Type.Literal('scheduled_authorization.manage'),
-    Type.Literal('destination.station.manage'),
-    Type.Literal('destination.manage'),
+    Type.Literal('room.station.manage'),
+    Type.Literal('room.manage'),
     Type.Literal('schedule.view'),
     Type.Literal('schedule.manage'),
     Type.Literal('people.view'),
@@ -291,14 +292,13 @@ export const TeachingSectionContextSchema = Type.Object(
   { $id: 'TeachingSectionContext', additionalProperties: false },
 );
 
-export const StaffedDestinationContextSchema = Type.Object(
+export const StaffedRoomContextSchema = Type.Object(
   {
     id: UuidSchema,
-    displayName: Type.String(),
-    serviceType: Type.String(),
+    name: Type.String(),
     capabilities: Type.Array(CapabilitySchema),
   },
-  { $id: 'StaffedDestinationContext', additionalProperties: false },
+  { $id: 'StaffedRoomContext', additionalProperties: false },
 );
 
 const PlacementBlockSchema = Type.Object(
@@ -320,12 +320,11 @@ const PlacementSectionSchema = Type.Object(
   { additionalProperties: false },
 );
 
-const PlacementLocationSchema = Type.Object(
+const PlacementRoomSchema = Type.Object(
   {
     id: UuidSchema,
     name: Type.String(),
     code: Type.Union([Type.String(), Type.Null()]),
-    kind: Type.String(),
   },
   { additionalProperties: false },
 );
@@ -342,7 +341,7 @@ export const ExpectedPlacementContextSchema = Type.Union(
         kind: Type.Literal('resolved'),
         block: PlacementBlockSchema,
         section: PlacementSectionSchema,
-        expectedLocation: Type.Union([PlacementLocationSchema, Type.Null()]),
+        expectedRoom: Type.Union([PlacementRoomSchema, Type.Null()]),
         beginsAt: InstantSchema,
         endsAt: InstantSchema,
         elapsedSeconds: Type.Number(),
@@ -413,14 +412,14 @@ export const MyOrganizationContextSchema = Type.Object(
     capabilities: Type.Array(CapabilitySchema),
     expectedPlacement: Type.Union([ExpectedPlacementContextSchema, Type.Null()]),
     teachingSections: Type.Array(TeachingSectionContextSchema),
-    staffedDestinations: Type.Array(StaffedDestinationContextSchema),
+    staffedRooms: Type.Array(StaffedRoomContextSchema),
   },
   { $id: 'MyOrganizationContext', additionalProperties: false },
 );
 
 /** POST /api/v1/me/passes and POST /api/v1/students/:studentId/passes body. */
 export const PassRequestBodySchema = Type.Object(
-  { destinationId: UuidSchema },
+  { destinationRoomId: UuidSchema },
   { $id: 'PassRequestBody', additionalProperties: false },
 );
 
@@ -442,7 +441,7 @@ const PassOriginSectionSchema = Type.Object(
   { additionalProperties: false },
 );
 
-const PassOriginLocationSchema = Type.Object(
+const PassOriginRoomSchema = Type.Object(
   {
     id: UuidSchema,
     name: Type.String(),
@@ -467,7 +466,7 @@ export const PassPolicySchema = Type.Object(
 );
 
 /**
- * Non-dynamic destination-flow facts tied to the pass revision. Live queue
+ * Non-dynamic room-flow facts tied to the pass revision. Live queue
  * position, live capacity, and wall-clock overdue flags are excluded: they
  * change without a revision bump and must never sit under the strong ETag.
  */
@@ -493,7 +492,7 @@ export const PassMovementProjectionSchema = Type.Object(
  * underlying value is PostgreSQL bigint, never a JSON number.
  */
 /** Current category presentation joined onto pass/scheduled projections (never snapshotted). */
-export const PassDestinationCategorySchema = Type.Object(
+export const PassRoomCategorySchema = Type.Object(
   {
     id: UuidSchema,
     name: Type.String(),
@@ -512,14 +511,13 @@ export const PassSchema = Type.Object(
     destination: Type.Object(
       {
         id: UuidSchema,
-        displayName: Type.String(),
-        serviceType: Type.String(),
+        name: Type.String(),
         checkInMode: Type.Union([
           Type.Literal('none'),
           Type.Literal('optional'),
           Type.Literal('required'),
         ]),
-        category: Type.Union([PassDestinationCategorySchema, Type.Null()]),
+        category: Type.Union([PassRoomCategorySchema, Type.Null()]),
       },
       { additionalProperties: false },
     ),
@@ -528,7 +526,7 @@ export const PassSchema = Type.Object(
         placementKind: Type.String(),
         block: Type.Union([PassOriginBlockSchema, Type.Null()]),
         section: Type.Union([PassOriginSectionSchema, Type.Null()]),
-        location: Type.Union([PassOriginLocationSchema, Type.Null()]),
+        room: Type.Union([PassOriginRoomSchema, Type.Null()]),
       },
       { additionalProperties: false },
     ),
@@ -567,9 +565,17 @@ export const OverrideRequestBodySchema = Type.Object(
 
 const PendingApprovalSectionSchema = Type.Object(
   {
-    id: UuidSchema,
+    id: Type.Union([UuidSchema, Type.Null()]),
     code: Type.Union([Type.String(), Type.Null()]),
-    title: Type.String(),
+    title: Type.Union([Type.String(), Type.Null()]),
+  },
+  { additionalProperties: false },
+);
+
+const PendingApprovalRoomSchema = Type.Object(
+  {
+    id: UuidSchema,
+    name: Type.String(),
   },
   { additionalProperties: false },
 );
@@ -582,11 +588,10 @@ const PersonDisplaySchema = Type.Object(
   { additionalProperties: false },
 );
 
-const DestinationDisplaySchema = Type.Object(
+const RoomDisplaySchema = Type.Object(
   {
     id: UuidSchema,
-    displayName: Type.String(),
-    serviceType: Type.String(),
+    name: Type.String(),
   },
   { additionalProperties: false },
 );
@@ -600,8 +605,13 @@ export const PendingApprovalSchema = Type.Object(
     passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
     passEtag: Type.String({ minLength: 1 }),
     student: PersonDisplaySchema,
-    destination: DestinationDisplaySchema,
+    destination: RoomDisplaySchema,
+    approverKind: Type.Union([
+      Type.Literal('current_section_teacher'),
+      Type.Literal('room_responsible_staff'),
+    ]),
     requiredSection: PendingApprovalSectionSchema,
+    requiredRoom: Type.Union([PendingApprovalRoomSchema, Type.Null()]),
     requestedAt: InstantSchema,
   },
   { $id: 'PendingApproval', additionalProperties: false },
@@ -621,7 +631,7 @@ export const PendingOverrideSchema = Type.Object(
     passRevision: Type.String({ pattern: '^[1-9][0-9]*$' }),
     passEtag: Type.String({ minLength: 1 }),
     student: PersonDisplaySchema,
-    destination: DestinationDisplaySchema,
+    destination: RoomDisplaySchema,
     category: Type.Union([
       Type.Literal('urgent'),
       Type.Literal('private'),
@@ -637,6 +647,7 @@ export const PendingOverrideSchema = Type.Object(
       Type.Literal('no_violation'),
       Type.Literal('schedule_boundary_blackout'),
       Type.Literal('current_section_teacher_approval_required'),
+      Type.Literal('room_responsible_staff_approval_required'),
       Type.Literal('approval_context_unavailable'),
       Type.Literal('approval_satisfied'),
       Type.Literal('scheduled_preapproval_satisfied'),
@@ -689,7 +700,7 @@ export const LivePassSchema = Type.Object(
       { additionalProperties: false },
     ),
     destination: Type.Object(
-      { id: UuidSchema, displayName: Type.String(), serviceType: Type.String() },
+      { id: UuidSchema, name: Type.String() },
       { additionalProperties: false },
     ),
     lifecycleState: Type.Union([
@@ -738,105 +749,73 @@ const StationPersonSchema = Type.Object(
   { additionalProperties: false },
 );
 
-/** School control-plane location: server owns tenant, organization, status, and revision. */
-export const LocationSchema = Type.Object(
-  {
-    id: UuidSchema,
-    organizationId: UuidSchema,
-    parentLocationId: Type.Union([UuidSchema, Type.Null()]),
-    kind: Type.String({ minLength: 1, maxLength: 100 }),
-    name: Type.String({ minLength: 1, maxLength: 200 }),
-    code: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
-    floorLabel: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
-    status: Type.Union([
-      Type.Literal('active'),
-      Type.Literal('inactive'),
-      Type.Literal('archived'),
-    ]),
-    revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
-    createdAt: InstantSchema,
-    updatedAt: InstantSchema,
-  },
-  { $id: 'Location', additionalProperties: false },
-);
+const RoomCategoryPickerModeSchema = Type.Union([
+  Type.Literal('auto'),
+  Type.Literal('list'),
+  Type.Literal('search'),
+]);
 
-export const LocationListSchema = Type.Object(
-  { locations: Type.Array(LocationSchema) },
-  { $id: 'LocationList', additionalProperties: false },
-);
-
-export const LocationResponseSchema = Type.Object(
-  { location: LocationSchema },
-  { $id: 'LocationResponse', additionalProperties: false },
-);
-
-export const LocationWriteBodySchema = Type.Object(
-  {
-    parentLocationId: Type.Union([UuidSchema, Type.Null()]),
-    kind: Type.String({ minLength: 1, maxLength: 100 }),
-    name: Type.String({ minLength: 1, maxLength: 200 }),
-    code: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
-    floorLabel: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
-  },
-  { $id: 'LocationWriteBody', additionalProperties: false },
-);
-
-const CheckInModeSchema = Type.Union([
+const RoomCheckInModeSchema = Type.Union([
   Type.Literal('none'),
   Type.Literal('optional'),
   Type.Literal('required'),
 ]);
 
-/** School control-plane destination: server owns status lifecycle and revision. */
-export const DestinationSchema = Type.Object(
+const CheckInModeSchema = RoomCheckInModeSchema;
+
+/** School control-plane room: Category→Room unification, server owns status lifecycle and revision. */
+export const RoomSchema = Type.Object(
   {
     id: UuidSchema,
     organizationId: UuidSchema,
-    locationId: UuidSchema,
-    categoryId: UuidSchema,
+    categoryId: Type.Union([UuidSchema, Type.Null()]),
+    name: Type.String({ minLength: 1, maxLength: 200 }),
+    code: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
+    floorLabel: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
     studentSelfRequestable: Type.Boolean(),
-    serviceType: Type.String({ minLength: 1, maxLength: 100 }),
-    displayName: Type.Union([Type.String({ minLength: 1, maxLength: 200 }), Type.Null()]),
+    originSelectable: Type.Boolean(),
     capacity: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
     queueEnabled: Type.Boolean(),
-    checkInMode: CheckInModeSchema,
+    checkInMode: RoomCheckInModeSchema,
     defaultDurationSeconds: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
     maxDurationSeconds: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
     readyClaimTimeoutSeconds: Type.Integer({ minimum: 5, maximum: 600 }),
     queueTimeoutSeconds: Type.Integer({ minimum: 60, maximum: 14400 }),
-    status: Type.Union([Type.Literal('active'), Type.Literal('closed'), Type.Literal('archived')]),
+    status: Type.Union([Type.Literal('open'), Type.Literal('closed'), Type.Literal('archived')]),
     revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
+    createdAt: InstantSchema,
     updatedAt: InstantSchema,
   },
-  { $id: 'Destination', additionalProperties: false },
+  { $id: 'Room', additionalProperties: false },
 );
 
-export const DestinationListSchema = Type.Object(
-  { destinations: Type.Array(DestinationSchema) },
-  { $id: 'DestinationList', additionalProperties: false },
+export const RoomListSchema = Type.Object(
+  { rooms: Type.Array(RoomSchema) },
+  { $id: 'RoomList', additionalProperties: false },
 );
 
-export const DestinationResponseSchema = Type.Object(
-  { destination: DestinationSchema },
-  { $id: 'DestinationResponse', additionalProperties: false },
+export const RoomResponseSchema = Type.Object(
+  { room: RoomSchema },
+  { $id: 'RoomResponse', additionalProperties: false },
 );
 
-export const DestinationWriteBodySchema = Type.Object(
+export const RoomWriteBodySchema = Type.Object(
   {
-    locationId: UuidSchema,
-    categoryId: UuidSchema,
+    categoryId: Type.Union([UuidSchema, Type.Null()]),
+    name: Type.String({ minLength: 1, maxLength: 200 }),
+    code: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
+    floorLabel: Type.Union([Type.String({ minLength: 1, maxLength: 100 }), Type.Null()]),
     studentSelfRequestable: Type.Boolean(),
-    serviceType: Type.String({ minLength: 1, maxLength: 100 }),
-    displayName: Type.Union([Type.String({ minLength: 1, maxLength: 200 }), Type.Null()]),
+    originSelectable: Type.Boolean(),
     capacity: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
     queueEnabled: Type.Boolean(),
-    checkInMode: CheckInModeSchema,
+    checkInMode: RoomCheckInModeSchema,
     defaultDurationSeconds: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
     maxDurationSeconds: Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]),
     readyClaimTimeoutSeconds: Type.Integer({ minimum: 5, maximum: 600 }),
     queueTimeoutSeconds: Type.Integer({ minimum: 60, maximum: 14400 }),
   },
-  { $id: 'DestinationWriteBody', additionalProperties: false },
+  { $id: 'RoomWriteBody', additionalProperties: false },
 );
 
 export const BlockKindSchema = Type.Union([
@@ -1000,7 +979,8 @@ export const CalendarBulkWriteBodySchema = Type.Object(
 const PolicyScopeKindSchema = Type.Union([
   Type.Literal('organization'),
   Type.Literal('section'),
-  Type.Literal('destination'),
+  Type.Literal('room'),
+  Type.Literal('room_category'),
 ]);
 
 const PolicyScopeSchema = Type.Object(
@@ -1008,7 +988,8 @@ const PolicyScopeSchema = Type.Object(
     kind: PolicyScopeKindSchema,
     organizationId: Type.Union([UuidSchema, Type.Null()]),
     sectionId: Type.Union([UuidSchema, Type.Null()]),
-    destinationId: Type.Union([UuidSchema, Type.Null()]),
+    roomId: Type.Union([UuidSchema, Type.Null()]),
+    roomCategoryId: Type.Union([UuidSchema, Type.Null()]),
   },
   { additionalProperties: false },
 );
@@ -1052,7 +1033,7 @@ export const PolicyRuleResponseSchema = Type.Object(
 /** Closed school-manageable duty roles. Never student/teacher/system_admin. */
 export const AuthorizationGrantRoleSchema = Type.Union(
   [
-    Type.Literal('destination_staff'),
+    Type.Literal('room_staff'),
     Type.Literal('counselor'),
     Type.Literal('office_staff'),
     Type.Literal('school_admin'),
@@ -1074,11 +1055,11 @@ export const AuthorizationGrantSchema = Type.Object(
     ),
     accountId: UuidSchema,
     role: AuthorizationGrantRoleSchema,
-    scopeKind: Type.Union([Type.Literal('organization'), Type.Literal('destination')]),
+    scopeKind: Type.Union([Type.Literal('organization'), Type.Literal('room')]),
     organizationId: Type.Union([UuidSchema, Type.Null()]),
-    destinationId: Type.Union([UuidSchema, Type.Null()]),
-    destination: Type.Union([
-      Type.Object({ id: UuidSchema, displayName: Type.String() }, { additionalProperties: false }),
+    roomId: Type.Union([UuidSchema, Type.Null()]),
+    room: Type.Union([
+      Type.Object({ id: UuidSchema, name: Type.String() }, { additionalProperties: false }),
       Type.Null(),
     ]),
     status: Type.Union([Type.Literal('active'), Type.Literal('revoked')]),
@@ -1107,7 +1088,7 @@ export const AuthorizationGrantIssueBodySchema = Type.Object(
   {
     personId: UuidSchema,
     role: AuthorizationGrantRoleSchema,
-    destinationId: Type.Union([UuidSchema, Type.Null()]),
+    roomId: Type.Union([UuidSchema, Type.Null()]),
     validFrom: Type.Union([InstantSchema, Type.Null()]),
     validUntil: Type.Union([InstantSchema, Type.Null()]),
   },
@@ -1323,7 +1304,7 @@ export const ScheduledAuthOriginSchema = Type.Union(
   [
     Type.Object({ strategy: Type.Literal('expected') }, { additionalProperties: false }),
     Type.Object(
-      { strategy: Type.Literal('specific'), locationId: UuidSchema },
+      { strategy: Type.Literal('specific'), roomId: UuidSchema },
       { additionalProperties: false },
     ),
   ],
@@ -1333,7 +1314,7 @@ export const ScheduledAuthOriginSchema = Type.Union(
 export const ScheduledAuthCreateBodySchema = Type.Object(
   {
     studentId: UuidSchema,
-    destinationId: UuidSchema,
+    destinationRoomId: UuidSchema,
     validFrom: InstantSchema,
     validUntil: InstantSchema,
     approvalMode: Type.Union([Type.Literal('preapproved'), Type.Literal('approval_required')]),
@@ -1355,9 +1336,9 @@ export const ScheduledAuthSchema = Type.Object(
       },
       { additionalProperties: false },
     ),
-    destinationId: UuidSchema,
+    destinationRoomId: UuidSchema,
     destination: Type.Object(
-      { id: UuidSchema, displayName: Type.String(), serviceType: Type.String() },
+      { id: UuidSchema, name: Type.String() },
       { additionalProperties: false },
     ),
     validFrom: InstantSchema,
@@ -1370,8 +1351,8 @@ export const ScheduledAuthSchema = Type.Object(
     ]),
     approvalMode: Type.Union([Type.Literal('preapproved'), Type.Literal('approval_required')]),
     originStrategy: Type.Union([Type.Literal('expected'), Type.Literal('specific')]),
-    originLocationId: Type.Union([UuidSchema, Type.Null()]),
-    originLocation: Type.Union([
+    originRoomId: Type.Union([UuidSchema, Type.Null()]),
+    originRoom: Type.Union([
       Type.Object({ id: UuidSchema, name: Type.String() }, { additionalProperties: false }),
       Type.Null(),
     ]),
@@ -1421,13 +1402,12 @@ export const ScheduledAuthStudentViewSchema = Type.Object(
     destination: Type.Object(
       {
         id: UuidSchema,
-        displayName: Type.String(),
-        serviceType: Type.String(),
-        category: Type.Union([PassDestinationCategorySchema, Type.Null()]),
+        name: Type.String(),
+        category: Type.Union([PassRoomCategorySchema, Type.Null()]),
       },
       { additionalProperties: false },
     ),
-    originLocation: Type.Union([
+    originRoom: Type.Union([
       Type.Object({ id: UuidSchema, name: Type.String() }, { additionalProperties: false }),
       Type.Null(),
     ]),
@@ -1476,24 +1456,27 @@ export const PolicyRuleWriteBodySchema = Type.Object(
   { $id: 'PolicyRuleWriteBody', additionalProperties: false },
 );
 
-/** Stable picker-safe destination catalog: no occupants, identities, or policy internals. */
-export const DestinationCatalogEntrySchema = Type.Object(
+/** Stable picker-safe room catalog: no occupants, identities, or policy internals. */
+export const RoomCatalogEntrySchema = Type.Object(
   {
     id: UuidSchema,
-    displayName: Type.String(),
-    serviceType: Type.String(),
-    categoryId: UuidSchema,
+    name: Type.String(),
+    code: Type.Union([Type.String(), Type.Null()]),
+    floorLabel: Type.Union([Type.String(), Type.Null()]),
+    categoryId: Type.Union([UuidSchema, Type.Null()]),
     checkInMode: CheckInModeSchema,
+    /** Whether staff may pick this room as an explicit origin. */
+    originSelectable: Type.Boolean(),
   },
   { additionalProperties: false },
 );
 
 /**
- * School-defined destination category: the student-facing grouping for
- * destinations. Presentation travels as safe product keys; the frontend
+ * School-defined room category: the student-facing grouping for
+ * rooms. Presentation travels as safe product keys; the frontend
  * owns the single centralized key -> icon/class mapping.
  */
-export const DestinationCategorySchema = Type.Object(
+export const RoomCategorySchema = Type.Object(
   {
     id: UuidSchema,
     organizationId: UuidSchema,
@@ -1505,25 +1488,26 @@ export const DestinationCategorySchema = Type.Object(
       Type.Literal('secondary'),
       Type.Literal('hidden'),
     ]),
+    pickerMode: RoomCategoryPickerModeSchema,
     sortOrder: Type.Integer({ minimum: 0 }),
     status: Type.Union([Type.Literal('active'), Type.Literal('archived')]),
     revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
     updatedAt: InstantSchema,
   },
-  { $id: 'DestinationCategory', additionalProperties: false },
+  { $id: 'RoomCategory', additionalProperties: false },
 );
 
-export const DestinationCategoryListSchema = Type.Object(
-  { categories: Type.Array(DestinationCategorySchema) },
-  { $id: 'DestinationCategoryList', additionalProperties: false },
+export const RoomCategoryListSchema = Type.Object(
+  { categories: Type.Array(RoomCategorySchema) },
+  { $id: 'RoomCategoryList', additionalProperties: false },
 );
 
-export const DestinationCategoryResponseSchema = Type.Object(
-  { category: DestinationCategorySchema },
-  { $id: 'DestinationCategoryResponse', additionalProperties: false },
+export const RoomCategoryResponseSchema = Type.Object(
+  { category: RoomCategorySchema },
+  { $id: 'RoomCategoryResponse', additionalProperties: false },
 );
 
-export const DestinationCategoryWriteBodySchema = Type.Object(
+export const RoomCategoryWriteBodySchema = Type.Object(
   {
     name: Type.String({ minLength: 1, maxLength: 100 }),
     iconKey: Type.String({ minLength: 1, maxLength: 40 }),
@@ -1533,9 +1517,10 @@ export const DestinationCategoryWriteBodySchema = Type.Object(
       Type.Literal('secondary'),
       Type.Literal('hidden'),
     ]),
+    pickerMode: RoomCategoryPickerModeSchema,
     sortOrder: Type.Integer({ minimum: 0, maximum: 100000 }),
   },
-  { $id: 'DestinationCategoryWriteBody', additionalProperties: false },
+  { $id: 'RoomCategoryWriteBody', additionalProperties: false },
 );
 
 /**
@@ -1543,50 +1528,124 @@ export const DestinationCategoryWriteBodySchema = Type.Object(
  * categories with their eligible destinations. Hidden/archived categories,
  * non-requestable destinations, and empty categories never appear.
  */
-export const StudentDestinationCatalogDestinationSchema = Type.Object(
+export const StudentRoomCatalogSearchContextSchema = Type.Object(
   {
-    id: UuidSchema,
-    displayName: Type.String(),
-    location: Type.Object({ id: UuidSchema, name: Type.String() }, { additionalProperties: false }),
-    checkInMode: CheckInModeSchema,
+    teacherNames: Type.Array(Type.String()),
+    sectionLabels: Type.Array(Type.String()),
+    roomStaffNames: Type.Array(Type.String()),
   },
   { additionalProperties: false },
 );
 
-export const StudentDestinationCatalogCategorySchema = Type.Object(
+export const StudentRoomCatalogRoomSchema = Type.Object(
+  {
+    id: UuidSchema,
+    name: Type.String(),
+    code: Type.Union([Type.String(), Type.Null()]),
+    floorLabel: Type.Union([Type.String(), Type.Null()]),
+    checkInMode: CheckInModeSchema,
+    searchContext: StudentRoomCatalogSearchContextSchema,
+  },
+  { additionalProperties: false },
+);
+
+export const StudentRoomCatalogCategorySchema = Type.Object(
   {
     id: UuidSchema,
     name: Type.String(),
     iconKey: Type.String(),
     toneKey: Type.String(),
+    // Hidden categories never reach the catalog, so the launcher only ever
+    // sees the two placements it renders.
     studentSurface: Type.Union([Type.Literal('primary'), Type.Literal('secondary')]),
+    pickerMode: RoomCategoryPickerModeSchema,
     sortOrder: Type.Integer({ minimum: 0 }),
-    destinations: Type.Array(StudentDestinationCatalogDestinationSchema),
+    rooms: Type.Array(StudentRoomCatalogRoomSchema),
   },
   { additionalProperties: false },
 );
 
-export const StudentDestinationCatalogSchema = Type.Object(
-  { categories: Type.Array(StudentDestinationCatalogCategorySchema) },
-  { $id: 'StudentDestinationCatalog', additionalProperties: false },
+export const StudentRoomCatalogSchema = Type.Object(
+  { categories: Type.Array(StudentRoomCatalogCategorySchema) },
+  { $id: 'StudentRoomCatalog', additionalProperties: false },
 );
 
-export const DestinationCatalogSchema = Type.Object(
-  { destinations: Type.Array(DestinationCatalogEntrySchema) },
-  { $id: 'DestinationCatalog', additionalProperties: false },
+export const RoomCatalogSchema = Type.Object(
+  { rooms: Type.Array(RoomCatalogEntrySchema) },
+  { $id: 'RoomCatalog', additionalProperties: false },
+);
+
+/**
+ * One bulk room change. Exactly one change kind per request: the whole
+ * selection moves together or not at all.
+ */
+export const RoomBulkChangeSchema = Type.Union([
+  Type.Object(
+    {
+      kind: Type.Literal('category'),
+      categoryId: Type.Union([UuidSchema, Type.Null()]),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      kind: Type.Literal('student_requestable'),
+      studentSelfRequestable: Type.Boolean(),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      kind: Type.Literal('status'),
+      status: Type.Union([Type.Literal('open'), Type.Literal('closed')]),
+    },
+    { additionalProperties: false },
+  ),
+]);
+
+export const RoomBulkWriteBodySchema = Type.Object(
+  {
+    roomIds: Type.Array(UuidSchema, { minItems: 1, maxItems: 500 }),
+    change: RoomBulkChangeSchema,
+  },
+  { $id: 'RoomBulkWriteBody', additionalProperties: false },
+);
+
+export const RoomBulkResponseSchema = Type.Object(
+  { rooms: Type.Array(RoomSchema) },
+  { $id: 'RoomBulkResponse', additionalProperties: false },
+);
+
+/**
+ * Administrator view of schedule/staffing context per room. Covers every
+ * room in the school, including closed, uncategorized, and staff-only
+ * rooms the student catalog never returns.
+ */
+export const RoomContextEntrySchema = Type.Object(
+  {
+    roomId: UuidSchema,
+    teacherNames: Type.Array(Type.String()),
+    sectionLabels: Type.Array(Type.String()),
+    roomStaffNames: Type.Array(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+export const RoomContextListSchema = Type.Object(
+  { rooms: Type.Array(RoomContextEntrySchema) },
+  { $id: 'RoomContextList', additionalProperties: false },
 );
 
 /**
  * Minimized operational station view. No grants, rule JSON, override
  * categories, OIDC data, or schedule history.
  */
-export const DestinationStationViewSchema = Type.Object(
+export const RoomStationViewSchema = Type.Object(
   {
-    destination: Type.Object(
+    room: Type.Object(
       {
         id: UuidSchema,
-        displayName: Type.String(),
-        serviceType: Type.String(),
+        name: Type.String(),
         checkInMode: Type.Union([
           Type.Literal('none'),
           Type.Literal('optional'),
@@ -1654,5 +1713,5 @@ export const DestinationStationViewSchema = Type.Object(
       ),
     ),
   },
-  { $id: 'DestinationStationView', additionalProperties: false },
+  { $id: 'RoomStationView', additionalProperties: false },
 );

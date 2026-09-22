@@ -29,6 +29,20 @@ describe('parsePolicyRuleConfiguration', () => {
     expect(parsed.valid).toBe(true);
   });
 
+  it.each(['current_section_teacher', 'room_responsible_staff'] as const)(
+    'round-trips the %s approver instead of deriving it from scope',
+    (approver) => {
+      const parsed = parsePolicyRuleConfiguration('approval_requirement', {
+        ...approvalBase,
+        approver,
+      });
+      expect(parsed).toMatchObject({
+        valid: true,
+        configuration: { type: 'approval_requirement', config: { approver } },
+      });
+    },
+  );
+
   it.each([
     ['missing schemaVersion', 'schedule_boundary', { ...boundaryBase, schemaVersion: undefined }],
     ['unsupported schemaVersion', 'schedule_boundary', { ...boundaryBase, schemaVersion: 2 }],

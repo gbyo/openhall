@@ -9,6 +9,7 @@ import { getCsrfToken } from '../../../api/session';
 import type { PolicyRule } from '../../../api/types';
 import { ConflictNotice } from '../../../design-system/patterns/ConflictNotice';
 import { useSchool } from '../../../app/school/SchoolShell';
+import { readPolicyApprover, type PolicyApprover } from './policy-approvers.js';
 import { useUnsavedChanges } from '../../../app/useUnsavedChanges';
 import { PageHeader } from '../../../components/workspace/PageHeader';
 import {
@@ -25,7 +26,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Spinner } from '@/components/ui/spinner';
@@ -34,10 +35,11 @@ interface PolicyBody {
   name: string;
   ruleType: 'schedule_boundary' | 'approval_requirement';
   scope: {
-    kind: 'organization' | 'section' | 'destination';
+    kind: 'organization' | 'section' | 'room' | 'room_category';
     organizationId: string | null;
     sectionId: string | null;
-    destinationId: string | null;
+    roomId: string | null;
+    roomCategoryId: string | null;
   };
   priority: number;
   configuration: Record<string, unknown>;
@@ -56,6 +58,7 @@ interface PolicyDraft {
   lastMinutes: number;
   blockKinds: string[];
   requestSources: string[];
+  approver: PolicyApprover;
   validFrom: string;
   validUntil: string;
 }
@@ -100,7 +103,7 @@ function draftFor(rule: PolicyRule, timeZone: string): PolicyDraft {
   return {
     name: rule.name,
     scopeKind: rule.scope.kind,
-    scopeId: rule.scope.sectionId ?? rule.scope.destinationId ?? '',
+    scopeId: rule.scope.sectionId ?? rule.scope.roomId ?? rule.scope.roomCategoryId ?? '',
     priority: rule.priority,
     overrideMode: rule.overrideMode,
     firstMinutes: typeof configuration.firstMinutes === 'number' ? configuration.firstMinutes : 5,
@@ -111,6 +114,7 @@ function draftFor(rule: PolicyRule, timeZone: string): PolicyDraft {
     requestSources: Array.isArray(configuration.requestSources)
       ? configuration.requestSources.filter((value): value is string => typeof value === 'string')
       : ['student_web'],
+    approver: readPolicyApprover(configuration),
     validFrom: localDateTime(rule.validFrom, timeZone),
     validUntil: localDateTime(rule.validUntil, timeZone),
   };
@@ -149,12 +153,22 @@ export function Component() {
   );
   useUnsavedChanges(dirty);
 
-  const destinations = useQuery({
-    queryKey: queryKeys.destinations(organizationId),
-    enabled: draft?.scopeKind === 'destination',
+  const rooms = useQuery({
+    queryKey: queryKeys.rooms(organizationId),
+    enabled: draft?.scopeKind === 'room',
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/organizations/{organizationId}/destinations', {
+        api.GET('/api/v1/organizations/{organizationId}/rooms', {
+          params: { path: { organizationId } },
+        }),
+      ),
+  });
+  const roomCategories = useQuery({
+    queryKey: queryKeys.roomCategories(organizationId),
+    enabled: draft?.scopeKind === 'room_category',
+    queryFn: () =>
+      confirmed(
+        api.GET('/api/v1/organizations/{organizationId}/room-categories', {
           params: { path: { organizationId } },
         }),
       ),
@@ -224,7 +238,8 @@ export function Component() {
       kind: draft.scopeKind,
       organizationId: draft.scopeKind === 'organization' ? organizationId : null,
       sectionId: draft.scopeKind === 'section' ? draft.scopeId : null,
-      destinationId: draft.scopeKind === 'destination' ? draft.scopeId : null,
+      roomId: draft.scopeKind === 'room' ? draft.scopeId : null,
+      roomCategoryId: draft.scopeKind === 'room_category' ? draft.scopeId : null,
     },
     priority: draft.priority,
     configuration:
@@ -239,7 +254,7 @@ export function Component() {
         : {
             schemaVersion: 1,
             requestSources: draft.requestSources,
-            approver: 'current_section_teacher',
+            approver: draft.approver,
           },
     overrideMode: draft.overrideMode,
     validFrom: instant(draft.validFrom, context.organization.timeZone),
@@ -338,13 +353,18 @@ export function Component() {
               >
                 <NativeSelectOption value="organization">Whole school</NativeSelectOption>
                 <NativeSelectOption value="section">One class</NativeSelectOption>
-                <NativeSelectOption value="destination">One destination</NativeSelectOption>
+                <NativeSelectOption value="room">One room</NativeSelectOption>
+                <NativeSelectOption value="room_category">One room category</NativeSelectOption>
               </NativeSelect>
             </Field>
             {draft.scopeKind !== 'organization' && (
               <Field>
                 <FieldLabel htmlFor="policy-detail-scope-id">
-                  {draft.scopeKind === 'section' ? 'Class' : 'Destination'}
+                  {draft.scopeKind === 'section'
+                    ? 'Class'
+                    : draft.scopeKind === 'room_category'
+                      ? 'Room category'
+                      : 'Room'}
                 </FieldLabel>
                 <NativeSelect
                   id="policy-detail-scope-id"
@@ -361,12 +381,41 @@ export function Component() {
                           {section.title}
                         </NativeSelectOption>
                       ))
-                    : destinations.data?.destinations.map((destination) => (
-                        <NativeSelectOption key={destination.id} value={destination.id}>
-                          {destination.displayName ?? destination.serviceType}
-                        </NativeSelectOption>
-                      ))}
+                    : draft.scopeKind === 'room_category'
+                      ? roomCategories.data?.categories.map((category) => (
+                          <NativeSelectOption key={category.id} value={category.id}>
+                            {category.name}
+                          </NativeSelectOption>
+                        ))
+                      : rooms.data?.rooms.map((room) => (
+                          <NativeSelectOption key={room.id} value={room.id}>
+                            {room.name}
+                          </NativeSelectOption>
+                        ))}
                 </NativeSelect>
+              </Field>
+            )}
+            {rule.ruleType === 'approval_requirement' && (
+              <Field>
+                <FieldLabel htmlFor="policy-detail-approver">Who approves</FieldLabel>
+                <NativeSelect
+                  id="policy-detail-approver"
+                  value={draft.approver}
+                  onChange={(event) => {
+                    setDraft({ ...draft, approver: event.target.value as PolicyApprover });
+                  }}
+                >
+                  <NativeSelectOption value="current_section_teacher">
+                    The student&apos;s current class teacher
+                  </NativeSelectOption>
+                  <NativeSelectOption value="room_responsible_staff">
+                    Staff responsible for the destination room
+                  </NativeSelectOption>
+                </NativeSelect>
+                <FieldDescription>
+                  Independent of where the rule applies: a room rule can still ask the class
+                  teacher.
+                </FieldDescription>
               </Field>
             )}
             {rule.ruleType === 'schedule_boundary' && (

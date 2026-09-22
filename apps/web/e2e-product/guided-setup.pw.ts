@@ -75,6 +75,17 @@ async function guidedShell(page: Page, state: GuidedMocks): Promise<void> {
       },
     }),
   );
+  // Hermetic against any live backend on the dev proxy: unmocked schedule
+  // reads would 401, which the app treats as session expiry.
+  await page.route(`**/api/v1/organizations/${ORG_ID}/schedule/blocks`, (route) =>
+    route.fulfill({ json: { blocks: [] } }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG_ID}/schedule/templates`, (route) =>
+    route.fulfill({ json: { templates: [] } }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG_ID}/schedule/calendar*`, (route) =>
+    route.fulfill({ json: { assignments: [] } }),
+  );
   await page.route(`**/api/v1/me/organizations/${ORG_ID}/context`, (route) =>
     route.fulfill({
       json: {

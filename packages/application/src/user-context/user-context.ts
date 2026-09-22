@@ -27,7 +27,8 @@ export interface OrganizationContext {
   readonly affiliations: readonly ('student' | 'staff' | 'other')[];
   readonly capabilities: OrganizationAuthorizationSnapshot['capabilities'];
   readonly teachingSections: OrganizationAuthorizationSnapshot['teachingSections'];
-  readonly staffedDestinations: OrganizationAuthorizationSnapshot['staffedDestinations'];
+  readonly staffedRooms: OrganizationAuthorizationSnapshot['staffedRooms'];
+  readonly teachingMeetingRoomIds: OrganizationAuthorizationSnapshot['teachingMeetingRoomIds'];
   /** Raw resolver result; the HTTP layer maps it to the minimized public DTO. */
   readonly expectedPlacement: ExpectedPlacementResult | null;
 }
@@ -127,7 +128,8 @@ export class UserContextService {
       affiliations: snapshot.affiliations,
       capabilities: snapshot.capabilities,
       teachingSections: snapshot.teachingSections,
-      staffedDestinations: snapshot.staffedDestinations,
+      staffedRooms: snapshot.staffedRooms,
+      teachingMeetingRoomIds: snapshot.teachingMeetingRoomIds,
       expectedPlacement,
     };
   }

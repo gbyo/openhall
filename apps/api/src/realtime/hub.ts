@@ -8,7 +8,8 @@ export interface RealtimeSubscriberContext {
   readonly affiliations: readonly string[];
   readonly capabilities: readonly Capability[];
   readonly teachingSectionIds: readonly string[];
-  readonly staffedDestinationIds: readonly string[];
+  readonly staffedRoomIds: readonly string[];
+  readonly teachingRoomIds: readonly string[];
 }
 
 export type RealtimeMessage =
@@ -73,9 +74,10 @@ export function topicsFor(
   const topics = new Set<string>();
   const payload = event.payload;
   const studentId = stringField(payload, 'studentId');
-  const destinationId = stringField(payload, 'destinationId');
+  const destinationRoomId = stringField(payload, 'destinationRoomId');
   const originSectionId = stringField(payload, 'originSectionId');
   const requiredSectionId = stringField(payload, 'requiredSectionId');
+  const requiredRoomId = stringField(payload, 'requiredRoomId');
 
   if (event.aggregateKind === 'pass') {
     if (studentId === subscriber.personId) topics.add('self-pass');
@@ -90,10 +92,20 @@ export function topicsFor(
         topics.add(`section-live:${sectionId}`);
       }
     }
-    if (destinationId !== null && subscriber.staffedDestinationIds.includes(destinationId)) {
-      topics.add(`station:${destinationId}`);
+    if (destinationRoomId !== null && subscriber.staffedRoomIds.includes(destinationRoomId)) {
+      topics.add(`station:${destinationRoomId}`);
     }
     if (requiredSectionId !== null && subscriber.teachingSectionIds.includes(requiredSectionId)) {
+      topics.add('requests');
+    }
+    if (
+      requiredRoomId !== null &&
+      (subscriber.staffedRoomIds.includes(requiredRoomId) ||
+        subscriber.teachingRoomIds.includes(requiredRoomId))
+    ) {
+      // Room-responsible approvals reach explicit room staff and
+      // schedule-derived classroom teachers alike. Invalidation only;
+      // the pending-approvals endpoint stays the exact eligibility gate.
       topics.add('requests');
     }
   } else if (event.aggregateKind === 'scheduled_authorization') {
@@ -101,8 +113,8 @@ export function topicsFor(
     if (subscriber.capabilities.includes('scheduled_authorization.manage')) {
       topics.add('scheduled-passes');
     }
-  } else if (event.aggregateKind === 'destination') {
-    topics.add('destinations');
+  } else if (event.aggregateKind === 'room' || event.aggregateKind === 'room_category') {
+    topics.add('rooms');
   } else if (
     event.aggregateKind === 'schedule' ||
     event.aggregateKind === 'schedule_configuration' ||
@@ -118,8 +130,6 @@ export function topicsFor(
   } else if (event.aggregateKind === 'identity_enrollment_grant') {
     if (subscriber.capabilities.includes('people.view')) topics.add('people');
     if (subscriber.capabilities.includes('identity.enroll')) topics.add('enrollment');
-  } else if (event.aggregateKind === 'location') {
-    if (subscriber.capabilities.includes('destination.manage')) topics.add('locations');
   }
   if (subscriber.capabilities.includes('audit.view')) topics.add('audit');
   return [...topics];

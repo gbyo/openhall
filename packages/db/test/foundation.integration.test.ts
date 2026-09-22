@@ -88,33 +88,19 @@ async function seed() {
       [tenantA],
     )
   ).rows[0]?.id;
-  const location = (
-    await pool.query<{ id: string }>(
-      "INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', '101') RETURNING id",
-      [tenantA, organizationA],
-    )
-  ).rows[0]?.id;
   const category = (
     await pool.query<{ id: string }>(
-      "INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Room') RETURNING id",
+      "INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Room') RETURNING id",
       [tenantA, organizationA],
     )
   ).rows[0]?.id;
-  const destination = (
+  const room = (
     await pool.query<{ id: string }>(
-      "INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type) VALUES ($1, $2, $3, $4, 'room') RETURNING id",
-      [tenantA, organizationA, location, category],
+      "INSERT INTO room (tenant_id, organization_id, category_id, name, code) VALUES ($1, $2, $3, 'Room 101', '101') RETURNING id",
+      [tenantA, organizationA, category],
     )
   ).rows[0]?.id;
-  if (
-    !organizationA ||
-    !organizationB ||
-    !student ||
-    !staff ||
-    !location ||
-    !destination ||
-    !category
-  ) {
+  if (!organizationA || !organizationB || !student || !staff || !room || !category) {
     throw new Error('Fixture insert failed');
   }
   return {
@@ -124,24 +110,16 @@ async function seed() {
     organizationB,
     student,
     staff,
-    location,
-    destination,
+    room,
     category,
   };
 }
 
 async function insertPass(fixture: Awaited<ReturnType<typeof seed>>, state = 'requested') {
   const result = await pool.query<{ id: string }>(
-    `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, requested_by_person_id, lifecycle_state)
+    `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, request_source, requested_by_person_id, lifecycle_state)
      VALUES ($1, $2, $3, $4, 'staff_web', $5, $6) RETURNING id`,
-    [
-      fixture.tenantA,
-      fixture.organizationA,
-      fixture.student,
-      fixture.destination,
-      fixture.staff,
-      state,
-    ],
+    [fixture.tenantA, fixture.organizationA, fixture.student, fixture.room, fixture.staff, state],
   );
   const id = result.rows[0]?.id;
   if (!id) throw new Error('Pass fixture insert failed');
@@ -261,7 +239,7 @@ describe('foundation migration on PostgreSQL 18', () => {
     ).rejects.toMatchObject({ code: '23505' });
   });
 
-  it('enforces exact-school schedule and location references', async () => {
+  it('enforces exact-school schedule and room references', async () => {
     const fixture = await seed();
     const schoolB = (
       await pool.query<{ id: string }>(
@@ -270,10 +248,10 @@ describe('foundation migration on PostgreSQL 18', () => {
         [fixture.tenantA, `same-b-${randomUUID()}`],
       )
     ).rows[0]?.id;
-    const locationB = (
+    const categoryB = (
       await pool.query<{ id: string }>(
-        `INSERT INTO location (tenant_id, organization_id, kind, name)
-         VALUES ($1, $2, 'classroom', 'B 101') RETURNING id`,
+        `INSERT INTO room_category (tenant_id, organization_id, name)
+         VALUES ($1, $2, 'B Category') RETURNING id`,
         [fixture.tenantA, schoolB],
       )
     ).rows[0]?.id;
@@ -324,10 +302,10 @@ describe('foundation migration on PostgreSQL 18', () => {
 
     await expect(
       pool.query(
-        `INSERT INTO location
-           (tenant_id, organization_id, parent_location_id, kind, name)
-         VALUES ($1, $2, $3, 'room', 'Cross-school child')`,
-        [fixture.tenantA, fixture.organizationA, locationB],
+        `INSERT INTO room
+           (tenant_id, organization_id, category_id, name)
+         VALUES ($1, $2, $3, 'Cross-school room')`,
+        [fixture.tenantA, fixture.organizationA, categoryB],
       ),
     ).rejects.toMatchObject({ code: '23503' });
     await expect(
@@ -354,11 +332,19 @@ describe('foundation migration on PostgreSQL 18', () => {
         [fixture.tenantA, fixture.organizationA, templateB],
       ),
     ).rejects.toMatchObject({ code: '23503' });
+    const roomB = (
+      await pool.query<{ id: string }>(
+        `INSERT INTO room (tenant_id, organization_id, name)
+         VALUES ($1, $2, 'B 101') RETURNING id`,
+        [fixture.tenantA, schoolB],
+      )
+    ).rows[0]?.id;
     await expect(
       pool.query(
-        `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type)
-         VALUES ($1, $2, $3, $4, 'cross-school')`,
-        [fixture.tenantA, fixture.organizationA, locationB, fixture.category],
+        `INSERT INTO section_meeting
+           (tenant_id, organization_id, section_id, schedule_block_id, room_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [fixture.tenantA, fixture.organizationA, sectionA, blockA, roomB],
       ),
     ).rejects.toMatchObject({ code: '23503' });
     expect(blockA).toBeDefined();
@@ -432,20 +418,20 @@ describe('foundation migration on PostgreSQL 18', () => {
     const reservationValues: [string, string, string, string, string] = [
       fixture.tenantA,
       fixture.organizationA,
-      fixture.destination,
+      fixture.room,
       passId,
       evaluationId,
     ];
     await pool.query(
-      `INSERT INTO destination_reservation
-         (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
+      `INSERT INTO room_reservation
+         (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
        VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '1 minute', statement_timestamp() + interval '10 minutes')`,
       reservationValues,
     );
     await expect(
       pool.query(
-        `INSERT INTO destination_reservation
-           (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
+        `INSERT INTO room_reservation
+           (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
          VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '1 minute', statement_timestamp() + interval '10 minutes')`,
         reservationValues,
       ),
@@ -453,20 +439,20 @@ describe('foundation migration on PostgreSQL 18', () => {
     const queueValues: [string, string, string, string, string] = [
       fixture.tenantA,
       fixture.organizationA,
-      fixture.destination,
+      fixture.room,
       passId,
       evaluationId,
     ];
     await pool.query(
       `INSERT INTO queue_entry
-         (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, flow_expires_at)
+         (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, flow_expires_at)
        VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '10 minutes')`,
       queueValues,
     );
     await expect(
       pool.query(
         `INSERT INTO queue_entry
-           (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, flow_expires_at)
+           (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, flow_expires_at)
          VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '10 minutes')`,
         queueValues,
       ),
@@ -521,7 +507,7 @@ describe('foundation migration on PostgreSQL 18', () => {
     const handle = createDatabase(databaseUrl, { max: 1 });
     const probe = new PostgresReadinessProbe(handle.database);
     await expect(probe.check()).resolves.toEqual({
-      migration: '010_destination_categories',
+      migration: '011_rooms_unification',
     });
     await handle.destroy();
     await expect(probe.check()).rejects.toBeDefined();

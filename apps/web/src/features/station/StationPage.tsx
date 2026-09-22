@@ -86,14 +86,14 @@ function StateGroup({
 export function StationPage() {
   const { context, organizationId } = useSchool();
   const navigate = useNavigate();
-  const destinationId = useParams().destinationId ?? context.staffedDestinations[0]?.id ?? '';
+  const roomId = useParams().roomId ?? context.staffedRooms[0]?.id ?? '';
   const queryClient = useQueryClient();
   const station = useQuery({
-    queryKey: queryKeys.station(destinationId),
+    queryKey: queryKeys.station(roomId),
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/destinations/{destinationId}/station', {
-          params: { path: { destinationId } },
+        api.GET('/api/v1/rooms/{roomId}/station', {
+          params: { path: { roomId } },
         }),
       ),
     staleTime: 3_000,
@@ -103,7 +103,7 @@ export function StationPage() {
     mutationFn: (input: StationAction) => {
       const options = {
         params: {
-          path: { destinationId, passId: input.passId },
+          path: { roomId, passId: input.passId },
           header: { 'idempotency-key': input.key, 'if-match': input.etag },
         },
         headers: {
@@ -113,24 +113,13 @@ export function StationPage() {
         },
       } as const;
       return input.kind === 'check-in'
-        ? confirmed(
-            api.POST('/api/v1/destinations/{destinationId}/passes/{passId}/check-in', options),
-          )
+        ? confirmed(api.POST('/api/v1/rooms/{roomId}/passes/{passId}/check-in', options))
         : input.kind === 'begin-return'
-          ? confirmed(
-              api.POST(
-                '/api/v1/destinations/{destinationId}/passes/{passId}/begin-return',
-                options,
-              ),
-            )
-          : confirmed(
-              api.POST('/api/v1/destinations/{destinationId}/passes/{passId}/complete', options),
-            );
+          ? confirmed(api.POST('/api/v1/rooms/{roomId}/passes/{passId}/begin-return', options))
+          : confirmed(api.POST('/api/v1/rooms/{roomId}/passes/{passId}/complete', options));
     },
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: queryKeys.station(destinationId) }),
-    onError: () =>
-      void queryClient.invalidateQueries({ queryKey: queryKeys.station(destinationId) }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.station(roomId) }),
+    onError: () => void queryClient.invalidateQueries({ queryKey: queryKeys.station(roomId) }),
   });
   const data = station.data;
 
@@ -194,14 +183,14 @@ export function StationPage() {
   return (
     <section aria-labelledby="station-title" className="flex flex-col gap-4">
       <PageHeader
-        title={data.destination.displayName}
+        title={data.room.name}
         description={`${String(data.atDestination.length)} here · ${String(data.outbound.length)} on the way`}
       />
-      {context.staffedDestinations.length > 1 && (
+      {context.staffedRooms.length > 1 && (
         <div className="flex max-w-xs flex-col gap-1.5">
           <Label htmlFor="station-switcher">Station</Label>
           <Select
-            value={destinationId}
+            value={roomId}
             onValueChange={(value) => {
               if (value) void navigate(`/schools/${organizationId}/stations/${value}`);
             }}
@@ -210,9 +199,9 @@ export function StationPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {context.staffedDestinations.map((destination) => (
-                <SelectItem key={destination.id} value={destination.id}>
-                  {destination.displayName}
+              {context.staffedRooms.map((room) => (
+                <SelectItem key={room.id} value={room.id}>
+                  {room.name}
                 </SelectItem>
               ))}
             </SelectContent>

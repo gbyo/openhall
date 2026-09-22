@@ -1,14 +1,10 @@
 import type { Temporal } from '@js-temporal/polyfill';
 import type {
-  DestinationRecord,
-  DestinationRepository,
-  DestinationStatus,
-  DestinationUpdate,
-  LocationRecord,
-  LocationRepository,
-  LocationUpdate,
-  NewDestination,
-  NewLocation,
+  RoomRecord,
+  RoomRepository,
+  RoomStatus,
+  RoomUpdate,
+  NewRoom,
 } from '@openhall/application';
 import type { TenantTransactionContext } from '@openhall/application';
 import {
@@ -27,42 +23,25 @@ const LIVE_PASS_STATES = [
   'returning',
 ];
 
-function locationStatus(value: string): LocationRecord['status'] {
-  return value === 'archived' ? 'archived' : value === 'inactive' ? 'inactive' : 'active';
+function roomStatus(value: string): RoomStatus {
+  return value === 'closed' ? 'closed' : value === 'archived' ? 'archived' : 'open';
 }
 
-function destinationStatus(value: string): DestinationStatus {
-  return value === 'active' ? 'active' : value === 'archived' ? 'archived' : 'closed';
-}
-
-function checkInMode(value: string): DestinationRecord['checkInMode'] {
+function checkInMode(value: string): RoomRecord['checkInMode'] {
   return value === 'optional' ? 'optional' : value === 'required' ? 'required' : 'none';
 }
 
-interface LocationRow {
+interface RoomRow {
   id: string;
   tenant_id: string;
   organization_id: string;
-  parent_location_id: string | null;
-  kind: string;
+  category_id: string | null;
   name: string;
   code: string | null;
   floor_label: string | null;
   status: string;
-  revision: string | bigint | number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface DestinationRow {
-  id: string;
-  tenant_id: string;
-  organization_id: string;
-  location_id: string;
-  category_id: string;
   student_self_requestable: boolean;
-  service_type: string;
-  display_name: string | null;
+  origin_selectable: boolean;
   capacity: number | null;
   queue_enabled: boolean;
   check_in_mode: string;
@@ -70,38 +49,23 @@ interface DestinationRow {
   max_duration_seconds: number | null;
   ready_claim_timeout_seconds: number;
   queue_timeout_seconds: number;
-  status: string;
   revision: string | bigint | number;
+  created_at: string;
   updated_at: string;
 }
 
-function toLocationRecord(row: LocationRow): LocationRecord {
+function toRoomRecord(row: RoomRow): RoomRecord {
   return {
     id: row.id,
     tenantId: row.tenant_id,
     organizationId: row.organization_id,
-    parentLocationId: row.parent_location_id,
-    kind: row.kind,
+    categoryId: row.category_id,
     name: row.name,
     code: row.code,
     floorLabel: row.floor_label,
-    status: locationStatus(row.status),
-    revision: toBigInt(row.revision),
-    createdAt: fromDatabaseInstant(row.created_at),
-    updatedAt: fromDatabaseInstant(row.updated_at),
-  };
-}
-
-function toDestinationRecord(row: DestinationRow): DestinationRecord {
-  return {
-    id: row.id,
-    tenantId: row.tenant_id,
-    organizationId: row.organization_id,
-    locationId: row.location_id,
-    categoryId: row.category_id,
+    status: roomStatus(row.status),
     studentSelfRequestable: row.student_self_requestable,
-    serviceType: row.service_type,
-    displayName: row.display_name,
+    originSelectable: row.origin_selectable,
     capacity: row.capacity,
     queueEnabled: row.queue_enabled,
     checkInMode: checkInMode(row.check_in_mode),
@@ -109,14 +73,14 @@ function toDestinationRecord(row: DestinationRow): DestinationRecord {
     maxDurationSeconds: row.max_duration_seconds,
     readyClaimTimeoutSeconds: row.ready_claim_timeout_seconds,
     queueTimeoutSeconds: row.queue_timeout_seconds,
-    status: destinationStatus(row.status),
     revision: toBigInt(row.revision),
+    createdAt: fromDatabaseInstant(row.created_at),
     updatedAt: fromDatabaseInstant(row.updated_at),
   };
 }
 
-/** PostgreSQL location administration persistence (tenant-scoped, no unscoped path). */
-export class PostgresLocationRepository implements LocationRepository {
+/** PostgreSQL room administration persistence (tenant-scoped, no unscoped path). */
+export class PostgresRoomRepository implements RoomRepository {
   async loadSchoolTimeZone(
     context: TenantTransactionContext,
     organizationId: string,
@@ -134,147 +98,210 @@ export class PostgresLocationRepository implements LocationRepository {
   async listByOrganization(
     context: TenantTransactionContext,
     organizationId: string,
-  ): Promise<readonly LocationRecord[]> {
+  ): Promise<readonly RoomRecord[]> {
     const connection = connectionFor(context);
     const rows = await connection
-      .selectFrom('location')
-      .selectAll('location')
+      .selectFrom('room')
+      .selectAll('room')
       .where('tenant_id', '=', context.tenantId)
       .where('organization_id', '=', organizationId)
       .orderBy('name')
       .orderBy('id')
       .execute();
-    return rows.map(toLocationRecord);
+    return rows.map(toRoomRecord);
   }
 
-  async loadById(
+  async listOpenCatalog(
     context: TenantTransactionContext,
-    locationId: string,
-  ): Promise<LocationRecord | null> {
+    organizationId: string,
+  ): Promise<readonly RoomRecord[]> {
+    const connection = connectionFor(context);
+    const rows = await connection
+      .selectFrom('room')
+      .selectAll('room')
+      .where('tenant_id', '=', context.tenantId)
+      .where('organization_id', '=', organizationId)
+      .where('status', '=', 'open')
+      .orderBy('name')
+      .orderBy('id')
+      .execute();
+    return rows.map(toRoomRecord);
+  }
+
+  async loadById(context: TenantTransactionContext, roomId: string): Promise<RoomRecord | null> {
     const connection = connectionFor(context);
     const row = await connection
-      .selectFrom('location')
-      .selectAll('location')
+      .selectFrom('room')
+      .selectAll('room')
       .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', locationId)
+      .where('id', '=', roomId)
       .executeTakeFirst();
-    return row === undefined ? null : toLocationRecord(row);
+    return row === undefined ? null : toRoomRecord(row);
   }
 
   async loadForUpdate(
     context: TenantTransactionContext,
-    locationId: string,
-  ): Promise<LocationRecord | null> {
+    roomId: string,
+  ): Promise<RoomRecord | null> {
     const connection = connectionFor(context);
     const row = await connection
-      .selectFrom('location')
-      .selectAll('location')
+      .selectFrom('room')
+      .selectAll('room')
       .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', locationId)
+      .where('id', '=', roomId)
       .forUpdate()
       .executeTakeFirst();
-    return row === undefined ? null : toLocationRecord(row);
+    return row === undefined ? null : toRoomRecord(row);
   }
 
-  async listHierarchyPairs(
-    context: TenantTransactionContext,
-    organizationId: string,
-  ): Promise<readonly { readonly id: string; readonly parentLocationId: string | null }[]> {
-    const connection = connectionFor(context);
-    const rows = await connection
-      .selectFrom('location')
-      .select(['id', 'parent_location_id'])
-      .where('tenant_id', '=', context.tenantId)
-      .where('organization_id', '=', organizationId)
-      .execute();
-    return rows.map((row) => ({ id: row.id, parentLocationId: row.parent_location_id }));
-  }
-
-  async insert(context: TenantTransactionContext, input: NewLocation): Promise<LocationRecord> {
+  async insert(context: TenantTransactionContext, input: NewRoom): Promise<RoomRecord> {
     const connection = connectionFor(context);
     const row = await connection
-      .insertInto('location')
+      .insertInto('room')
       .values({
         tenant_id: context.tenantId,
         organization_id: input.organizationId,
-        parent_location_id: input.parentLocationId,
-        kind: input.kind,
+        category_id: input.categoryId,
         name: input.name,
         code: input.code,
         floor_label: input.floorLabel,
+        student_self_requestable: input.studentSelfRequestable,
+        origin_selectable: input.originSelectable,
+        capacity: input.capacity,
+        queue_enabled: input.queueEnabled,
+        check_in_mode: input.checkInMode,
+        default_duration_seconds: input.defaultDurationSeconds,
+        max_duration_seconds: input.maxDurationSeconds,
+        ready_claim_timeout_seconds: input.readyClaimTimeoutSeconds,
+        queue_timeout_seconds: input.queueTimeoutSeconds,
+        // Spec 24: a new room starts closed at revision 1; open is an
+        // explicit later step, never implied by creation.
+        status: 'closed',
       })
       .returningAll()
       .executeTakeFirstOrThrow();
-    return toLocationRecord(row);
+    return toRoomRecord(row);
   }
 
   async updateToRevision(
     context: TenantTransactionContext,
-    locationId: string,
+    roomId: string,
     expectedRevision: bigint,
-    update: LocationUpdate,
+    update: RoomUpdate,
     at: Temporal.Instant,
-  ): Promise<LocationRecord | null> {
+  ): Promise<RoomRecord | null> {
     const connection = connectionFor(context);
     const row = await connection
-      .updateTable('location')
+      .updateTable('room')
       .set({
-        parent_location_id: update.parentLocationId,
-        kind: update.kind,
+        category_id: update.categoryId,
         name: update.name,
         code: update.code,
         floor_label: update.floorLabel,
+        student_self_requestable: update.studentSelfRequestable,
+        origin_selectable: update.originSelectable,
+        capacity: update.capacity,
+        queue_enabled: update.queueEnabled,
+        check_in_mode: update.checkInMode,
+        default_duration_seconds: update.defaultDurationSeconds,
+        max_duration_seconds: update.maxDurationSeconds,
+        ready_claim_timeout_seconds: update.readyClaimTimeoutSeconds,
+        queue_timeout_seconds: update.queueTimeoutSeconds,
         revision: String(expectedRevision + 1n),
         updated_at: toDatabaseInstant(at),
       })
       .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', locationId)
+      .where('id', '=', roomId)
       .where('revision', '=', String(expectedRevision))
       .returningAll()
       .executeTakeFirst();
-    return row === undefined ? null : toLocationRecord(row);
+    return row === undefined ? null : toRoomRecord(row);
   }
 
-  async archiveToRevision(
+  async transitionStatusToRevision(
     context: TenantTransactionContext,
-    locationId: string,
+    roomId: string,
     expectedRevision: bigint,
+    status: RoomStatus,
     at: Temporal.Instant,
-  ): Promise<LocationRecord | null> {
+  ): Promise<RoomRecord | null> {
     const connection = connectionFor(context);
     const row = await connection
-      .updateTable('location')
+      .updateTable('room')
       .set({
-        status: 'archived',
+        status,
         revision: String(expectedRevision + 1n),
         updated_at: toDatabaseInstant(at),
       })
       .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', locationId)
+      .where('id', '=', roomId)
       .where('revision', '=', String(expectedRevision))
       .returningAll()
       .executeTakeFirst();
-    return row === undefined ? null : toLocationRecord(row);
+    return row === undefined ? null : toRoomRecord(row);
   }
 
-  async countActiveDestinationReferences(
+  async countLivePasses(context: TenantTransactionContext, roomId: string): Promise<number> {
+    const connection = connectionFor(context);
+    const row = await connection
+      .selectFrom('pass')
+      .select((builder) => builder.fn.countAll().as('count'))
+      .where('tenant_id', '=', context.tenantId)
+      .where('destination_room_id', '=', roomId)
+      .where('lifecycle_state', 'in', LIVE_PASS_STATES)
+      .executeTakeFirstOrThrow();
+    return Number(row.count);
+  }
+
+  async countActiveStaffGrants(context: TenantTransactionContext, roomId: string): Promise<number> {
+    const connection = connectionFor(context);
+    const row = await connection
+      .selectFrom('authorization_grant')
+      .select((builder) => builder.fn.countAll().as('count'))
+      .where('tenant_id', '=', context.tenantId)
+      .where('room_id', '=', roomId)
+      .where('role', '=', 'room_staff')
+      .where('status', '=', 'active')
+      .executeTakeFirstOrThrow();
+    return Number(row.count);
+  }
+
+  async countEnabledPolicyRules(
     context: TenantTransactionContext,
-    locationId: string,
+    roomId: string,
   ): Promise<number> {
     const connection = connectionFor(context);
     const row = await connection
-      .selectFrom('destination')
+      .selectFrom('policy_rule')
       .select((builder) => builder.fn.countAll().as('count'))
       .where('tenant_id', '=', context.tenantId)
-      .where('location_id', '=', locationId)
-      .where('status', '<>', 'archived')
+      .where('scope_kind', '=', 'room')
+      .where('scope_room_id', '=', roomId)
+      .where('enabled', '=', true)
+      .executeTakeFirstOrThrow();
+    return Number(row.count);
+  }
+
+  async countLiveScheduledAuthorizations(
+    context: TenantTransactionContext,
+    roomId: string,
+    now: Temporal.Instant,
+  ): Promise<number> {
+    const connection = connectionFor(context);
+    const row = await connection
+      .selectFrom('scheduled_authorization')
+      .select((builder) => builder.fn.countAll().as('count'))
+      .where('tenant_id', '=', context.tenantId)
+      .where('destination_room_id', '=', roomId)
+      .where('status', '=', 'active')
+      .where('valid_until', '>', toDatabaseInstant(now))
       .executeTakeFirstOrThrow();
     return Number(row.count);
   }
 
   async countRelevantSectionMeetings(
     context: TenantTransactionContext,
-    locationId: string,
+    roomId: string,
     today: string,
   ): Promise<number> {
     const connection = connectionFor(context);
@@ -282,7 +309,7 @@ export class PostgresLocationRepository implements LocationRepository {
       .selectFrom('section_meeting')
       .select((builder) => builder.fn.countAll().as('count'))
       .where('section_meeting.tenant_id', '=', context.tenantId)
-      .where('section_meeting.location_id', '=', locationId)
+      .where('section_meeting.room_id', '=', roomId)
       .where((eb) =>
         eb.or([
           eb('section_meeting.effective_until', 'is', null),
@@ -295,7 +322,7 @@ export class PostgresLocationRepository implements LocationRepository {
 
   async countActiveScheduledOrigins(
     context: TenantTransactionContext,
-    locationId: string,
+    roomId: string,
     now: Temporal.Instant,
   ): Promise<number> {
     const connection = connectionFor(context);
@@ -303,222 +330,109 @@ export class PostgresLocationRepository implements LocationRepository {
       .selectFrom('scheduled_authorization')
       .select((builder) => builder.fn.countAll().as('count'))
       .where('tenant_id', '=', context.tenantId)
-      .where('origin_location_id', '=', locationId)
+      .where('origin_room_id', '=', roomId)
       .where('status', '=', 'active')
       .where('valid_until', '>', toDatabaseInstant(now))
       .executeTakeFirstOrThrow();
     return Number(row.count);
   }
-}
 
-/** PostgreSQL destination administration persistence (tenant-scoped, no unscoped path). */
-export class PostgresDestinationRepository implements DestinationRepository {
-  async listByOrganization(
+  async listActiveRoomStaff(
     context: TenantTransactionContext,
     organizationId: string,
-  ): Promise<readonly DestinationRecord[]> {
+  ): Promise<readonly { readonly roomId: string; readonly staffDisplayName: string }[]> {
     const connection = connectionFor(context);
     const rows = await connection
-      .selectFrom('destination')
-      .selectAll('destination')
-      .where('tenant_id', '=', context.tenantId)
-      .where('organization_id', '=', organizationId)
-      .orderBy('service_type')
-      .orderBy('id')
+      .selectFrom('authorization_grant as grant')
+      .innerJoin('account', (join) =>
+        join
+          .onRef('account.tenant_id', '=', 'grant.tenant_id')
+          .onRef('account.id', '=', 'grant.account_id'),
+      )
+      .innerJoin('person', (join) =>
+        join
+          .onRef('person.tenant_id', '=', 'grant.tenant_id')
+          .onRef('person.id', '=', 'account.person_id'),
+      )
+      .innerJoin('room', (join) =>
+        join.onRef('room.tenant_id', '=', 'grant.tenant_id').onRef('room.id', '=', 'grant.room_id'),
+      )
+      .select(['grant.room_id as room_id', 'person.display_name as staff_display_name'])
+      .where('grant.tenant_id', '=', context.tenantId)
+      .where('room.organization_id', '=', organizationId)
+      .where('grant.role', '=', 'room_staff')
+      .where('grant.status', '=', 'active')
+      .where('grant.room_id', 'is not', null)
+      .orderBy('grant.room_id')
+      .orderBy('person.display_name')
       .execute();
-    return rows.map(toDestinationRecord);
+    return rows.flatMap((row) =>
+      row.room_id === null
+        ? []
+        : [
+            {
+              roomId: row.room_id,
+              staffDisplayName: row.staff_display_name,
+            },
+          ],
+    );
   }
 
-  async listActiveCatalog(
+  async listRoomClassContexts(
     context: TenantTransactionContext,
     organizationId: string,
-  ): Promise<readonly DestinationRecord[]> {
+  ): Promise<
+    readonly {
+      readonly roomId: string;
+      readonly teacherDisplayName: string;
+      readonly sectionTitle: string;
+      readonly sectionCode: string | null;
+    }[]
+  > {
     const connection = connectionFor(context);
     const rows = await connection
-      .selectFrom('destination')
-      .selectAll('destination')
-      .where('tenant_id', '=', context.tenantId)
-      .where('organization_id', '=', organizationId)
-      .where('status', '=', 'active')
-      .orderBy('service_type')
-      .orderBy('id')
+      .selectFrom('section_meeting as meeting')
+      .innerJoin('section', (join) =>
+        join
+          .onRef('section.tenant_id', '=', 'meeting.tenant_id')
+          .onRef('section.id', '=', 'meeting.section_id'),
+      )
+      .innerJoin('section_membership as teacher_membership', (join) =>
+        join
+          .onRef('teacher_membership.tenant_id', '=', 'meeting.tenant_id')
+          .onRef('teacher_membership.section_id', '=', 'meeting.section_id')
+          .on('teacher_membership.role', '=', 'teacher')
+          .on('teacher_membership.status', '=', 'active'),
+      )
+      .innerJoin('person as teacher', (join) =>
+        join
+          .onRef('teacher.tenant_id', '=', 'meeting.tenant_id')
+          .onRef('teacher.id', '=', 'teacher_membership.person_id'),
+      )
+      .select([
+        'meeting.room_id as room_id',
+        'teacher.display_name as teacher_display_name',
+        'section.title as section_title',
+        'section.code as section_code',
+      ])
+      .where('meeting.tenant_id', '=', context.tenantId)
+      .where('meeting.organization_id', '=', organizationId)
+      .where('meeting.room_id', 'is not', null)
+      .where('section.status', '=', 'active')
+      .orderBy('meeting.room_id')
+      .orderBy('teacher.display_name')
       .execute();
-    return rows.map(toDestinationRecord);
-  }
-
-  async loadById(
-    context: TenantTransactionContext,
-    destinationId: string,
-  ): Promise<DestinationRecord | null> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .selectFrom('destination')
-      .selectAll('destination')
-      .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', destinationId)
-      .executeTakeFirst();
-    return row === undefined ? null : toDestinationRecord(row);
-  }
-
-  async loadForUpdate(
-    context: TenantTransactionContext,
-    destinationId: string,
-  ): Promise<DestinationRecord | null> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .selectFrom('destination')
-      .selectAll('destination')
-      .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', destinationId)
-      .forUpdate()
-      .executeTakeFirst();
-    return row === undefined ? null : toDestinationRecord(row);
-  }
-
-  async insert(
-    context: TenantTransactionContext,
-    input: NewDestination,
-  ): Promise<DestinationRecord> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .insertInto('destination')
-      .values({
-        tenant_id: context.tenantId,
-        organization_id: input.organizationId,
-        location_id: input.locationId,
-        category_id: input.categoryId,
-        student_self_requestable: input.studentSelfRequestable,
-        service_type: input.serviceType,
-        display_name: input.displayName,
-        capacity: input.capacity,
-        queue_enabled: input.queueEnabled,
-        check_in_mode: input.checkInMode,
-        default_duration_seconds: input.defaultDurationSeconds,
-        max_duration_seconds: input.maxDurationSeconds,
-        ready_claim_timeout_seconds: input.readyClaimTimeoutSeconds,
-        queue_timeout_seconds: input.queueTimeoutSeconds,
-        status: 'closed',
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
-    return toDestinationRecord(row);
-  }
-
-  async updateToRevision(
-    context: TenantTransactionContext,
-    destinationId: string,
-    expectedRevision: bigint,
-    update: DestinationUpdate,
-    at: Temporal.Instant,
-  ): Promise<DestinationRecord | null> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .updateTable('destination')
-      .set({
-        location_id: update.locationId,
-        category_id: update.categoryId,
-        student_self_requestable: update.studentSelfRequestable,
-        service_type: update.serviceType,
-        display_name: update.displayName,
-        capacity: update.capacity,
-        queue_enabled: update.queueEnabled,
-        check_in_mode: update.checkInMode,
-        default_duration_seconds: update.defaultDurationSeconds,
-        max_duration_seconds: update.maxDurationSeconds,
-        ready_claim_timeout_seconds: update.readyClaimTimeoutSeconds,
-        queue_timeout_seconds: update.queueTimeoutSeconds,
-        revision: String(expectedRevision + 1n),
-        updated_at: toDatabaseInstant(at),
-      })
-      .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', destinationId)
-      .where('revision', '=', String(expectedRevision))
-      .returningAll()
-      .executeTakeFirst();
-    return row === undefined ? null : toDestinationRecord(row);
-  }
-
-  async transitionStatusToRevision(
-    context: TenantTransactionContext,
-    destinationId: string,
-    expectedRevision: bigint,
-    status: DestinationStatus,
-    at: Temporal.Instant,
-  ): Promise<DestinationRecord | null> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .updateTable('destination')
-      .set({
-        status,
-        revision: String(expectedRevision + 1n),
-        updated_at: toDatabaseInstant(at),
-      })
-      .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', destinationId)
-      .where('revision', '=', String(expectedRevision))
-      .returningAll()
-      .executeTakeFirst();
-    return row === undefined ? null : toDestinationRecord(row);
-  }
-
-  async countLivePasses(context: TenantTransactionContext, destinationId: string): Promise<number> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .selectFrom('pass')
-      .select((builder) => builder.fn.countAll().as('count'))
-      .where('tenant_id', '=', context.tenantId)
-      .where('destination_id', '=', destinationId)
-      .where('lifecycle_state', 'in', LIVE_PASS_STATES)
-      .executeTakeFirstOrThrow();
-    return Number(row.count);
-  }
-
-  async countActiveStaffGrants(
-    context: TenantTransactionContext,
-    destinationId: string,
-  ): Promise<number> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .selectFrom('authorization_grant')
-      .select((builder) => builder.fn.countAll().as('count'))
-      .where('tenant_id', '=', context.tenantId)
-      .where('destination_id', '=', destinationId)
-      .where('role', '=', 'destination_staff')
-      .where('status', '=', 'active')
-      .executeTakeFirstOrThrow();
-    return Number(row.count);
-  }
-
-  async countEnabledPolicyRules(
-    context: TenantTransactionContext,
-    destinationId: string,
-  ): Promise<number> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .selectFrom('policy_rule')
-      .select((builder) => builder.fn.countAll().as('count'))
-      .where('tenant_id', '=', context.tenantId)
-      .where('scope_kind', '=', 'destination')
-      .where('scope_destination_id', '=', destinationId)
-      .where('enabled', '=', true)
-      .executeTakeFirstOrThrow();
-    return Number(row.count);
-  }
-
-  async countLiveScheduledAuthorizations(
-    context: TenantTransactionContext,
-    destinationId: string,
-    now: Temporal.Instant,
-  ): Promise<number> {
-    const connection = connectionFor(context);
-    const row = await connection
-      .selectFrom('scheduled_authorization')
-      .select((builder) => builder.fn.countAll().as('count'))
-      .where('tenant_id', '=', context.tenantId)
-      .where('destination_id', '=', destinationId)
-      .where('status', '=', 'active')
-      .where('valid_until', '>', toDatabaseInstant(now))
-      .executeTakeFirstOrThrow();
-    return Number(row.count);
+    return rows.flatMap((row) =>
+      row.room_id === null
+        ? []
+        : [
+            {
+              roomId: row.room_id,
+              teacherDisplayName: row.teacher_display_name,
+              sectionTitle: row.section_title,
+              sectionCode: row.section_code,
+            },
+          ],
+    );
   }
 }

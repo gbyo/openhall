@@ -117,10 +117,10 @@ async function seedSchedule() {
       [tenant, section, teacherId],
     );
   }
-  const location = (
+  const room = (
     await handle.pool.query<{ id: string }>(
-      `INSERT INTO location (tenant_id, organization_id, kind, name, code)
-       VALUES ($1, $2, 'classroom', 'Room 303', '303') RETURNING id`,
+      `INSERT INTO room (tenant_id, organization_id, name, code)
+       VALUES ($1, $2, 'Room 303', '303') RETURNING id`,
       [tenant, school],
     )
   ).rows[0]?.id;
@@ -138,13 +138,13 @@ async function seedSchedule() {
       [tenant, school],
     )
   ).rows[0]?.id;
-  if (!location || !block || !template) throw new Error('Schedule fixture failed');
+  if (!room || !block || !template) throw new Error('Schedule fixture failed');
   await handle.pool.query(
     `INSERT INTO section_meeting
-       (tenant_id, organization_id, section_id, schedule_block_id, location_id, cycle_code,
+       (tenant_id, organization_id, section_id, schedule_block_id, room_id, cycle_code,
         effective_from, effective_until)
      VALUES ($1, $2, $3, $4, $5, NULL, '2026-09-01', '2027-06-30')`,
-    [tenant, school, section, block, location],
+    [tenant, school, section, block, room],
   );
   await handle.pool.query(
     `INSERT INTO schedule_slot
@@ -261,16 +261,14 @@ describe('PostgreSQL expected-placement repository', () => {
     const constraints = await handle.pool.query<{ conname: string }>(
       `SELECT conname FROM pg_constraint
        WHERE conname IN (
-         'location_parent_same_school_fk',
          'section_meeting_section_same_school_fk',
          'section_meeting_block_same_school_fk',
-         'section_meeting_location_same_school_fk',
+         'section_meeting_phase11_room_same_school_fk',
          'schedule_slot_template_same_school_fk',
          'schedule_slot_block_same_school_fk',
-         'calendar_day_template_same_school_fk',
-         'destination_location_same_school_fk'
+         'calendar_day_template_same_school_fk'
        )`,
     );
-    expect(constraints.rows).toHaveLength(8);
+    expect(constraints.rows).toHaveLength(6);
   });
 });

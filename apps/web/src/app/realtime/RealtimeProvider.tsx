@@ -13,8 +13,8 @@ function contextRevisionOf(context: OrganizationContext | undefined): string | n
       .map((section) => section.id)
       .sort()
       .join(','),
-    context.staffedDestinations
-      .map((destination) => destination.id)
+    context.staffedRooms
+      .map((room) => room.id)
       .sort()
       .join(','),
   ].join('|');
@@ -31,9 +31,11 @@ function invalidateTopic(
     void queryClient.invalidateQueries({ queryKey: queryKeys.activeSelfPass });
   else if (topic === 'self-scheduled')
     void queryClient.invalidateQueries({ queryKey: queryKeys.selfScheduled });
-  else if (topic === 'destinations')
-    void queryClient.invalidateQueries({ queryKey: queryKeys.destinations(organizationId) });
-  else if (topic === 'organization-context')
+  else if (topic === 'rooms') {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.rooms(organizationId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.roomCategories(organizationId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.studentRoomCatalog(organizationId) });
+  } else if (topic === 'organization-context')
     void queryClient.invalidateQueries({ queryKey: queryKeys.organizationContext(organizationId) });
   else if (topic === 'requests') {
     void queryClient.invalidateQueries({ queryKey: queryKeys.pendingApprovals });
@@ -60,8 +62,6 @@ function invalidateTopic(
     void queryClient.invalidateQueries({ queryKey: ['enrollment', organizationId] });
   else if (topic === 'audit')
     void queryClient.invalidateQueries({ queryKey: queryKeys.audit(organizationId) });
-  else if (topic === 'locations')
-    void queryClient.invalidateQueries({ queryKey: queryKeys.locations(organizationId) });
 }
 
 export function RealtimeProvider({
@@ -77,7 +77,7 @@ export function RealtimeProvider({
   // Track the organization context without mounting a query observer: the
   // loader already caches it, and reading it from the cache avoids disturbing
   // in-flight route transitions. When the cached affiliations, capabilities,
-  // teaching sections, or staffed destinations change, the revision below
+  // teaching sections, or staffed rooms change, the revision below
   // changes and the EventSource subscription below reconnects so the hub
   // authorizes with the current context.
   const [contextRevision, setContextRevision] = useState<string | null>(() =>

@@ -22,11 +22,12 @@ export interface PolicyPassInput {
   readonly revision: bigint;
   readonly organizationId: string;
   readonly studentId: string;
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
+  readonly destinationRoomCategoryId: string | null;
   readonly requestSource: string;
   readonly originBlockId: string | null;
   readonly originSectionId: string | null;
-  readonly originLocationId: string | null;
+  readonly originRoomId: string | null;
 }
 
 /** Immutable versioned rule snapshot: what was actually evaluated. */
@@ -39,7 +40,8 @@ export function buildRuleSnapshot(rule: PolicyRuleInput): Readonly<Record<string
       kind: rule.scopeKind,
       organizationId: rule.scopeOrganizationId,
       sectionId: rule.scopeSectionId,
-      destinationId: rule.scopeDestinationId,
+      roomId: rule.scopeRoomId,
+      roomCategoryId: rule.scopeRoomCategoryId,
     },
     configuration: rule.configuration,
     overrideMode: rule.overrideMode,
@@ -70,11 +72,11 @@ export function buildContextSnapshot(input: {
     schemaVersion: 1,
     passRevision: pass.revision.toString(10),
     requestSource: pass.requestSource,
-    destinationId: pass.destinationId,
+    destinationRoomId: pass.destinationRoomId,
     origin: {
       blockId: pass.originBlockId,
       sectionId: pass.originSectionId,
-      locationId: pass.originLocationId,
+      roomId: pass.originRoomId,
     },
     currentPlacement,
   };
@@ -180,7 +182,11 @@ export async function reconcilePendingApprovals(
       input.passId,
       requirement.ruleId,
       requirement.ruleRevision,
-      requirement.requiredSectionId,
+      {
+        approverKind: requirement.approverKind,
+        requiredSectionId: requirement.requiredSectionId,
+        requiredRoomId: requirement.requiredRoomId,
+      },
     );
     if (existing !== null) {
       kept.push(existing);
@@ -194,7 +200,9 @@ export async function reconcilePendingApprovals(
       originEvaluationResultId: originResultId,
       ruleId: requirement.ruleId,
       ruleRevision: requirement.ruleRevision,
+      approverKind: requirement.approverKind,
       requiredSectionId: requirement.requiredSectionId,
+      requiredRoomId: requirement.requiredRoomId,
     });
     kept.push(row);
     if (!created.some((approval) => approval.id === row.id)) created.push(row);

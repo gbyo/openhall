@@ -95,7 +95,8 @@ export function registerRealtimeRoutes(
           affiliations: context.affiliations,
           capabilities: context.capabilities,
           teachingSectionIds: context.teachingSections.map((section) => section.id),
-          staffedDestinationIds: context.staffedDestinations.map((destination) => destination.id),
+          staffedRoomIds: context.staffedRooms.map((room) => room.id),
+          teachingRoomIds: [...context.teachingMeetingRoomIds],
         },
         send,
       );

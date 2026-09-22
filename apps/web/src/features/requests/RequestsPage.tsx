@@ -31,7 +31,7 @@ interface RequestRow {
   id: string;
   etag: string;
   student: { displayName: string };
-  destination: { displayName: string };
+  destination: { name: string };
   requestedAt: string;
   context: string;
 }
@@ -115,7 +115,7 @@ export function RequestsPage() {
         student: row.student,
         destination: row.destination,
         requestedAt: row.requestedAt,
-        context: row.requiredSection.title,
+        context: row.requiredRoom?.name ?? row.requiredSection.title ?? 'Staff review',
       })) ?? []),
     ...(overrides.data?.overrides
       .filter((row) => row.organizationId === organizationId)
@@ -207,7 +207,7 @@ export function RequestsPage() {
                     {row.kind === 'override' ? <Badge>Staff review</Badge> : null}
                   </div>
                   <ItemDescription>
-                    {row.destination.displayName} · {row.context} ·{' '}
+                    {row.destination.name} · {row.context} ·{' '}
                     <time dateTime={row.requestedAt}>{relativeMinutes(row.requestedAt)}</time>
                   </ItemDescription>
                 </ItemContent>

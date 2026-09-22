@@ -1,7 +1,12 @@
 import type { Temporal } from '@js-temporal/polyfill';
 import type { TenantTransactionContext } from '../persistence.js';
 import type { OverrideCategory, PolicyOverrideMode } from './configurations.js';
-import type { PolicyApprovalEvidence, PolicyOverrideEvidence, PolicyRuleInput } from './context.js';
+import type {
+  PolicyApprovalEvidence,
+  PolicyApproverKind,
+  PolicyOverrideEvidence,
+  PolicyRuleInput,
+} from './context.js';
 import type { PolicyContribution, PolicyDecision, PolicyRuleOutcome } from './decisions.js';
 import type { PolicyReasonCode } from './reason-codes.js';
 
@@ -33,7 +38,7 @@ export interface PolicyRuleSnapshotInput {
   readonly scopeKind: string;
   readonly scopeOrganizationId: string | null;
   readonly scopeSectionId: string | null;
-  readonly scopeDestinationId: string | null;
+  readonly scopeRoomId: string | null;
   readonly configuration: unknown;
   readonly overrideMode: string;
   readonly revision: number;
@@ -64,7 +69,9 @@ export interface NewPendingApproval {
   readonly originEvaluationResultId: string;
   readonly ruleId: string;
   readonly ruleRevision: number;
-  readonly requiredSectionId: string;
+  readonly approverKind: PolicyApproverKind;
+  readonly requiredSectionId: string | null;
+  readonly requiredRoomId: string | null;
 }
 
 export interface PolicyApprovalRecord extends PolicyApprovalEvidence {
@@ -138,7 +145,11 @@ export interface PolicyRepository {
     passId: string,
     ruleId: string,
     ruleRevision: number,
-    requiredSectionId: string,
+    requirement: {
+      readonly approverKind: PolicyApproverKind;
+      readonly requiredSectionId: string | null;
+      readonly requiredRoomId: string | null;
+    },
   ): Promise<PolicyApprovalRecord | null>;
 
   createPendingApproval(
@@ -250,12 +261,14 @@ export interface PendingApprovalView {
   readonly organizationId: string;
   readonly studentId: string;
   readonly studentDisplayName: string;
-  readonly destinationId: string;
-  readonly destinationDisplayName: string;
-  readonly destinationServiceType: string;
-  readonly requiredSectionId: string;
+  readonly destinationRoomId: string;
+  readonly destinationRoomName: string;
+  readonly approverKind: PolicyApproverKind;
+  readonly requiredSectionId: string | null;
+  readonly requiredRoomId: string | null;
+  readonly requiredRoomName: string | null;
   readonly sectionCode: string | null;
-  readonly sectionTitle: string;
+  readonly sectionTitle: string | null;
   readonly requestedAt: Temporal.Instant;
 }
 
@@ -267,9 +280,8 @@ export interface PendingOverrideView {
   readonly organizationId: string;
   readonly studentId: string;
   readonly studentDisplayName: string;
-  readonly destinationId: string;
-  readonly destinationDisplayName: string;
-  readonly destinationServiceType: string;
+  readonly destinationRoomId: string;
+  readonly destinationRoomName: string;
   readonly category: OverrideCategory;
   readonly overrideMode: PolicyOverrideMode;
   readonly reasonCode: PolicyReasonCode;

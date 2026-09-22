@@ -1,9 +1,9 @@
 import type { Temporal } from '@js-temporal/polyfill';
 import type {
   CalendarDayId,
-  LocationId,
   OrganizationId,
   PersonId,
+  RoomId,
   ScheduleBlockId,
   ScheduleSlotId,
   ScheduleTemplateId,
@@ -71,14 +71,13 @@ export interface SectionMeetingReference {
   readonly cycleCode: string | null;
   readonly effectiveFrom: Temporal.PlainDate | null;
   readonly effectiveUntil: Temporal.PlainDate | null;
-  readonly location: LocationReference | null;
+  readonly room: RoomReference | null;
 }
 
-export interface LocationReference {
-  readonly id: LocationId;
+export interface RoomReference {
+  readonly id: RoomId;
   readonly name: string;
   readonly code: string | null;
-  readonly kind: string;
 }
 
 export interface PersonReference {

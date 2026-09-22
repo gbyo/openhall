@@ -7,6 +7,7 @@ export const POLICY_REASON_CODES = [
   'no_violation',
   'schedule_boundary_blackout',
   'current_section_teacher_approval_required',
+  'room_responsible_staff_approval_required',
   'approval_context_unavailable',
   'approval_satisfied',
   'scheduled_preapproval_satisfied',

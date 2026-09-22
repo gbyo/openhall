@@ -8,9 +8,9 @@ import type {
   AuthorizationFactsRepository,
   RelationshipAuthorizationService,
 } from '../authorization/index.js';
-import { allocateDestinationFlow } from '../destination-flow/allocator.js';
-import type { DestinationFlowRepository } from '../destination-flow/ports.js';
-import { loadMovementForRow } from '../destination-flow/projections.js';
+import { allocateRoomFlow } from '../room-flow/allocator.js';
+import type { RoomFlowRepository } from '../room-flow/ports.js';
+import { loadMovementForRow } from '../room-flow/projections.js';
 import type { IdempotencyTransactionStore } from '../idempotency/coordinator.js';
 import { runIdempotentCommand } from '../idempotency/coordinator.js';
 import type {
@@ -43,7 +43,7 @@ export interface RequestPassDependencies {
   readonly facts: AuthorizationFactsRepository;
   readonly placement: ExpectedPlacementResolver;
   readonly passes: PassRepository;
-  readonly flow: DestinationFlowRepository;
+  readonly flow: RoomFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -54,7 +54,7 @@ export interface RequestPassDependencies {
 
 export interface RequestPassInput {
   readonly principal: Principal;
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
   readonly idempotencyKey: unknown;
   readonly requestId: string;
 }
@@ -73,7 +73,7 @@ export interface RequestPassResult {
 interface OriginSnapshot {
   readonly blockId: string | null;
   readonly sectionId: string | null;
-  readonly locationId: string | null;
+  readonly roomId: string | null;
   readonly kind: string;
 }
 
@@ -84,26 +84,26 @@ function snapshotPlacement(placement: ExpectedPlacementResult): OriginSnapshot {
         kind: 'resolved',
         blockId: placement.block.id,
         sectionId: placement.section.id,
-        locationId: placement.expectedLocation?.id ?? null,
+        roomId: placement.expectedLocation?.id ?? null,
       };
     case 'block_only':
-      return { kind: 'block_only', blockId: placement.block.id, sectionId: null, locationId: null };
+      return { kind: 'block_only', blockId: placement.block.id, sectionId: null, roomId: null };
     default:
-      return { kind: placement.kind, blockId: null, sectionId: null, locationId: null };
+      return { kind: placement.kind, blockId: null, sectionId: null, roomId: null };
   }
 }
 
 function requestedEventMetadata(input: {
   placement: ExpectedPlacementResult;
   snapshot: OriginSnapshot;
-  destinationId: string;
+  destinationRoomId: string;
 }): Readonly<Record<string, unknown>> {
-  const { placement, snapshot, destinationId } = input;
+  const { placement, snapshot, destinationRoomId } = input;
   const origin: Record<string, unknown> = { kind: snapshot.kind };
   if (placement.kind === 'resolved') {
     origin.blockId = snapshot.blockId;
     if (snapshot.sectionId !== null) origin.sectionId = snapshot.sectionId;
-    if (snapshot.locationId !== null) origin.locationId = snapshot.locationId;
+    if (snapshot.roomId !== null) origin.roomId = snapshot.roomId;
     origin.slotBeginsAt = placement.beginsAt.toString();
     origin.slotEndsAt = placement.endsAt.toString();
   } else if (placement.kind === 'block_only') {
@@ -120,7 +120,7 @@ function requestedEventMetadata(input: {
     state: 'requested',
     revision: '1',
     origin,
-    destinationId,
+    destinationRoomId,
   };
 }
 
@@ -154,7 +154,7 @@ export interface ScheduledPassCreation {
 export interface PassCreationTransactionInput {
   readonly principal: Principal;
   readonly targetStudentId: string;
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
   readonly requestSource: 'student_web' | 'staff_web' | 'scheduled';
   readonly requestId: string;
   readonly now: Temporal.Instant;
@@ -179,7 +179,7 @@ export async function createPassInTransaction(
   const {
     principal,
     targetStudentId,
-    destinationId,
+    destinationRoomId,
     requestSource,
     requestId,
     now,
@@ -190,18 +190,18 @@ export async function createPassInTransaction(
   } = input;
   const { authorization, passes, audit, outbox } = dependencies;
   const generatePassId = dependencies.generatePassId ?? randomUUID;
-  const destination = await passes.loadDestination(context, destinationId);
+  const destination = await passes.loadRoom(context, destinationRoomId);
   if (destination?.tenantId !== principal.tenantId) {
-    throw new PassApplicationError('destination_not_found', 'Destination not found.');
+    throw new PassApplicationError('room_not_found', 'Room not found.');
   }
   if (destination.organizationId !== schoolId) {
-    throw new PassApplicationError('destination_not_found', 'Destination not found.');
+    throw new PassApplicationError('room_not_found', 'Room not found.');
   }
   if (destination.status === 'archived') {
-    throw new PassApplicationError('destination_not_found', 'Destination not found.');
+    throw new PassApplicationError('room_not_found', 'Room not found.');
   }
-  if (destination.status !== 'active') {
-    throw new PassApplicationError('destination_unavailable', 'Destination is not requestable.');
+  if (destination.status !== 'open') {
+    throw new PassApplicationError('room_unavailable', 'Room is not requestable.');
   }
   if (requestSource === 'student_web') {
     // Student self-service is server-enforced, never merely a UI filter:
@@ -213,19 +213,19 @@ export async function createPassInTransaction(
       destination.categoryStatus !== 'active' ||
       (destination.categorySurface !== 'primary' && destination.categorySurface !== 'secondary')
     ) {
-      throw new PassApplicationError('destination_unavailable', 'Destination is not requestable.');
+      throw new PassApplicationError('room_unavailable', 'Room is not requestable.');
     }
   }
   const school = await dependencies.facts.loadOrganization(context, schoolId);
   if (school?.kind !== 'school' || school.status !== 'active') {
-    throw new PassApplicationError('destination_not_found', 'Destination not found.');
+    throw new PassApplicationError('room_not_found', 'Room not found.');
   }
   const timeZone = school.timeZone ?? 'UTC';
   let schoolDate: Temporal.PlainDate;
   try {
     schoolDate = now.toZonedDateTimeISO(timeZone).toPlainDate();
   } catch {
-    throw new PassApplicationError('destination_not_found', 'Destination not found.');
+    throw new PassApplicationError('room_not_found', 'Room not found.');
   }
   // Staff callers authorize before the student lookup so unauthorized
   // callers cannot distinguish missing students from active ones.
@@ -277,7 +277,7 @@ export async function createPassInTransaction(
             Temporal.PlainDate.compare(schoolDate, membership.validUntil) <= 0),
       );
       if (!present) {
-        throw new PassApplicationError('destination_not_found', 'Destination not found.');
+        throw new PassApplicationError('room_not_found', 'Room not found.');
       }
     }
     throw new PassApplicationError('student_not_found', 'Student not found.');
@@ -296,17 +296,17 @@ export async function createPassInTransaction(
   // snapshot; policy still evaluates the current ExpectedPlacement.
   const snapshot =
     scheduled?.originLocationOverride != null
-      ? { ...placementSnapshot, locationId: scheduled.originLocationOverride }
+      ? { ...placementSnapshot, roomId: scheduled.originLocationOverride }
       : placementSnapshot;
   const aggregate = createRequestedPass({
     id: generatePassId(),
     tenantId: principal.tenantId,
     organizationId: schoolId,
     studentId: targetStudentId,
-    originLocationId: snapshot.locationId,
+    originRoomId: snapshot.roomId,
     originSectionId: snapshot.sectionId,
     originScheduleBlockId: snapshot.blockId,
-    destinationId,
+    destinationRoomId,
     requestSource,
     requestedByPersonId: principal.personId,
     requestedAt: now,
@@ -317,10 +317,10 @@ export async function createPassInTransaction(
       id: aggregate.id,
       organizationId: aggregate.organizationId,
       studentId: aggregate.studentId,
-      originLocationId: aggregate.originLocationId,
+      originRoomId: aggregate.originRoomId,
       originSectionId: aggregate.originSectionId,
       originScheduleBlockId: aggregate.originScheduleBlockId,
-      destinationId: aggregate.destinationId,
+      destinationRoomId: aggregate.destinationRoomId,
       requestSource,
       scheduledAuthorizationId: scheduled?.scheduledAuthorizationId ?? null,
       requestedByPersonId: principal.personId,
@@ -335,7 +335,7 @@ export async function createPassInTransaction(
     }
     throw error;
   }
-  const metadata = requestedEventMetadata({ placement, snapshot, destinationId });
+  const metadata = requestedEventMetadata({ placement, snapshot, destinationRoomId });
   await passes.appendPassEvent(context, {
     passId: row.id,
     sequence: 1n,
@@ -351,11 +351,12 @@ export async function createPassInTransaction(
       revision: row.revision,
       organizationId: row.organizationId,
       studentId: row.studentId,
-      destinationId: row.destinationId,
+      destinationRoomId: row.destinationRoomId,
+      destinationRoomCategoryId: destination.categoryId,
       requestSource,
       originBlockId: row.originScheduleBlockId,
       originSectionId: row.originSectionId,
-      originLocationId: row.originLocationId,
+      originRoomId: row.originRoomId,
     },
     placement,
     at: now,
@@ -403,7 +404,7 @@ export async function createPassInTransaction(
       studentId: targetStudentId,
       lifecycleState: 'requested',
       revision: '1',
-      destinationId,
+      destinationRoomId,
     },
   });
   const reasonCodes: string[] = [];
@@ -459,7 +460,7 @@ export async function createPassInTransaction(
   // original request transaction. Approval/override decisions stay
   // requested; only allow enters destination flow.
   if (decided.outcome.decision === 'allow') {
-    const allocation = await allocateDestinationFlow(
+    const allocation = await allocateRoomFlow(
       context,
       { passes, flow: dependencies.flow, policy: dependencies.policy, outbox },
       {
@@ -481,11 +482,11 @@ export async function createPassInTransaction(
           tenantId: row.tenantId,
           organizationId: row.organizationId,
           studentId: row.studentId,
-          originLocationId: row.originLocationId,
+          originRoomId: row.originRoomId,
           originSectionId: row.originSectionId,
           originScheduleBlockId: row.originScheduleBlockId,
-          destinationId: row.destinationId,
-          returnLocationId: row.returnLocationId,
+          destinationRoomId: row.destinationRoomId,
+          returnRoomId: row.returnRoomId,
           requestSource,
           requestedByPersonId: row.requestedByPersonId,
           requestedAt: row.requestedAt,
@@ -533,7 +534,7 @@ export async function createPassInTransaction(
         studentId: targetStudentId,
         lifecycleState: 'denied',
         revision: denied.revision.toString(10),
-        destinationId,
+        destinationRoomId,
       },
     });
     // Terminal passes must not leave actionable workflow rows.
@@ -573,7 +574,7 @@ async function executeRequest(
   input: {
     principal: Principal;
     targetStudentId: string;
-    destinationId: string;
+    destinationRoomId: string;
     requestSource: 'student_web' | 'staff_web' | 'scheduled';
     command: 'pass.request.self:v1' | 'pass.request.student:v1' | 'pass.request.scheduled:v1';
     fingerprint: string;
@@ -590,7 +591,7 @@ async function executeRequest(
   const {
     principal,
     targetStudentId,
-    destinationId,
+    destinationRoomId,
     requestSource,
     command,
     fingerprint,
@@ -619,7 +620,7 @@ async function executeRequest(
         {
           principal,
           targetStudentId,
-          destinationId,
+          destinationRoomId,
           requestSource,
           requestId,
           now,
@@ -650,18 +651,18 @@ async function executeRequest(
   };
 }
 
-async function loadSchoolForDestination(
+async function loadSchoolForRoom(
   dependencies: RequestPassDependencies,
   principal: Principal,
-  destinationId: string,
+  destinationRoomId: string,
 ): Promise<string> {
   const schoolId = await dependencies.runner.run(principal.tenantId, async (context) => {
-    const destination = await dependencies.passes.loadDestination(context, destinationId);
+    const destination = await dependencies.passes.loadRoom(context, destinationRoomId);
     if (destination?.tenantId !== principal.tenantId) {
-      throw new PassApplicationError('destination_not_found', 'Destination not found.');
+      throw new PassApplicationError('room_not_found', 'Room not found.');
     }
     if (destination.status === 'archived') {
-      throw new PassApplicationError('destination_not_found', 'Destination not found.');
+      throw new PassApplicationError('room_not_found', 'Room not found.');
     }
     return destination.organizationId;
   });
@@ -684,11 +685,7 @@ export async function requestSelfPass(
   }
   const key = requireIdempotencyKey(input.idempotencyKey);
   const now = dependencies.clock.now();
-  const schoolId = await loadSchoolForDestination(
-    dependencies,
-    input.principal,
-    input.destinationId,
-  );
+  const schoolId = await loadSchoolForRoom(dependencies, input.principal, input.destinationRoomId);
   const placement = await dependencies.placement.resolve({
     tenantId: input.principal.tenantId,
     organizationId: schoolId,
@@ -699,10 +696,10 @@ export async function requestSelfPass(
     {
       principal: input.principal,
       targetStudentId: input.principal.personId,
-      destinationId: input.destinationId,
+      destinationRoomId: input.destinationRoomId,
       requestSource: 'student_web',
       command: 'pass.request.self:v1',
-      fingerprint: fingerprintSelfRequest(input.destinationId),
+      fingerprint: fingerprintSelfRequest(input.destinationRoomId),
       key,
       requestId: input.requestId,
       now,
@@ -731,11 +728,7 @@ export async function requestStudentPass(
   }
   const key = requireIdempotencyKey(input.idempotencyKey);
   const now = dependencies.clock.now();
-  const schoolId = await loadSchoolForDestination(
-    dependencies,
-    input.principal,
-    input.destinationId,
-  );
+  const schoolId = await loadSchoolForRoom(dependencies, input.principal, input.destinationRoomId);
   const placement = await dependencies.placement.resolve({
     tenantId: input.principal.tenantId,
     organizationId: schoolId,
@@ -746,10 +739,10 @@ export async function requestStudentPass(
     {
       principal: input.principal,
       targetStudentId: input.studentId,
-      destinationId: input.destinationId,
+      destinationRoomId: input.destinationRoomId,
       requestSource: 'staff_web',
       command: 'pass.request.student:v1',
-      fingerprint: fingerprintStaffRequest(input.studentId, input.destinationId),
+      fingerprint: fingerprintStaffRequest(input.studentId, input.destinationRoomId),
       key,
       requestId: input.requestId,
       now,

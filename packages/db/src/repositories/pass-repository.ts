@@ -2,13 +2,13 @@ import type { Temporal } from '@js-temporal/polyfill';
 import type {
   ActiveStudentRecord,
   NewPassRow,
-  PassDestinationRecord,
+  PassRoomRecord,
   PassEventInput,
   PassRepository,
   PassRow,
 } from '@openhall/application';
 import type { TenantTransactionContext } from '@openhall/application';
-import type { DestinationId, OrganizationId, PassId, PersonId } from '@openhall/domain';
+import type { RoomId, OrganizationId, PassId, PersonId } from '@openhall/domain';
 import {
   connectionFor,
   fromDatabaseInstant,
@@ -28,11 +28,11 @@ interface PassCore {
   tenant_id: string;
   organization_id: string;
   student_id: string;
-  origin_location_id: string | null;
+  origin_room_id: string | null;
   origin_section_id: string | null;
   origin_schedule_block_id: string | null;
-  destination_id: string;
-  return_location_id: string | null;
+  destination_room_id: string;
+  return_room_id: string | null;
   request_source: string;
   requested_by_person_id: string | null;
   requested_at: string;
@@ -50,22 +50,20 @@ interface PassCore {
  * is no unscoped path in pass operations.
  */
 export class PostgresPassRepository implements PassRepository {
-  async loadDestination(
+  async loadRoom(
     context: TenantTransactionContext,
-    destinationId: DestinationId,
-  ): Promise<PassDestinationRecord | null> {
+    roomId: RoomId,
+  ): Promise<PassRoomRecord | null> {
     const connection = connectionFor(context);
     const row = await connection
-      .selectFrom('destination')
+      .selectFrom('room')
       .select([
         'id',
         'tenant_id',
         'organization_id',
-        'location_id',
         'category_id',
+        'name',
         'student_self_requestable',
-        'service_type',
-        'display_name',
         'status',
         'check_in_mode',
         'capacity',
@@ -77,23 +75,26 @@ export class PostgresPassRepository implements PassRepository {
         'revision',
       ])
       .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', destinationId)
+      .where('id', '=', roomId)
       .executeTakeFirst();
     if (row === undefined) return null;
     const status =
-      row.status === 'active' ? 'active' : row.status === 'closed' ? 'closed' : 'archived';
+      row.status === 'closed' ? 'closed' : row.status === 'archived' ? 'archived' : 'open';
     const checkInMode =
       row.check_in_mode === 'optional'
         ? 'optional'
         : row.check_in_mode === 'required'
           ? 'required'
           : 'none';
-    const category = await connection
-      .selectFrom('destination_category')
-      .select(['name', 'icon_key', 'tone_key', 'student_surface', 'status'])
-      .where('tenant_id', '=', context.tenantId)
-      .where('id', '=', row.category_id)
-      .executeTakeFirst();
+    const category =
+      row.category_id === null
+        ? undefined
+        : await connection
+            .selectFrom('room_category')
+            .select(['name', 'icon_key', 'tone_key', 'student_surface', 'status'])
+            .where('tenant_id', '=', context.tenantId)
+            .where('id', '=', row.category_id)
+            .executeTakeFirst();
     const categorySurface =
       category?.student_surface === 'primary'
         ? 'primary'
@@ -104,7 +105,6 @@ export class PostgresPassRepository implements PassRepository {
       id: row.id,
       tenantId: row.tenant_id,
       organizationId: row.organization_id,
-      locationId: row.location_id,
       categoryId: row.category_id,
       studentSelfRequestable: row.student_self_requestable,
       categoryStatus: category?.status === 'archived' ? 'archived' : 'active',
@@ -113,8 +113,7 @@ export class PostgresPassRepository implements PassRepository {
         category == null
           ? null
           : { name: category.name, iconKey: category.icon_key, toneKey: category.tone_key },
-      serviceType: row.service_type,
-      displayName: row.display_name ?? row.service_type,
+      name: row.name,
       status,
       revision: toBigInt(row.revision),
       checkInMode,
@@ -196,10 +195,10 @@ export class PostgresPassRepository implements PassRepository {
         tenant_id: context.tenantId,
         organization_id: input.organizationId,
         student_id: input.studentId,
-        origin_location_id: input.originLocationId,
+        origin_room_id: input.originRoomId,
         origin_section_id: input.originSectionId,
         origin_schedule_block_id: input.originScheduleBlockId,
-        destination_id: input.destinationId,
+        destination_room_id: input.destinationRoomId,
         request_source: input.requestSource,
         scheduled_authorization_id: input.scheduledAuthorizationId,
         requested_by_person_id: input.requestedByPersonId,
@@ -351,10 +350,10 @@ export class PostgresPassRepository implements PassRepository {
     passId: PassId,
     expectedRevision: bigint,
     at: Temporal.Instant,
-    returnLocationId: string | null,
+    returnRoomId: string | null,
   ): Promise<PassRow | null> {
     return this.transitionTo(context, passId, expectedRevision, at, 'returning', {
-      return_location_id: returnLocationId,
+      return_room_id: returnRoomId,
     });
   }
 
@@ -384,7 +383,7 @@ export class PostgresPassRepository implements PassRepository {
     lifecycleState: string,
     extra: {
       expected_return_at?: string | null;
-      return_location_id?: string | null;
+      return_room_id?: string | null;
       departure_check_in_mode?: string;
       departure_destination_revision?: string;
     },
@@ -446,16 +445,16 @@ export class PostgresPassRepository implements PassRepository {
     row: PassCore,
   ): Promise<PassRow> {
     const destination = await connection
-      .selectFrom('destination')
-      .select(['display_name', 'service_type', 'check_in_mode', 'category_id'])
+      .selectFrom('room')
+      .select(['name', 'check_in_mode', 'category_id'])
       .where('tenant_id', '=', row.tenant_id)
-      .where('id', '=', row.destination_id)
+      .where('id', '=', row.destination_room_id)
       .executeTakeFirst();
-    const destinationCategory =
+    const roomCategory =
       destination?.category_id == null
         ? null
         : await connection
-            .selectFrom('destination_category')
+            .selectFrom('room_category')
             .select(['id', 'name', 'icon_key', 'tone_key'])
             .where('tenant_id', '=', row.tenant_id)
             .where('id', '=', destination.category_id)
@@ -478,25 +477,25 @@ export class PostgresPassRepository implements PassRepository {
             .where('tenant_id', '=', row.tenant_id)
             .where('id', '=', row.origin_section_id)
             .executeTakeFirst();
-    const location =
-      row.origin_location_id === null
+    const originRoom =
+      row.origin_room_id === null
         ? null
         : await connection
-            .selectFrom('location')
+            .selectFrom('room')
             .select(['id', 'name'])
             .where('tenant_id', '=', row.tenant_id)
-            .where('id', '=', row.origin_location_id)
+            .where('id', '=', row.origin_room_id)
             .executeTakeFirst();
     return {
       id: row.id,
       tenantId: row.tenant_id,
       organizationId: row.organization_id,
       studentId: row.student_id,
-      originLocationId: row.origin_location_id,
+      originRoomId: row.origin_room_id,
       originSectionId: row.origin_section_id,
       originScheduleBlockId: row.origin_schedule_block_id,
-      destinationId: row.destination_id,
-      returnLocationId: row.return_location_id,
+      destinationRoomId: row.destination_room_id,
+      returnRoomId: row.return_room_id,
       requestSource: row.request_source,
       requestedByPersonId: row.requested_by_person_id,
       requestedAt: fromDatabaseInstant(row.requested_at),
@@ -510,22 +509,21 @@ export class PostgresPassRepository implements PassRepository {
         row.departure_destination_revision === null
           ? null
           : toBigInt(row.departure_destination_revision),
-      destinationDisplayName: destination?.display_name ?? '',
-      destinationServiceType: destination?.service_type ?? '',
+      destinationRoomName: destination?.name ?? '',
       destinationCheckInMode:
         destination?.check_in_mode === 'optional'
           ? 'optional'
           : destination?.check_in_mode === 'required'
             ? 'required'
             : 'none',
-      destinationCategory:
-        destinationCategory == null
+      roomCategory:
+        roomCategory == null
           ? null
           : {
-              id: destinationCategory.id,
-              name: destinationCategory.name,
-              iconKey: destinationCategory.icon_key,
-              toneKey: destinationCategory.tone_key,
+              id: roomCategory.id,
+              name: roomCategory.name,
+              iconKey: roomCategory.icon_key,
+              toneKey: roomCategory.tone_key,
             },
       originBlock:
         block === null || block === undefined
@@ -535,10 +533,10 @@ export class PostgresPassRepository implements PassRepository {
         section === null || section === undefined
           ? null
           : { id: section.id, code: section.code, title: section.title },
-      originLocation:
-        location === null || location === undefined
+      originRoom:
+        originRoom === null || originRoom === undefined
           ? null
-          : { id: location.id, name: location.name },
+          : { id: originRoom.id, name: originRoom.name },
     };
   }
 }

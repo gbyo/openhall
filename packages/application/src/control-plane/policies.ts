@@ -24,7 +24,8 @@ import {
   type ControlPlaneCommand,
 } from './idempotency.js';
 import type {
-  DestinationRepository,
+  RoomCategoryRepository,
+  RoomRepository,
   PolicyAdminRepository,
   PolicyRuleRecord,
   PolicyRuleWrite,
@@ -37,7 +38,8 @@ export interface PolicyDependencies {
   readonly runner: TenantTransactionRunner;
   readonly authorization: RelationshipAuthorizationService;
   readonly policies: PolicyAdminRepository;
-  readonly destinations: DestinationRepository;
+  readonly rooms: RoomRepository;
+  readonly categories: RoomCategoryRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
   readonly outbox: OutboxWriter;
@@ -52,7 +54,8 @@ export interface PolicyRuleView {
     readonly kind: PolicyScopeKind;
     readonly organizationId: string | null;
     readonly sectionId: string | null;
-    readonly destinationId: string | null;
+    readonly roomId: string | null;
+    readonly roomCategoryId: string | null;
   };
   readonly priority: number;
   readonly configuration: unknown;
@@ -76,7 +79,8 @@ export function toPolicyRuleView(row: PolicyRuleRecord): PolicyRuleView {
       kind: row.scopeKind,
       organizationId: row.scopeOrganizationId,
       sectionId: row.scopeSectionId,
-      destinationId: row.scopeDestinationId,
+      roomId: row.scopeRoomId,
+      roomCategoryId: row.scopeRoomCategoryId,
     },
     priority: row.priority,
     configuration: row.configuration,
@@ -105,7 +109,8 @@ export interface PolicyScopeInput {
   readonly kind: unknown;
   readonly organizationId: string | null;
   readonly sectionId: string | null;
-  readonly destinationId: string | null;
+  readonly roomId: string | null;
+  readonly roomCategoryId: string | null;
 }
 
 export interface PolicyWriteBody {
@@ -173,7 +178,13 @@ function cleanInstant(value: string | null, field: string): Temporal.Instant | n
 }
 
 function cleanScopeKind(value: unknown): PolicyScopeKind {
-  if (value === 'organization' || value === 'section' || value === 'destination') return value;
+  if (
+    value === 'organization' ||
+    value === 'section' ||
+    value === 'room' ||
+    value === 'room_category'
+  )
+    return value;
   throw new ControlPlaneError('policy_rule_invalid', 'Invalid policy scope.');
 }
 
@@ -191,25 +202,51 @@ function canonicalWrite(body: PolicyWriteBody): PolicyRuleWrite {
     throw new ControlPlaneError('policy_rule_invalid', 'Invalid override mode.');
   }
   const scopeKind = cleanScopeKind(body.scope.kind);
-  const { organizationId, sectionId, destinationId } = body.scope;
+  const { organizationId, sectionId, roomId, roomCategoryId } = body.scope;
   let scopeOrganizationId: string | null = null;
   let scopeSectionId: string | null = null;
-  let scopeDestinationId: string | null = null;
+  let scopeRoomId: string | null = null;
+  let scopeRoomCategoryId: string | null = null;
   if (scopeKind === 'organization') {
-    if (typeof organizationId !== 'string' || sectionId !== null || destinationId !== null) {
+    if (
+      typeof organizationId !== 'string' ||
+      sectionId !== null ||
+      roomId !== null ||
+      roomCategoryId !== null
+    ) {
       throw new ControlPlaneError('policy_rule_invalid', 'Invalid policy scope.');
     }
     scopeOrganizationId = organizationId;
   } else if (scopeKind === 'section') {
-    if (typeof sectionId !== 'string' || organizationId !== null || destinationId !== null) {
+    if (
+      typeof sectionId !== 'string' ||
+      organizationId !== null ||
+      roomId !== null ||
+      roomCategoryId !== null
+    ) {
       throw new ControlPlaneError('policy_rule_invalid', 'Invalid policy scope.');
     }
     scopeSectionId = sectionId;
-  } else {
-    if (typeof destinationId !== 'string' || organizationId !== null || sectionId !== null) {
+  } else if (scopeKind === 'room') {
+    if (
+      typeof roomId !== 'string' ||
+      organizationId !== null ||
+      sectionId !== null ||
+      roomCategoryId !== null
+    ) {
       throw new ControlPlaneError('policy_rule_invalid', 'Invalid policy scope.');
     }
-    scopeDestinationId = destinationId;
+    scopeRoomId = roomId;
+  } else {
+    if (
+      typeof roomCategoryId !== 'string' ||
+      organizationId !== null ||
+      sectionId !== null ||
+      roomId !== null
+    ) {
+      throw new ControlPlaneError('policy_rule_invalid', 'Invalid policy scope.');
+    }
+    scopeRoomCategoryId = roomCategoryId;
   }
   const parsed = parsePolicyRuleConfiguration(body.ruleType, body.configuration);
   if (!parsed.valid) {
@@ -233,7 +270,8 @@ function canonicalWrite(body: PolicyWriteBody): PolicyRuleWrite {
     scopeKind,
     scopeOrganizationId,
     scopeSectionId,
-    scopeDestinationId,
+    scopeRoomId,
+    scopeRoomCategoryId,
     priority: cleanPriority(body.priority),
     configuration: body.configuration,
     overrideMode: body.overrideMode,
@@ -245,7 +283,8 @@ function canonicalWrite(body: PolicyWriteBody): PolicyRuleWrite {
 /**
  * Validates that the scope still designates a live same-school resource.
  * Organization scope must be the exact route school; section scope must
- * belong to it; destination scope must belong to it and not be archived.
+ * belong to it; room scope must belong to it and not be archived; room
+ * category scope must belong to it and be active.
  */
 async function assertScopeValid(
   context: TenantTransactionContext,
@@ -270,14 +309,22 @@ async function assertScopeValid(
     }
     return;
   }
-  const destination = await dependencies.destinations.loadById(
-    context,
-    write.scopeDestinationId ?? '',
-  );
+  if (write.scopeKind === 'room') {
+    const room = await dependencies.rooms.loadById(context, write.scopeRoomId ?? '');
+    if (
+      room?.tenantId !== tenantId ||
+      room.organizationId !== organizationId ||
+      room.status === 'archived'
+    ) {
+      throw new ControlPlaneError('policy_rule_invalid', 'Invalid policy scope.');
+    }
+    return;
+  }
+  const category = await dependencies.categories.loadById(context, write.scopeRoomCategoryId ?? '');
   if (
-    destination?.tenantId !== tenantId ||
-    destination.organizationId !== organizationId ||
-    destination.status === 'archived'
+    category?.tenantId !== tenantId ||
+    category.organizationId !== organizationId ||
+    category.status !== 'active'
   ) {
     throw new ControlPlaneError('policy_rule_invalid', 'Invalid policy scope.');
   }
@@ -290,7 +337,8 @@ function fingerprintWrite(write: PolicyRuleWrite): string[] {
     write.scopeKind,
     write.scopeOrganizationId ?? '',
     write.scopeSectionId ?? '',
-    write.scopeDestinationId ?? '',
+    write.scopeRoomId ?? '',
+    write.scopeRoomCategoryId ?? '',
     String(write.priority),
     JSON.stringify(write.configuration),
     write.overrideMode,
@@ -712,7 +760,8 @@ export async function activatePolicyRule(
           scopeKind: current.scopeKind,
           scopeOrganizationId: current.scopeOrganizationId,
           scopeSectionId: current.scopeSectionId,
-          scopeDestinationId: current.scopeDestinationId,
+          scopeRoomId: current.scopeRoomId,
+          scopeRoomCategoryId: current.scopeRoomCategoryId,
           priority: current.priority,
           configuration: current.configuration,
           overrideMode: current.overrideMode,

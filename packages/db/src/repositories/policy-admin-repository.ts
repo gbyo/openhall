@@ -19,7 +19,10 @@ function toJsonb(value: unknown): JsonObject {
 }
 
 function scopeKind(value: string): PolicyScopeKind {
-  return value === 'section' ? 'section' : value === 'destination' ? 'destination' : 'organization';
+  if (value === 'section') return 'section';
+  if (value === 'room') return 'room';
+  if (value === 'room_category') return 'room_category';
+  return 'organization';
 }
 
 interface PolicyRow {
@@ -31,7 +34,8 @@ interface PolicyRow {
   scope_kind: string;
   scope_organization_id: string | null;
   scope_section_id: string | null;
-  scope_destination_id: string | null;
+  scope_room_id: string | null;
+  scope_room_category_id: string | null;
   priority: number;
   configuration: unknown;
   override_mode: string;
@@ -54,7 +58,8 @@ function toRecord(row: PolicyRow): PolicyRuleRecord {
     scopeKind: scopeKind(row.scope_kind),
     scopeOrganizationId: row.scope_organization_id,
     scopeSectionId: row.scope_section_id,
-    scopeDestinationId: row.scope_destination_id,
+    scopeRoomId: row.scope_room_id,
+    scopeRoomCategoryId: row.scope_room_category_id,
     priority: row.priority,
     configuration: row.configuration,
     overrideMode: row.override_mode,
@@ -131,7 +136,8 @@ export class PostgresPolicyAdminRepository implements PolicyAdminRepository {
         scope_kind: input.scopeKind,
         scope_organization_id: input.scopeOrganizationId,
         scope_section_id: input.scopeSectionId,
-        scope_destination_id: input.scopeDestinationId,
+        scope_room_category_id: input.scopeRoomCategoryId,
+        scope_room_id: input.scopeRoomId,
         priority: input.priority,
         configuration: toJsonb(input.configuration),
         override_mode: input.overrideMode,
@@ -160,7 +166,8 @@ export class PostgresPolicyAdminRepository implements PolicyAdminRepository {
         scope_kind: input.scopeKind,
         scope_organization_id: input.scopeOrganizationId,
         scope_section_id: input.scopeSectionId,
-        scope_destination_id: input.scopeDestinationId,
+        scope_room_category_id: input.scopeRoomCategoryId,
+        scope_room_id: input.scopeRoomId,
         priority: input.priority,
         configuration: toJsonb(input.configuration),
         override_mode: input.overrideMode,

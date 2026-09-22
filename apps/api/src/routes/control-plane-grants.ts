@@ -153,7 +153,7 @@ export function registerGrantRoutes(
             body: {
               personId: request.body.personId,
               role: request.body.role,
-              destinationId: request.body.destinationId,
+              roomId: request.body.roomId,
               validFrom: request.body.validFrom,
               validUntil: request.body.validUntil,
             },

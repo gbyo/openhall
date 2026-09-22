@@ -9,7 +9,8 @@ const subscriber: RealtimeSubscriberContext = {
   affiliations: ['student', 'staff'],
   capabilities: ['pass.view.school_live', 'schedule.view', 'audit.view'],
   teachingSectionIds: ['section-a'],
-  staffedDestinationIds: ['destination-a'],
+  staffedRoomIds: ['room-a'],
+  teachingRoomIds: ['room-b'],
 };
 
 function event(overrides: Partial<ObservedOutboxEvent> = {}): ObservedOutboxEvent {
@@ -23,7 +24,7 @@ function event(overrides: Partial<ObservedOutboxEvent> = {}): ObservedOutboxEven
     payload: {
       studentId: 'student-a',
       originSectionId: 'section-a',
-      destinationId: 'destination-a',
+      destinationRoomId: 'room-a',
     },
     ...overrides,
   };
@@ -35,7 +36,7 @@ describe('realtime topic isolation', () => {
       'self-pass',
       'school-live',
       'section-live:section-a',
-      'station:destination-a',
+      'station:room-a',
       'audit',
     ]);
   });
@@ -48,6 +49,37 @@ describe('realtime topic isolation', () => {
   it('uses authorized broad section invalidation when legacy pass metadata lacks origin', () => {
     expect(topicsFor(event({ payload: { studentId: 'other-student' } }), subscriber)).toContain(
       'section-live:section-a',
+    );
+  });
+
+  it('notifies explicit room staff of room-responsible approvals', () => {
+    const topics = topicsFor(
+      event({ payload: { studentId: 'other-student', requiredRoomId: 'room-a' } }),
+      subscriber,
+    );
+    expect(topics).toContain('requests');
+  });
+
+  it('notifies schedule-derived classroom teachers of room-responsible approvals', () => {
+    const topics = topicsFor(
+      event({ payload: { studentId: 'other-student', requiredRoomId: 'room-b' } }),
+      subscriber,
+    );
+    expect(topics).toContain('requests');
+  });
+
+  it('does not leak room approvals to unrelated staff', () => {
+    const topics = topicsFor(
+      event({ payload: { studentId: 'other-student', requiredRoomId: 'room-z' } }),
+      subscriber,
+    );
+    expect(topics).not.toContain('requests');
+  });
+
+  it('maps room aggregates to the rooms topic', () => {
+    expect(topicsFor(event({ aggregateKind: 'room', payload: {} }), subscriber)).toContain('rooms');
+    expect(topicsFor(event({ aggregateKind: 'room_category', payload: {} }), subscriber)).toContain(
+      'rooms',
     );
   });
 

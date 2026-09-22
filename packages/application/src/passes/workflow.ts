@@ -2,8 +2,8 @@ import type { Temporal } from '@js-temporal/polyfill';
 import { transitionPass } from '@openhall/domain';
 import type { OutboxWriter, TenantTransactionContext } from '../persistence.js';
 import type { ExpectedPlacementResult } from '../scheduling/index.js';
-import { allocateDestinationFlow } from '../destination-flow/allocator.js';
-import type { DestinationFlowRepository } from '../destination-flow/ports.js';
+import { allocateRoomFlow } from '../room-flow/allocator.js';
+import type { RoomFlowRepository } from '../room-flow/ports.js';
 import {
   buildPolicyProjection,
   evaluateAndPersistPolicy,
@@ -17,7 +17,7 @@ import type { PassPolicyProjection } from './representations.js';
 
 export interface WorkflowTailDependencies {
   readonly passes: PassRepository;
-  readonly flow: DestinationFlowRepository;
+  readonly flow: RoomFlowRepository;
   readonly policy: PolicyRepository;
   readonly outbox: OutboxWriter;
 }
@@ -26,7 +26,7 @@ export interface WorkflowTailInput {
   readonly passId: string;
   readonly schoolId: string;
   readonly studentId: string;
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
   readonly placement: ExpectedPlacementResult;
   readonly at: Temporal.Instant;
   readonly stage: Extract<PolicyEvaluationStage, 'approval' | 'override'>;
@@ -55,17 +55,19 @@ export async function reevaluatePersistAndApply(
 ): Promise<WorkflowTailResult> {
   const { passes, flow, policy, outbox } = dependencies;
   const { workflowRow, placement, at, stage } = input;
+  const room = await passes.loadRoom(context, workflowRow.destinationRoomId);
   const decided = await evaluateAndPersistPolicy(context, policy, {
     pass: {
       id: workflowRow.id,
       revision: workflowRow.revision,
       organizationId: workflowRow.organizationId,
       studentId: workflowRow.studentId,
-      destinationId: workflowRow.destinationId,
+      destinationRoomId: workflowRow.destinationRoomId,
+      destinationRoomCategoryId: room?.categoryId ?? null,
       requestSource: input.requestSource,
       originBlockId: workflowRow.originScheduleBlockId,
       originSectionId: workflowRow.originSectionId,
-      originLocationId: workflowRow.originLocationId,
+      originRoomId: workflowRow.originRoomId,
     },
     placement,
     at,
@@ -133,11 +135,11 @@ export async function reevaluatePersistAndApply(
           tenantId: workflowRow.tenantId,
           organizationId: workflowRow.organizationId,
           studentId: workflowRow.studentId,
-          originLocationId: workflowRow.originLocationId,
+          originRoomId: workflowRow.originRoomId,
           originSectionId: workflowRow.originSectionId,
           originScheduleBlockId: workflowRow.originScheduleBlockId,
-          destinationId: workflowRow.destinationId,
-          returnLocationId: workflowRow.returnLocationId,
+          destinationRoomId: workflowRow.destinationRoomId,
+          returnRoomId: workflowRow.returnRoomId,
           requestSource: input.requestSource as 'student_web' | 'staff_web',
           requestedByPersonId: workflowRow.requestedByPersonId,
           requestedAt: workflowRow.requestedAt,
@@ -190,7 +192,7 @@ export async function reevaluatePersistAndApply(
         studentId: input.studentId,
         lifecycleState: 'denied',
         revision: denied.revision.toString(10),
-        destinationId: input.destinationId,
+        destinationRoomId: input.destinationRoomId,
       },
     });
     await policy.cancelAllPendingWorkflows(context, workflowRow.id, at);
@@ -202,7 +204,7 @@ export async function reevaluatePersistAndApply(
   // operationally denied. Only requested passes allocate; passes already in
   // flow keep their existing reservation or queue position.
   if (decided.outcome.decision === 'allow' && finalRow.lifecycleState === 'requested') {
-    const allocation = await allocateDestinationFlow(
+    const allocation = await allocateRoomFlow(
       context,
       { passes, flow, policy, outbox },
       {

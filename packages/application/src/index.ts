@@ -2,7 +2,7 @@ export * from './auditing/index.js';
 export * from './authentication/index.js';
 export * from './authorization/index.js';
 export * from './control-plane/index.js';
-export * from './destination-flow/index.js';
+export * from './room-flow/index.js';
 export * from './idempotency/index.js';
 export * from './passes/index.js';
 export * from './policy/index.js';

@@ -21,8 +21,8 @@ import {
   requireIdempotencyKey,
 } from './idempotency.js';
 import type { PassRepository } from './ports.js';
-import type { DestinationFlowRepository } from '../destination-flow/ports.js';
-import { loadMovementForRow } from '../destination-flow/projections.js';
+import type { RoomFlowRepository } from '../room-flow/ports.js';
+import { loadMovementForRow } from '../room-flow/projections.js';
 import type { PendingApprovalView, PolicyRepository } from '../policy/index.js';
 import {
   etagForPass,
@@ -39,7 +39,7 @@ export interface ApprovalCommandDependencies {
   readonly facts: AuthorizationFactsRepository;
   readonly placement: ExpectedPlacementResolver;
   readonly passes: PassRepository;
-  readonly flow: DestinationFlowRepository;
+  readonly flow: RoomFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -156,16 +156,27 @@ export async function resolvePassApproval(
           'This approval is no longer actionable.',
         );
       }
-      const authDecision = await authorization.decideWithContext(context, {
-        principal: input.principal,
-        capability: 'pass.approve.section',
-        resource: {
-          kind: 'student_in_section',
-          sectionId: approval.requiredSectionId,
-          studentId: row.studentId,
-        },
-        at: now,
-      });
+      const authDecision =
+        approval.approverKind === 'room_responsible_staff'
+          ? await authorization.decideWithContext(context, {
+              principal: input.principal,
+              capability: 'pass.approve.room',
+              resource: {
+                kind: 'room',
+                roomId: approval.requiredRoomId ?? '',
+              },
+              at: now,
+            })
+          : await authorization.decideWithContext(context, {
+              principal: input.principal,
+              capability: 'pass.approve.section',
+              resource: {
+                kind: 'student_in_section',
+                sectionId: approval.requiredSectionId ?? '',
+                studentId: row.studentId,
+              },
+              at: now,
+            });
       if (!authDecision.allowed) throw concealAuthDenial(authDecision.reason);
       const resolved = await policy.resolveApproval(context, approval.id, {
         decision: input.decision,
@@ -234,7 +245,9 @@ export async function resolvePassApproval(
           passId: row.id,
           organizationId: row.organizationId,
           studentId: row.studentId,
+          approverKind: approval.approverKind,
           requiredSectionId: approval.requiredSectionId,
+          requiredRoomId: approval.requiredRoomId,
           passRevision: bumped.revision.toString(10),
         },
       });
@@ -245,7 +258,7 @@ export async function resolvePassApproval(
           passId: row.id,
           schoolId: row.organizationId,
           studentId: row.studentId,
-          destinationId: row.destinationId,
+          destinationRoomId: row.destinationRoomId,
           placement,
           at: now,
           stage: 'approval',
@@ -292,14 +305,18 @@ export interface PendingApprovalItem {
   readonly student: { readonly id: string; readonly displayName: string };
   readonly destination: {
     readonly id: string;
-    readonly displayName: string;
-    readonly serviceType: string;
+    readonly name: string;
   };
+  readonly approverKind: 'current_section_teacher' | 'room_responsible_staff';
   readonly requiredSection: {
-    readonly id: string;
+    readonly id: string | null;
     readonly code: string | null;
-    readonly title: string;
+    readonly title: string | null;
   };
+  readonly requiredRoom: {
+    readonly id: string;
+    readonly name: string;
+  } | null;
   readonly requestedAt: string;
 }
 
@@ -312,17 +329,51 @@ function toPendingItem(view: PendingApprovalView): PendingApprovalItem {
     passEtag: etagForPass(view.passId, view.passRevision),
     student: { id: view.studentId, displayName: view.studentDisplayName },
     destination: {
-      id: view.destinationId,
-      displayName: view.destinationDisplayName,
-      serviceType: view.destinationServiceType,
+      id: view.destinationRoomId,
+      name: view.destinationRoomName,
     },
+    approverKind: view.approverKind,
     requiredSection: {
       id: view.requiredSectionId,
       code: view.sectionCode,
       title: view.sectionTitle,
     },
+    requiredRoom:
+      view.requiredRoomId === null
+        ? null
+        : { id: view.requiredRoomId, name: view.requiredRoomName ?? '' },
     requestedAt: view.requestedAt.toString(),
   };
+}
+
+async function mayResolveApproval(
+  principal: Principal,
+  authorization: ApprovalCommandDependencies['authorization'],
+  view: PendingApprovalView,
+  at: Temporal.Instant,
+): Promise<boolean> {
+  if (view.approverKind === 'room_responsible_staff') {
+    if (view.requiredRoomId === null) return false;
+    const decision = await authorization.decide({
+      principal,
+      capability: 'pass.approve.room',
+      resource: { kind: 'room', roomId: view.requiredRoomId },
+      at,
+    });
+    return decision.allowed;
+  }
+  if (view.requiredSectionId === null) return false;
+  const decision = await authorization.decide({
+    principal,
+    capability: 'pass.approve.section',
+    resource: {
+      kind: 'student_in_section',
+      sectionId: view.requiredSectionId,
+      studentId: view.studentId,
+    },
+    at,
+  });
+  return decision.allowed;
 }
 
 /**
@@ -346,17 +397,9 @@ export async function listPendingApprovals(
   );
   const items: PendingApprovalItem[] = [];
   for (const view of views) {
-    const decision = await dependencies.authorization.decide({
-      principal,
-      capability: 'pass.approve.section',
-      resource: {
-        kind: 'student_in_section',
-        sectionId: view.requiredSectionId,
-        studentId: view.studentId,
-      },
-      at,
-    });
-    if (decision.allowed) items.push(toPendingItem(view));
+    if (await mayResolveApproval(principal, dependencies.authorization, view, at)) {
+      items.push(toPendingItem(view));
+    }
   }
   return items;
 }

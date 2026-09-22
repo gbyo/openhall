@@ -1,8 +1,8 @@
 import { Skeleton } from '@/components/ui/skeleton';
-import { StudentDestinationGrid } from './StudentDestinationGrid.js';
+import { StudentRoomGrid } from './StudentRoomGrid.js';
 import type { ScheduledAuthorization } from './scheduled-presentation.js';
-import type { StudentCatalogCategory, StudentCategory } from './student-intents.js';
-import { splitStudentCatalog } from './student-intents.js';
+import type { StudentCatalogCategory, StudentCategory } from './student-room-intents.js';
+import { splitStudentCatalog } from './student-room-intents.js';
 import { ReadyNowPasses, UpcomingPasses } from './UpcomingPasses.js';
 
 interface StudentHomeProps {
@@ -39,10 +39,10 @@ export function StudentHome({
         onStart={onStartScheduled}
       />
       <div className="flex flex-col gap-3">
-        <h1 id="destination-title" className="text-xl font-semibold tracking-tight text-balance">
+        <h1 id="room-title" className="text-xl font-semibold tracking-tight text-balance">
           Where do you need to go?
         </h1>
-        <StudentDestinationGrid
+        <StudentRoomGrid
           primary={primary}
           hasSecondary={secondary.length > 0}
           disabled={actionsDisabled}
@@ -61,7 +61,7 @@ export function StudentHomeSkeleton() {
   return (
     <div
       role="status"
-      aria-label="Loading destinations"
+      aria-label="Loading rooms"
       className="mx-auto flex w-full max-w-3xl flex-col gap-6"
     >
       <Skeleton className="h-7 w-2/3" />
@@ -75,7 +75,7 @@ export function StudentHomeSkeleton() {
         <Skeleton className="h-16 w-full" />
         <Skeleton className="h-16 w-full" />
       </div>
-      <span className="sr-only">Loading destinations…</span>
+      <span className="sr-only">Loading rooms…</span>
     </div>
   );
 }

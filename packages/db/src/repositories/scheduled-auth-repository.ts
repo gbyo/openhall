@@ -19,9 +19,8 @@ interface ScheduledAuthRow {
   student_id: string;
   student_display_name: string;
   student_grade_level: string | null;
-  destination_id: string;
-  destination_display_name: string | null;
-  destination_service_type: string;
+  destination_room_id: string;
+  destination_room_name: string | null;
   created_by_person_id: string;
   created_by_account_id: string | null;
   valid_from: string;
@@ -29,8 +28,8 @@ interface ScheduledAuthRow {
   status: string;
   approval_mode: string;
   origin_strategy: string;
-  origin_location_id: string | null;
-  origin_location_name: string | null;
+  origin_room_id: string | null;
+  origin_room_name: string | null;
   display_category: string | null;
   revision: string | bigint | number;
   created_at: string;
@@ -50,9 +49,8 @@ function toRecord(row: ScheduledAuthRow): ScheduledAuthRecord {
     studentId: row.student_id,
     studentDisplayName: row.student_display_name,
     studentGradeLevel: row.student_grade_level,
-    destinationId: row.destination_id,
-    destinationDisplayName: row.destination_display_name ?? row.destination_service_type,
-    destinationServiceType: row.destination_service_type,
+    destinationRoomId: row.destination_room_id,
+    destinationRoomName: row.destination_room_name ?? '',
     createdByPersonId: row.created_by_person_id,
     createdByAccountId: row.created_by_account_id,
     validFrom: fromDatabaseInstant(row.valid_from),
@@ -60,8 +58,8 @@ function toRecord(row: ScheduledAuthRow): ScheduledAuthRecord {
     status: row.status,
     approvalMode: row.approval_mode,
     originStrategy: row.origin_strategy,
-    originLocationId: row.origin_location_id,
-    originLocationName: row.origin_location_name,
+    originRoomId: row.origin_room_id,
+    originRoomName: row.origin_room_name,
     displayCategory: row.display_category,
     revision: toBigInt(row.revision),
     createdAt: fromDatabaseInstant(row.created_at),
@@ -82,9 +80,8 @@ function selection() {
     'scheduled_authorization.student_id as student_id',
     'person.display_name as student_display_name',
     'student_membership.grade_level as student_grade_level',
-    'scheduled_authorization.destination_id as destination_id',
-    'destination.display_name as destination_display_name',
-    'destination.service_type as destination_service_type',
+    'scheduled_authorization.destination_room_id as destination_room_id',
+    'room.name as destination_room_name',
     'scheduled_authorization.created_by_person_id as created_by_person_id',
     'scheduled_authorization.created_by_account_id as created_by_account_id',
     'scheduled_authorization.valid_from as valid_from',
@@ -92,8 +89,8 @@ function selection() {
     'scheduled_authorization.status as status',
     'scheduled_authorization.approval_mode as approval_mode',
     'scheduled_authorization.origin_strategy as origin_strategy',
-    'scheduled_authorization.origin_location_id as origin_location_id',
-    'origin_location.name as origin_location_name',
+    'scheduled_authorization.origin_room_id as origin_room_id',
+    'origin_room.name as origin_room_name',
     'scheduled_authorization.display_category as display_category',
     'scheduled_authorization.revision as revision',
     'scheduled_authorization.created_at as created_at',
@@ -159,22 +156,26 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
     return { personId: row.person_id };
   }
 
-  async loadActiveLocation(
+  async loadActiveRoom(
     context: TenantTransactionContext,
     organizationId: string,
-    locationId: string,
-  ): Promise<{ readonly id: string; readonly name: string } | null> {
+    roomId: string,
+  ): Promise<{
+    readonly id: string;
+    readonly name: string;
+    readonly originSelectable: boolean;
+  } | null> {
     const connection = connectionFor(context);
     const row = await connection
-      .selectFrom('location')
-      .select(['id', 'name'])
+      .selectFrom('room')
+      .select(['id', 'name', 'origin_selectable'])
       .where('tenant_id', '=', context.tenantId)
       .where('organization_id', '=', organizationId)
-      .where('id', '=', locationId)
-      .where('status', '=', 'active')
+      .where('id', '=', roomId)
+      .where('status', '=', 'open')
       .executeTakeFirst();
     if (row === undefined) return null;
-    return { id: row.id, name: row.name };
+    return { id: row.id, name: row.name, originSelectable: row.origin_selectable };
   }
 
   async listByOrganization(
@@ -189,10 +190,10 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
           .onRef('person.tenant_id', '=', 'scheduled_authorization.tenant_id')
           .onRef('person.id', '=', 'scheduled_authorization.student_id'),
       )
-      .innerJoin('destination', (join) =>
+      .innerJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'scheduled_authorization.tenant_id')
-          .onRef('destination.id', '=', 'scheduled_authorization.destination_id'),
+          .onRef('room.tenant_id', '=', 'scheduled_authorization.tenant_id')
+          .onRef('room.id', '=', 'scheduled_authorization.destination_room_id'),
       )
       .leftJoin('organization_membership as student_membership', (join) =>
         join
@@ -205,10 +206,10 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
           .onRef('student_membership.person_id', '=', 'scheduled_authorization.student_id')
           .on('student_membership.affiliation', '=', 'student'),
       )
-      .leftJoin('location as origin_location', (join) =>
+      .leftJoin('room as origin_room', (join) =>
         join
-          .onRef('origin_location.tenant_id', '=', 'scheduled_authorization.tenant_id')
-          .onRef('origin_location.id', '=', 'scheduled_authorization.origin_location_id'),
+          .onRef('origin_room.tenant_id', '=', 'scheduled_authorization.tenant_id')
+          .onRef('origin_room.id', '=', 'scheduled_authorization.origin_room_id'),
       )
       .select(selection())
       .where('scheduled_authorization.tenant_id', '=', context.tenantId)
@@ -231,10 +232,10 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
           .onRef('person.tenant_id', '=', 'scheduled_authorization.tenant_id')
           .onRef('person.id', '=', 'scheduled_authorization.student_id'),
       )
-      .innerJoin('destination', (join) =>
+      .innerJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'scheduled_authorization.tenant_id')
-          .onRef('destination.id', '=', 'scheduled_authorization.destination_id'),
+          .onRef('room.tenant_id', '=', 'scheduled_authorization.tenant_id')
+          .onRef('room.id', '=', 'scheduled_authorization.destination_room_id'),
       )
       .leftJoin('organization_membership as student_membership', (join) =>
         join
@@ -247,10 +248,10 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
           .onRef('student_membership.person_id', '=', 'scheduled_authorization.student_id')
           .on('student_membership.affiliation', '=', 'student'),
       )
-      .leftJoin('location as origin_location', (join) =>
+      .leftJoin('room as origin_room', (join) =>
         join
-          .onRef('origin_location.tenant_id', '=', 'scheduled_authorization.tenant_id')
-          .onRef('origin_location.id', '=', 'scheduled_authorization.origin_location_id'),
+          .onRef('origin_room.tenant_id', '=', 'scheduled_authorization.tenant_id')
+          .onRef('origin_room.id', '=', 'scheduled_authorization.origin_room_id'),
       )
       .select(selection())
       .where('scheduled_authorization.tenant_id', '=', context.tenantId)
@@ -273,10 +274,10 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
           .onRef('person.tenant_id', '=', 'scheduled_authorization.tenant_id')
           .onRef('person.id', '=', 'scheduled_authorization.student_id'),
       )
-      .innerJoin('destination', (join) =>
+      .innerJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'scheduled_authorization.tenant_id')
-          .onRef('destination.id', '=', 'scheduled_authorization.destination_id'),
+          .onRef('room.tenant_id', '=', 'scheduled_authorization.tenant_id')
+          .onRef('room.id', '=', 'scheduled_authorization.destination_room_id'),
       )
       .leftJoin('organization_membership as student_membership', (join) =>
         join
@@ -289,10 +290,10 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
           .onRef('student_membership.person_id', '=', 'scheduled_authorization.student_id')
           .on('student_membership.affiliation', '=', 'student'),
       )
-      .leftJoin('location as origin_location', (join) =>
+      .leftJoin('room as origin_room', (join) =>
         join
-          .onRef('origin_location.tenant_id', '=', 'scheduled_authorization.tenant_id')
-          .onRef('origin_location.id', '=', 'scheduled_authorization.origin_location_id'),
+          .onRef('origin_room.tenant_id', '=', 'scheduled_authorization.tenant_id')
+          .onRef('origin_room.id', '=', 'scheduled_authorization.origin_room_id'),
       )
       .select(selection())
       .where('scheduled_authorization.tenant_id', '=', context.tenantId)
@@ -313,10 +314,10 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
           .onRef('person.tenant_id', '=', 'scheduled_authorization.tenant_id')
           .onRef('person.id', '=', 'scheduled_authorization.student_id'),
       )
-      .innerJoin('destination', (join) =>
+      .innerJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'scheduled_authorization.tenant_id')
-          .onRef('destination.id', '=', 'scheduled_authorization.destination_id'),
+          .onRef('room.tenant_id', '=', 'scheduled_authorization.tenant_id')
+          .onRef('room.id', '=', 'scheduled_authorization.destination_room_id'),
       )
       .leftJoin('organization_membership as student_membership', (join) =>
         join
@@ -329,10 +330,10 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
           .onRef('student_membership.person_id', '=', 'scheduled_authorization.student_id')
           .on('student_membership.affiliation', '=', 'student'),
       )
-      .leftJoin('location as origin_location', (join) =>
+      .leftJoin('room as origin_room', (join) =>
         join
-          .onRef('origin_location.tenant_id', '=', 'scheduled_authorization.tenant_id')
-          .onRef('origin_location.id', '=', 'scheduled_authorization.origin_location_id'),
+          .onRef('origin_room.tenant_id', '=', 'scheduled_authorization.tenant_id')
+          .onRef('origin_room.id', '=', 'scheduled_authorization.origin_room_id'),
       )
       .select(selection())
       .where('scheduled_authorization.tenant_id', '=', context.tenantId)
@@ -353,7 +354,7 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
         tenant_id: context.tenantId,
         organization_id: input.organizationId,
         student_id: input.studentId,
-        destination_id: input.destinationId,
+        destination_room_id: input.destinationRoomId,
         created_by_person_id: input.createdByPersonId,
         created_by_account_id: input.createdByAccountId,
         valid_from: toDatabaseInstant(input.validFrom),
@@ -361,7 +362,7 @@ export class PostgresScheduledAuthRepository implements ScheduledAuthRepository 
         status: 'active',
         approval_mode: input.approvalMode,
         origin_strategy: input.originStrategy,
-        origin_location_id: input.originLocationId,
+        origin_room_id: input.originRoomId,
       })
       .returning('id')
       .executeTakeFirstOrThrow();

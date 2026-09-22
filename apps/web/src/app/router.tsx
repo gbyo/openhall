@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet, useLoaderData } from 'react-router';
+import { createBrowserRouter, Navigate, Outlet, useLoaderData, useParams } from 'react-router';
 import { ErrorPage } from './ErrorPage';
 import {
   connectSignInLoader,
@@ -34,12 +34,22 @@ import { ClassPage } from '../features/teacher/ClassPage';
 import { LiveMovementPage } from '../features/movement/LiveMovementPage';
 import { StationPage } from '../features/station/StationPage';
 import { AdminIndex, AdminLayout } from '../features/admin/AdminLayout';
-import { DestinationWorkspace } from '../features/admin/destinations/DestinationWorkspace';
-import { DestinationDetailPage } from '../features/admin/destinations/DestinationDetailPage';
+import { RoomsPage } from '../features/admin/rooms/RoomsPage';
+import { RoomDetailPage } from '../features/admin/rooms/RoomDetailPage';
 import { DemoPage, demoLoader, type DemoInfo } from '../features/demo/DemoPage';
 
 function DemoRoute() {
   return <DemoPage info={useLoaderData<DemoInfo>()} />;
+}
+
+/**
+ * Old `/admin/destinations/:destinationId` bookmarks still resolve: migration
+ * 011 preserved destination UUIDs as room UUIDs, so the id names the room.
+ */
+function DestinationRedirect() {
+  const { destinationId } = useParams();
+  // Two segments up: this route's own path is `destinations/:destinationId`.
+  return <Navigate replace to={destinationId ? `../../rooms/${destinationId}` : '../../rooms'} />;
 }
 
 async function protectedSchoolLoader(args: Parameters<typeof schoolLoader>[0]) {
@@ -113,16 +123,20 @@ export const router = createBrowserRouter([
         path: 'scheduled-passes',
         lazy: () => import('../features/admin/scheduled-passes/ScheduledPassesPage'),
       },
-      { path: 'stations/:destinationId', element: <StationPage /> },
+      { path: 'stations/:roomId', element: <StationPage /> },
       {
         path: 'admin',
         element: <AdminLayout />,
         children: [
           { index: true, element: <AdminIndex /> },
           { path: 'live', element: <Navigate replace to="../../movement" /> },
-          { path: 'destinations', element: <DestinationWorkspace /> },
-          { path: 'destinations/:destinationId', element: <DestinationDetailPage /> },
-          { path: 'locations', lazy: () => import('../features/admin/locations/LocationsPage') },
+          { path: 'rooms', element: <RoomsPage /> },
+          { path: 'rooms/:roomId', element: <RoomDetailPage /> },
+          { path: 'destinations', element: <Navigate replace to="../rooms" /> },
+          // Migration 011 keeps old destination UUIDs as room UUIDs, so an
+          // old deep link still names a real room.
+          { path: 'destinations/:destinationId', element: <DestinationRedirect /> },
+          { path: 'locations', element: <Navigate replace to="../rooms" /> },
           { path: 'schedules', lazy: () => import('../features/admin/schedules/SchedulesPage') },
           { path: 'policies', lazy: () => import('../features/admin/policies/PoliciesPage') },
           {

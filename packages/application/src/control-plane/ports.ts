@@ -1,113 +1,14 @@
 import type { Temporal } from '@js-temporal/polyfill';
 import type { CalendarDayKind, ScheduleBlockKind } from '@openhall/domain';
 import type { TenantTransactionContext } from '../persistence.js';
-import type { DestinationCheckInMode } from '../passes/ports.js';
+import type { RoomCheckInMode } from '../passes/ports.js';
 
-/** Server-owned location row projection. Revisions are bigint end to end. */
-export interface LocationRecord {
-  readonly id: string;
-  readonly tenantId: string;
-  readonly organizationId: string;
-  readonly parentLocationId: string | null;
-  readonly kind: string;
-  readonly name: string;
-  readonly code: string | null;
-  readonly floorLabel: string | null;
-  readonly status: 'active' | 'inactive' | 'archived';
-  readonly revision: bigint;
-  readonly createdAt: Temporal.Instant;
-  readonly updatedAt: Temporal.Instant;
-}
-
-export interface NewLocation {
-  readonly organizationId: string;
-  readonly parentLocationId: string | null;
-  readonly kind: string;
-  readonly name: string;
-  readonly code: string | null;
-  readonly floorLabel: string | null;
-}
-
-export interface LocationUpdate {
-  readonly parentLocationId: string | null;
-  readonly kind: string;
-  readonly name: string;
-  readonly code: string | null;
-  readonly floorLabel: string | null;
-}
-
-/** Purpose-built location persistence port; no generic SQL escape hatch. */
-export interface LocationRepository {
-  /** Canonical school timezone for school-local date predicates, if the school exists. */
-  loadSchoolTimeZone(
-    context: TenantTransactionContext,
-    organizationId: string,
-  ): Promise<string | null>;
-  listByOrganization(
-    context: TenantTransactionContext,
-    organizationId: string,
-  ): Promise<readonly LocationRecord[]>;
-  loadById(context: TenantTransactionContext, locationId: string): Promise<LocationRecord | null>;
-  loadForUpdate(
-    context: TenantTransactionContext,
-    locationId: string,
-  ): Promise<LocationRecord | null>;
-  /** Minimal (id, parent) pairs for in-transaction hierarchy cycle checks. */
-  listHierarchyPairs(
-    context: TenantTransactionContext,
-    organizationId: string,
-  ): Promise<readonly { readonly id: string; readonly parentLocationId: string | null }[]>;
-  insert(context: TenantTransactionContext, input: NewLocation): Promise<LocationRecord>;
-  /**
-   * Full replacement of mutable metadata, incrementing revision once.
-   * Returns null when the row no longer matches the expected revision.
-   */
-  updateToRevision(
-    context: TenantTransactionContext,
-    locationId: string,
-    expectedRevision: bigint,
-    update: LocationUpdate,
-    at: Temporal.Instant,
-  ): Promise<LocationRecord | null>;
-  /**
-   * Semantic archive (status -> archived), incrementing revision once.
-   * Returns null when the row no longer matches the expected revision.
-   */
-  archiveToRevision(
-    context: TenantTransactionContext,
-    locationId: string,
-    expectedRevision: bigint,
-    at: Temporal.Instant,
-  ): Promise<LocationRecord | null>;
-  /**
-   * Non-archived destinations referencing this location. Closed destinations
-   * count: archiving their location would still silently alter placement and
-   * destination semantics, so the guard is conservative by design.
-   */
-  countActiveDestinationReferences(
-    context: TenantTransactionContext,
-    locationId: string,
-  ): Promise<number>;
-  /** Section meetings referencing this location that are current or future. */
-  countRelevantSectionMeetings(
-    context: TenantTransactionContext,
-    locationId: string,
-    today: string,
-  ): Promise<number>;
-  /** Active scheduled authorizations using this location as specific origin. */
-  countActiveScheduledOrigins(
-    context: TenantTransactionContext,
-    locationId: string,
-    now: Temporal.Instant,
-  ): Promise<number>;
-}
-
-export type DestinationStatus = 'active' | 'closed' | 'archived';
-export type { DestinationCheckInMode };
+export type RoomStatus = 'open' | 'closed' | 'archived';
+export type { RoomCheckInMode };
 
 export type ScheduleBlockStatus = 'active' | 'archived';
 
-export type PolicyScopeKind = 'organization' | 'section' | 'destination';
+export type PolicyScopeKind = 'organization' | 'section' | 'room' | 'room_category';
 
 /** Server-owned policy rule projection. Revision is a positive integer. */
 export interface PolicyRuleRecord {
@@ -119,7 +20,8 @@ export interface PolicyRuleRecord {
   readonly scopeKind: PolicyScopeKind;
   readonly scopeOrganizationId: string | null;
   readonly scopeSectionId: string | null;
-  readonly scopeDestinationId: string | null;
+  readonly scopeRoomId: string | null;
+  readonly scopeRoomCategoryId: string | null;
   readonly priority: number;
   readonly configuration: unknown;
   readonly overrideMode: string;
@@ -138,7 +40,8 @@ export interface PolicyRuleWrite {
   readonly scopeKind: PolicyScopeKind;
   readonly scopeOrganizationId: string | null;
   readonly scopeSectionId: string | null;
-  readonly scopeDestinationId: string | null;
+  readonly scopeRoomId: string | null;
+  readonly scopeRoomCategoryId: string | null;
   readonly priority: number;
   readonly configuration: unknown;
   readonly overrideMode: string;
@@ -384,61 +287,67 @@ export interface ScheduleAdminRepository {
   ): Promise<CalendarDayRecord>;
 }
 
-/** Server-owned destination row projection. */
-export interface DestinationRecord {
+/** Server-owned room row projection. Revisions are bigint end to end. */
+export interface RoomRecord {
   readonly id: string;
   readonly tenantId: string;
   readonly organizationId: string;
-  readonly locationId: string;
-  readonly categoryId: string;
+  readonly categoryId: string | null;
+  readonly name: string;
+  readonly code: string | null;
+  readonly floorLabel: string | null;
+  readonly status: RoomStatus;
   readonly studentSelfRequestable: boolean;
-  readonly serviceType: string;
-  readonly displayName: string | null;
+  readonly originSelectable: boolean;
   readonly capacity: number | null;
   readonly queueEnabled: boolean;
-  readonly checkInMode: DestinationCheckInMode;
+  readonly checkInMode: RoomCheckInMode;
   readonly defaultDurationSeconds: number | null;
   readonly maxDurationSeconds: number | null;
   readonly readyClaimTimeoutSeconds: number;
   readonly queueTimeoutSeconds: number;
-  readonly status: DestinationStatus;
   readonly revision: bigint;
+  readonly createdAt: Temporal.Instant;
   readonly updatedAt: Temporal.Instant;
 }
 
-export interface NewDestination {
+export interface NewRoom {
   readonly organizationId: string;
-  readonly locationId: string;
-  readonly categoryId: string;
+  readonly categoryId: string | null;
+  readonly name: string;
+  readonly code: string | null;
+  readonly floorLabel: string | null;
   readonly studentSelfRequestable: boolean;
-  readonly serviceType: string;
-  readonly displayName: string | null;
+  readonly originSelectable: boolean;
   readonly capacity: number | null;
   readonly queueEnabled: boolean;
-  readonly checkInMode: DestinationCheckInMode;
+  readonly checkInMode: RoomCheckInMode;
   readonly defaultDurationSeconds: number | null;
   readonly maxDurationSeconds: number | null;
   readonly readyClaimTimeoutSeconds: number;
   readonly queueTimeoutSeconds: number;
 }
 
-export interface DestinationUpdate {
-  readonly locationId: string;
-  readonly categoryId: string;
+export interface RoomUpdate {
+  readonly categoryId: string | null;
+  readonly name: string;
+  readonly code: string | null;
+  readonly floorLabel: string | null;
   readonly studentSelfRequestable: boolean;
-  readonly serviceType: string;
-  readonly displayName: string | null;
+  readonly originSelectable: boolean;
   readonly capacity: number | null;
   readonly queueEnabled: boolean;
-  readonly checkInMode: DestinationCheckInMode;
+  readonly checkInMode: RoomCheckInMode;
   readonly defaultDurationSeconds: number | null;
   readonly maxDurationSeconds: number | null;
   readonly readyClaimTimeoutSeconds: number;
   readonly queueTimeoutSeconds: number;
 }
 
-/** Server-owned destination-category row projection. Revisions are bigint end to end. */
-export interface DestinationCategoryRecord {
+export type RoomCategoryPickerMode = 'auto' | 'list' | 'search';
+
+/** Server-owned room-category row projection. Revisions are bigint end to end. */
+export interface RoomCategoryRecord {
   readonly id: string;
   readonly tenantId: string;
   readonly organizationId: string;
@@ -446,6 +355,7 @@ export interface DestinationCategoryRecord {
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly pickerMode: RoomCategoryPickerMode;
   readonly sortOrder: number;
   readonly status: 'active' | 'archived';
   readonly revision: bigint;
@@ -453,41 +363,40 @@ export interface DestinationCategoryRecord {
   readonly updatedAt: Temporal.Instant;
 }
 
-export interface NewDestinationCategory {
+export interface NewRoomCategory {
   readonly organizationId: string;
   readonly name: string;
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly pickerMode: RoomCategoryPickerMode;
   readonly sortOrder: number;
 }
 
-export interface DestinationCategoryUpdate {
+export interface RoomCategoryUpdate {
   readonly name: string;
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly pickerMode: RoomCategoryPickerMode;
   readonly sortOrder: number;
 }
 
 /** Purpose-built destination-category persistence port; no generic SQL escape hatch. */
-export interface DestinationCategoryRepository {
+export interface RoomCategoryRepository {
   listByOrganization(
     context: TenantTransactionContext,
     organizationId: string,
-  ): Promise<readonly DestinationCategoryRecord[]>;
+  ): Promise<readonly RoomCategoryRecord[]>;
   loadById(
     context: TenantTransactionContext,
     categoryId: string,
-  ): Promise<DestinationCategoryRecord | null>;
+  ): Promise<RoomCategoryRecord | null>;
   loadForUpdate(
     context: TenantTransactionContext,
     categoryId: string,
-  ): Promise<DestinationCategoryRecord | null>;
-  insert(
-    context: TenantTransactionContext,
-    input: NewDestinationCategory,
-  ): Promise<DestinationCategoryRecord>;
+  ): Promise<RoomCategoryRecord | null>;
+  insert(context: TenantTransactionContext, input: NewRoomCategory): Promise<RoomCategoryRecord>;
   /**
    * Full replacement of mutable presentation metadata, incrementing revision
    * once. Returns null when the row no longer matches the expected revision.
@@ -496,9 +405,9 @@ export interface DestinationCategoryRepository {
     context: TenantTransactionContext,
     categoryId: string,
     expectedRevision: bigint,
-    update: DestinationCategoryUpdate,
+    update: RoomCategoryUpdate,
     at: Temporal.Instant,
-  ): Promise<DestinationCategoryRecord | null>;
+  ): Promise<RoomCategoryRecord | null>;
   /**
    * Semantic archive (status -> archived), incrementing revision once.
    * Returns null when the row no longer matches the expected revision.
@@ -508,79 +417,109 @@ export interface DestinationCategoryRepository {
     categoryId: string,
     expectedRevision: bigint,
     at: Temporal.Instant,
-  ): Promise<DestinationCategoryRecord | null>;
+  ): Promise<RoomCategoryRecord | null>;
   /**
    * Non-archived destinations referencing this category. Closed destinations
    * count: archiving their category would still silently alter student
    * grouping, so the guard is conservative by design.
    */
-  countActiveDestinationReferences(
-    context: TenantTransactionContext,
-    categoryId: string,
-  ): Promise<number>;
+  countActiveRoomReferences(context: TenantTransactionContext, categoryId: string): Promise<number>;
 }
 
-/** Purpose-built destination persistence port; no generic SQL escape hatch. */
-export interface DestinationRepository {
+/** Purpose-built room persistence port; no generic SQL escape hatch. */
+export interface RoomRepository {
+  /** Canonical school timezone for school-local date predicates, if the school exists. */
+  loadSchoolTimeZone(
+    context: TenantTransactionContext,
+    organizationId: string,
+  ): Promise<string | null>;
   listByOrganization(
     context: TenantTransactionContext,
     organizationId: string,
-  ): Promise<readonly DestinationRecord[]>;
-  listActiveCatalog(
+  ): Promise<readonly RoomRecord[]>;
+  /** Open rooms of the school for catalogs and pickers. */
+  listOpenCatalog(
     context: TenantTransactionContext,
     organizationId: string,
-  ): Promise<readonly DestinationRecord[]>;
-  loadById(
-    context: TenantTransactionContext,
-    destinationId: string,
-  ): Promise<DestinationRecord | null>;
-  loadForUpdate(
-    context: TenantTransactionContext,
-    destinationId: string,
-  ): Promise<DestinationRecord | null>;
-  insert(context: TenantTransactionContext, input: NewDestination): Promise<DestinationRecord>;
+  ): Promise<readonly RoomRecord[]>;
+  loadById(context: TenantTransactionContext, roomId: string): Promise<RoomRecord | null>;
+  loadForUpdate(context: TenantTransactionContext, roomId: string): Promise<RoomRecord | null>;
+  insert(context: TenantTransactionContext, input: NewRoom): Promise<RoomRecord>;
   /**
    * Configuration replacement (never status), incrementing revision once.
    * Returns null when the row no longer matches the expected revision.
    */
   updateToRevision(
     context: TenantTransactionContext,
-    destinationId: string,
+    roomId: string,
     expectedRevision: bigint,
-    update: DestinationUpdate,
+    update: RoomUpdate,
     at: Temporal.Instant,
-  ): Promise<DestinationRecord | null>;
+  ): Promise<RoomRecord | null>;
   /**
-   * Semantic status transition, incrementing revision once. Returns null
-   * when the row no longer matches the expected revision.
+   * Semantic status transition (open/closed/archived), incrementing revision
+   * once. Returns null when the row no longer matches the expected revision.
    */
   transitionStatusToRevision(
     context: TenantTransactionContext,
-    destinationId: string,
+    roomId: string,
     expectedRevision: bigint,
-    status: DestinationStatus,
+    status: RoomStatus,
     at: Temporal.Instant,
-  ): Promise<DestinationRecord | null>;
-  /** Passes in live workflow states bound to this destination. */
-  countLivePasses(context: TenantTransactionContext, destinationId: string): Promise<number>;
-  /** Active explicit destination_staff grants for this destination. */
-  countActiveStaffGrants(context: TenantTransactionContext, destinationId: string): Promise<number>;
-  /** Enabled destination-scoped policy rules for this destination. */
-  countEnabledPolicyRules(
-    context: TenantTransactionContext,
-    destinationId: string,
-  ): Promise<number>;
-  /** Active or future scheduled authorizations targeting this destination. */
+  ): Promise<RoomRecord | null>;
+  /** Passes in live workflow states bound to this room as destination. */
+  countLivePasses(context: TenantTransactionContext, roomId: string): Promise<number>;
+  /** Active explicit room_staff grants for this room. */
+  countActiveStaffGrants(context: TenantTransactionContext, roomId: string): Promise<number>;
+  /** Enabled room-scoped policy rules for this room. */
+  countEnabledPolicyRules(context: TenantTransactionContext, roomId: string): Promise<number>;
+  /** Active or future scheduled authorizations targeting this room. */
   countLiveScheduledAuthorizations(
     context: TenantTransactionContext,
-    destinationId: string,
+    roomId: string,
     now: Temporal.Instant,
   ): Promise<number>;
+  /** Section meetings referencing this room that are current or future. */
+  countRelevantSectionMeetings(
+    context: TenantTransactionContext,
+    roomId: string,
+    today: string,
+  ): Promise<number>;
+  /** Active scheduled authorizations using this room as specific origin. */
+  countActiveScheduledOrigins(
+    context: TenantTransactionContext,
+    roomId: string,
+    now: Temporal.Instant,
+  ): Promise<number>;
+  /**
+   * Active explicit room_staff grants per room with staff display names.
+   * Read-only here; category names never imply staffing.
+   */
+  listActiveRoomStaff(
+    context: TenantTransactionContext,
+    organizationId: string,
+  ): Promise<readonly { readonly roomId: string; readonly staffDisplayName: string }[]>;
+  /**
+   * Derived class context per room: active teacher memberships on sections
+   * meeting at the room. Read-only here; teachers are never granted room
+   * staff implicitly through this listing.
+   */
+  listRoomClassContexts(
+    context: TenantTransactionContext,
+    organizationId: string,
+  ): Promise<
+    readonly {
+      readonly roomId: string;
+      readonly teacherDisplayName: string;
+      readonly sectionTitle: string;
+      readonly sectionCode: string | null;
+    }[]
+  >;
 }
 
 /** School-manageable explicit duty roles. Never student/teacher/system_admin. */
 export const SCHOOL_GRANT_ROLES = [
-  'destination_staff',
+  'room_staff',
   'counselor',
   'office_staff',
   'school_admin',
@@ -606,8 +545,8 @@ export interface GrantRecord {
   readonly role: string;
   readonly scopeKind: string;
   readonly organizationId: string | null;
-  readonly destinationId: string | null;
-  readonly destinationDisplayName: string | null;
+  readonly roomId: string | null;
+  readonly roomName: string | null;
   readonly status: string;
   readonly validFrom: Temporal.Instant | null;
   readonly validUntil: Temporal.Instant | null;
@@ -622,9 +561,9 @@ export interface NewGrant {
   readonly accountId: string;
   readonly personId: string;
   readonly role: SchoolGrantRole;
-  readonly scopeKind: 'organization' | 'destination';
+  readonly scopeKind: 'organization' | 'room';
   readonly organizationId: string | null;
-  readonly destinationId: string | null;
+  readonly roomId: string | null;
   readonly validFrom: Temporal.Instant | null;
   readonly validUntil: Temporal.Instant | null;
   readonly createdByAccountId: string;
@@ -889,9 +828,8 @@ export interface ScheduledAuthRecord {
   readonly studentId: string;
   readonly studentDisplayName: string;
   readonly studentGradeLevel: string | null;
-  readonly destinationId: string;
-  readonly destinationDisplayName: string;
-  readonly destinationServiceType: string;
+  readonly destinationRoomId: string;
+  readonly destinationRoomName: string;
   readonly createdByPersonId: string;
   readonly createdByAccountId: string | null;
   readonly validFrom: Temporal.Instant;
@@ -899,8 +837,8 @@ export interface ScheduledAuthRecord {
   readonly status: string;
   readonly approvalMode: string;
   readonly originStrategy: string;
-  readonly originLocationId: string | null;
-  readonly originLocationName: string | null;
+  readonly originRoomId: string | null;
+  readonly originRoomName: string | null;
   readonly displayCategory: string | null;
   readonly revision: bigint;
   readonly createdAt: Temporal.Instant;
@@ -915,14 +853,14 @@ export interface ScheduledAuthRecord {
 export interface NewScheduledAuth {
   readonly organizationId: string;
   readonly studentId: string;
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
   readonly createdByPersonId: string;
   readonly createdByAccountId: string;
   readonly validFrom: Temporal.Instant;
   readonly validUntil: Temporal.Instant;
   readonly approvalMode: 'preapproved' | 'approval_required';
   readonly originStrategy: 'expected' | 'specific';
-  readonly originLocationId: string | null;
+  readonly originRoomId: string | null;
 }
 
 /** Purpose-built scheduled authorization persistence port. */
@@ -948,14 +886,19 @@ export interface ScheduledAuthRepository {
     onDate: string,
   ): Promise<{ readonly personId: string } | null>;
   /**
-   * Same-school active location by id with its display name; null when
-   * missing, elsewhere, or not active.
+   * Same-school open room by id with its name and origin selectability;
+   * null when missing, elsewhere, or not open. Callers that create an
+   * explicit origin must also honor `originSelectable`.
    */
-  loadActiveLocation(
+  loadActiveRoom(
     context: TenantTransactionContext,
     organizationId: string,
-    locationId: string,
-  ): Promise<{ readonly id: string; readonly name: string } | null>;
+    roomId: string,
+  ): Promise<{
+    readonly id: string;
+    readonly name: string;
+    readonly originSelectable: boolean;
+  } | null>;
   /** Authorizations for the school, soonest window first. */
   listByOrganization(
     context: TenantTransactionContext,

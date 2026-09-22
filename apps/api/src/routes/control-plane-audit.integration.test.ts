@@ -242,14 +242,15 @@ describe('school audit feed', () => {
   it('projects committed mutations without metadata', async () => {
     const created = await app.inject({
       method: 'POST',
-      url: `/api/v1/organizations/${schoolA}/locations`,
+      url: `/api/v1/organizations/${schoolA}/room-categories`,
       headers: { ...authHeaders(requireAdmin()), 'idempotency-key': randomUUID() },
       payload: {
-        parentLocationId: null,
-        kind: 'classroom',
-        name: 'Audit Room',
-        code: 'AR1',
-        floorLabel: '1F',
+        name: 'Audit Cat',
+        iconKey: 'generic',
+        toneKey: 'neutral',
+        studentSurface: 'primary',
+        pickerMode: 'list',
+        sortOrder: 0,
       },
     });
     expect(created.statusCode).toBe(201);
@@ -261,12 +262,12 @@ describe('school audit feed', () => {
     });
     expect(response.statusCode).toBe(200);
     const body = response.json<{ events: AuditEventBody[]; nextCursor: string | null }>();
-    const entry = body.events.find((event) => event.action === 'location.created');
+    const entry = body.events.find((event) => event.action === 'room_category.created');
     expect(entry).toBeDefined();
     expect(entry?.actor.kind).toBe('account');
     expect(entry?.actor.accountId).toBe(requireAdmin().accountId);
     expect(entry?.actor.displayName).toBe('Ada Test');
-    expect(entry?.target.kind).toBe('location');
+    expect(entry?.target.kind).toBe('room_category');
     expect(entry?.outcome).toBe('success');
     // Minimized projection: no metadata key anywhere in the payload.
     expect(response.body).not.toContain('metadata');

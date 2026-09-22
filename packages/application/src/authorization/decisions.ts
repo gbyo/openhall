@@ -16,7 +16,7 @@ export interface AuthorizationRequest<C extends Capability = Capability> {
 }
 
 export type ExplicitRole =
-  'destination_staff' | 'counselor' | 'office_staff' | 'school_admin' | 'system_admin';
+  'room_staff' | 'counselor' | 'office_staff' | 'school_admin' | 'system_admin';
 
 export type AuthorizationBasis =
   | { readonly kind: 'self' }
@@ -27,9 +27,9 @@ export type AuthorizationBasis =
       readonly kind: 'explicit_grant';
       readonly grantId: string;
       readonly role: ExplicitRole;
-      readonly scopeKind: 'tenant' | 'organization' | 'destination';
+      readonly scopeKind: 'tenant' | 'organization' | 'room';
       readonly organizationId: string | null;
-      readonly destinationId: string | null;
+      readonly roomId: string | null;
     }
   | { readonly kind: 'system_admin'; readonly grantId: string };
 

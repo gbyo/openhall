@@ -1,7 +1,7 @@
 import { Temporal } from '@js-temporal/polyfill';
 import type {
   CalendarDayReference,
-  LocationReference,
+  RoomReference,
   OrganizationId,
   PersonId,
   PlacementCandidateReference,
@@ -48,7 +48,7 @@ export type ExpectedPlacementResult =
   | (ActiveSlotContext & {
       readonly kind: 'resolved';
       readonly section: SectionReference;
-      readonly expectedLocation: LocationReference | null;
+      readonly expectedLocation: RoomReference | null;
       readonly teachers: readonly TeacherReference[];
     })
   | (ActiveSlotContext & { readonly kind: 'block_only' })
@@ -283,7 +283,7 @@ export class ExpectedPlacementResolver {
     return {
       kind: 'resolved',
       section: selected.record.meeting.section,
-      expectedLocation: selected.record.meeting.location,
+      expectedLocation: selected.record.meeting.room,
       teachers,
       ...slotContext,
     };

@@ -154,14 +154,14 @@ function authHeaders(
 
 async function postSelfPass(
   session: { cookie: string; csrf: string },
-  destinationId: string,
+  destinationRoomId: string,
   key?: string,
 ) {
   return app.inject({
     method: 'POST',
     url: '/api/v1/me/passes',
     headers: authHeaders(session, key),
-    payload: { destinationId },
+    payload: { destinationRoomId },
   });
 }
 
@@ -240,45 +240,37 @@ beforeAll(async () => {
     [tenantA, schoolA, session],
   );
 
-  const locationA = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Room 214') RETURNING id`,
+  const meetingRoomA = await insertReturningId(
+    `INSERT INTO room (tenant_id, organization_id, name) VALUES ($1, $2, 'Room 214') RETURNING id`,
     [tenantA, schoolA],
   );
-  const locationB = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic B') RETURNING id`,
-    [tenantA, schoolB],
-  );
   const categoryA = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Restrooms', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Restrooms', 'primary') RETURNING id`,
     [tenantA, schoolA],
   );
   const categoryB = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
     [tenantA, schoolB],
   );
   const categoryTB = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
     [tenantB, tenantBSchool],
   );
   destinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'restroom', 'Restroom B') RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name) VALUES ($1, $2, $3, true, 'Restroom B') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   closedDestinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, status) VALUES ($1, $2, $3, $4, true, 'restroom', 'Closed Restroom', 'closed') RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name, status) VALUES ($1, $2, $3, true, 'Closed Restroom', 'closed') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   destinationB = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse B') RETURNING id`,
-    [tenantA, schoolB, locationB, categoryB],
-  );
-  const tenantBLocation = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'TB Clinic') RETURNING id`,
-    [tenantB, tenantBSchool],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name) VALUES ($1, $2, $3, true, 'Nurse B') RETURNING id`,
+    [tenantA, schoolB, categoryB],
   );
   crossTenantDestination = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'nurse', 'TB Nurse') RETURNING id`,
-    [tenantB, tenantBSchool, tenantBLocation, categoryTB],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name) VALUES ($1, $2, $3, true, 'TB Nurse') RETURNING id`,
+    [tenantB, tenantBSchool, categoryTB],
   );
 
   // Schedule fixtures so Expected Placement resolves for section members.
@@ -303,12 +295,12 @@ beforeAll(async () => {
     );
   }
   await pool.query(
-    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, location_id) VALUES ($1, $2, $3, $4, $5)`,
-    [tenantA, schoolA, sectionA1, block, locationA],
+    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, room_id) VALUES ($1, $2, $3, $4, $5)`,
+    [tenantA, schoolA, sectionA1, block, meetingRoomA],
   );
   await pool.query(
-    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, location_id) VALUES ($1, $2, $3, $4, $5)`,
-    [tenantA, schoolA, sectionA2, block, locationA],
+    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, room_id) VALUES ($1, $2, $3, $4, $5)`,
+    [tenantA, schoolA, sectionA2, block, meetingRoomA],
   );
 
   teacher = await makeStaff(tenantA, schoolA, 'Teacher');
@@ -355,12 +347,12 @@ interface PassBody {
   id: string;
   organizationId: string;
   studentId: string;
-  destination: { id: string; displayName: string; serviceType: string };
+  destination: { id: string; name: string };
   origin: {
     placementKind: string;
     block: { id: string; code: string; displayName: string } | null;
     section: { id: string; code: string | null; title: string } | null;
-    location: { id: string; name: string } | null;
+    room: { id: string; name: string } | null;
   };
   requestSource: string;
   requestedAt: string;
@@ -373,7 +365,7 @@ describe('POST /api/v1/me/passes', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/me/passes',
-      payload: { destinationId: destinationA },
+      payload: { destinationRoomId: destinationA },
     });
     expect(response.statusCode).toBe(401);
   });
@@ -388,7 +380,7 @@ describe('POST /api/v1/me/passes', () => {
         origin: ORIGIN,
         'idempotency-key': randomUUID(),
       },
-      payload: { destinationId: destinationA },
+      payload: { destinationRoomId: destinationA },
     });
     expect(response.statusCode).toBe(403);
   });
@@ -425,7 +417,7 @@ describe('POST /api/v1/me/passes', () => {
     expect(body.pass.studentId).toBe(student.personId);
     expect(body.pass.organizationId).toBe(schoolA);
     expect(body.pass.destination.id).toBe(destinationA);
-    expect(body.pass.destination.displayName).toBe('Restroom B');
+    expect(body.pass.destination.name).toBe('Restroom B');
     expect(body.pass.origin.placementKind).toBe('resolved');
     expect(body.pass.origin.section?.code).toBe('HIST-3');
     const raw = JSON.stringify(body);
@@ -484,7 +476,7 @@ describe('POST /api/v1/me/passes', () => {
     expect(await tableCount('pass_event')).toBe(events);
   });
 
-  it('rejects a closed destination with 409 destination_unavailable', async () => {
+  it('rejects a closed room with 409 room_unavailable', async () => {
     const student = await makeStudent(tenantA, schoolA, 'ClosedDest');
     const response = await postSelfPass(
       { cookie: student.cookie, csrf: student.csrf },
@@ -492,10 +484,10 @@ describe('POST /api/v1/me/passes', () => {
       randomUUID(),
     );
     expect(response.statusCode).toBe(409);
-    expect(response.json<{ code: string }>().code).toBe('destination_unavailable');
+    expect(response.json<{ code: string }>().code).toBe('room_unavailable');
   });
 
-  it('conceals other-school destinations with 404', async () => {
+  it('conceals other-school rooms with 404', async () => {
     const student = await makeStudent(tenantA, schoolA, 'OtherSchool');
     const response = await postSelfPass(
       { cookie: student.cookie, csrf: student.csrf },
@@ -503,7 +495,7 @@ describe('POST /api/v1/me/passes', () => {
       randomUUID(),
     );
     expect(response.statusCode).toBe(404);
-    expect(response.json<{ code: string }>().code).toBe('destination_not_found');
+    expect(response.json<{ code: string }>().code).toBe('room_not_found');
   });
 
   it('conceals cross-tenant destinations with 404', async () => {
@@ -512,7 +504,7 @@ describe('POST /api/v1/me/passes', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders({ cookie: student.cookie, csrf: student.csrf }, randomUUID()),
-      payload: { destinationId: crossTenantDestination },
+      payload: { destinationRoomId: crossTenantDestination },
     });
     expect(response.statusCode).toBe(404);
   });
@@ -533,7 +525,7 @@ describe('POST /api/v1/me/passes', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders({ cookie: recoveryCookie, csrf: recoveryCsrf }, randomUUID()),
-      payload: { destinationId: destinationA },
+      payload: { destinationRoomId: destinationA },
     });
     expect(response.statusCode).toBe(403);
     expect(response.json<{ code: string }>().code).toBe('recovery_session_restricted');
@@ -641,14 +633,14 @@ describe('POST /api/v1/students/:studentId/passes', () => {
   async function postStaffPass(
     session: { cookie: string; csrf: string },
     studentId: string,
-    destinationId: string,
+    destinationRoomId: string,
     key: string,
   ) {
     return app.inject({
       method: 'POST',
       url: `/api/v1/students/${studentId}/passes`,
       headers: authHeaders(session, key),
-      payload: { destinationId },
+      payload: { destinationRoomId },
     });
   }
 
@@ -722,7 +714,7 @@ describe('POST /api/v1/students/:studentId/passes', () => {
       method: 'POST',
       url: `/api/v1/students/${randomUUID()}/passes`,
       headers: authHeaders({ cookie: teacher.cookie, csrf: teacher.csrf }, randomUUID()),
-      payload: { destinationId: destinationA },
+      payload: { destinationRoomId: destinationA },
     });
     expect(missing.statusCode).toBe(403);
     expect(missing.json<{ code: string }>().code).toBe('forbidden');
@@ -962,7 +954,7 @@ describe('pass command durability', () => {
       method: 'POST',
       url: `/api/v1/students/${outsiderId}/passes`,
       headers: authHeaders({ cookie: counselor.cookie, csrf: counselor.csrf }, randomUUID()),
-      payload: { destinationId: destinationA },
+      payload: { destinationRoomId: destinationA },
     });
     expect(response.statusCode).toBe(403);
     expect(response.json<{ code: string }>().code).toBe('forbidden');
@@ -980,20 +972,20 @@ describe('pass command durability', () => {
     expect(body.pass.origin.placementKind).toBe('block_only');
     expect(body.pass.origin.block?.code).toBe('P3');
     expect(body.pass.origin.section).toBeNull();
-    expect(body.pass.origin.location).toBeNull();
+    expect(body.pass.origin.room).toBeNull();
     const row = (
       await pool.query<{
         origin_schedule_block_id: string | null;
         origin_section_id: string | null;
-        origin_location_id: string | null;
+        origin_room_id: string | null;
       }>(
-        `SELECT origin_schedule_block_id, origin_section_id, origin_location_id FROM pass WHERE id = $1`,
+        `SELECT origin_schedule_block_id, origin_section_id, origin_room_id FROM pass WHERE id = $1`,
         [body.pass.id],
       )
     ).rows[0];
     expect(row?.origin_schedule_block_id).not.toBeNull();
     expect(row?.origin_section_id).toBeNull();
-    expect(row?.origin_location_id).toBeNull();
+    expect(row?.origin_room_id).toBeNull();
     const metadata = (
       await pool.query<{ metadata: unknown }>(
         `SELECT metadata FROM pass_event WHERE pass_id = $1`,
@@ -1052,14 +1044,14 @@ describe('pass command durability', () => {
         { cookie: schoolBCounselor.cookie, csrf: schoolBCounselor.csrf },
         randomUUID(),
       ),
-      payload: { destinationId: destinationB },
+      payload: { destinationRoomId: destinationB },
     });
     expect(response.statusCode).toBe(201);
     const body = response.json<{ pass: PassBody }>();
     expect(body.pass.origin.placementKind).toBe('unresolved');
     expect(body.pass.origin.block).toBeNull();
     expect(body.pass.origin.section).toBeNull();
-    expect(body.pass.origin.location).toBeNull();
+    expect(body.pass.origin.room).toBeNull();
   });
 
   it('keeps pass events, audit, and outbox minimized', async () => {

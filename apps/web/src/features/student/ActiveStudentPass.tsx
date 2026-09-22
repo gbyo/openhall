@@ -9,7 +9,7 @@ import type { Pass } from '../../api/types';
 import { QueuePosition } from '../../design-system/patterns/QueuePosition';
 import { Route, RouteStop } from '../../design-system/patterns/Route';
 import type { StudentPassPresentation } from './presentation';
-import { iconForCategoryKey } from '../../lib/destination-category-presentation.js';
+import { iconForCategoryKey } from '../../lib/room-category-presentation.js';
 import { formatSchoolTime } from './student-time.js';
 
 export interface PassAction {
@@ -107,14 +107,10 @@ function stateCopy(presentation: StudentPassPresentation, pass: Pass): ReactNode
     case 'ready':
       return null;
     case 'outbound-lightweight':
-      return (
-        <p className="text-sm text-muted-foreground">Head to {pass.destination.displayName}.</p>
-      );
+      return <p className="text-sm text-muted-foreground">Head to {pass.destination.name}.</p>;
     case 'outbound-optional':
       return (
-        <p className="text-sm text-muted-foreground">
-          On your way to {pass.destination.displayName}.
-        </p>
+        <p className="text-sm text-muted-foreground">On your way to {pass.destination.name}.</p>
       );
     case 'outbound-station-required':
       return (
@@ -125,13 +121,13 @@ function stateCopy(presentation: StudentPassPresentation, pass: Pass): ReactNode
     case 'at-destination':
       return (
         <p className="text-sm text-muted-foreground">
-          Check in with staff at {pass.destination.displayName}.
+          Check in with staff at {pass.destination.name}.
         </p>
       );
     case 'returning':
       return (
         <p className="text-sm text-muted-foreground">
-          Head back to {pass.origin.location?.name ?? 'class'}.
+          Head back to {pass.origin.room?.name ?? 'class'}.
         </p>
       );
     case 'terminal':
@@ -158,7 +154,7 @@ export function ActiveStudentPass({
 }: ActiveStudentPassProps) {
   const category = pass.destination.category;
   const icon = iconForCategoryKey(category?.iconKey ?? 'generic');
-  const intentLabel = category?.name ?? pass.destination.displayName;
+  const intentLabel = category?.name ?? pass.destination.name;
   return (
     <div className="mx-auto w-full max-w-xl">
       <Card>
@@ -171,7 +167,7 @@ export function ActiveStudentPass({
           <h1 id="pass-title" className="font-heading text-xl font-semibold text-balance">
             {presentation.title}
           </h1>
-          <p className="text-base font-medium">{pass.destination.displayName}</p>
+          <p className="text-base font-medium">{pass.destination.name}</p>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {pass.movement.expectedReturnAt &&
@@ -193,12 +189,8 @@ export function ActiveStudentPass({
           {stateCopy(presentation, pass)}
           {(presentation.kind === 'at-destination' || presentation.kind === 'returning') && (
             <Route>
-              <RouteStop label={pass.destination.displayName} evidence="recorded" />
-              <RouteStop
-                label={pass.origin.location?.name ?? 'Return location'}
-                evidence="intended"
-                last
-              />
+              <RouteStop label={pass.destination.name} evidence="recorded" />
+              <RouteStop label={pass.origin.room?.name ?? 'Return room'} evidence="intended" last />
             </Route>
           )}
         </CardContent>

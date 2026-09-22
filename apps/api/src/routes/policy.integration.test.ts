@@ -186,7 +186,7 @@ interface PassBody {
 async function seedRule(input: {
   name: string;
   ruleType: string;
-  scopeKind: 'organization' | 'section' | 'destination';
+  scopeKind: 'organization' | 'section' | 'room';
   scopeId: string;
   priority?: number;
   configuration: unknown;
@@ -197,7 +197,7 @@ async function seedRule(input: {
       ? 'scope_organization_id'
       : input.scopeKind === 'section'
         ? 'scope_section_id'
-        : 'scope_destination_id';
+        : 'scope_room_id';
   return insertReturningId(
     `INSERT INTO policy_rule (tenant_id, organization_id, name, rule_type, scope_kind, ${scopeColumn}, priority, configuration, override_mode)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
@@ -235,7 +235,7 @@ async function clearRules(): Promise<void> {
   // Destination-flow rows bind exact policy evaluations; delete them before
   // the evaluations they reference.
   await pool.query(`DELETE FROM queue_entry`);
-  await pool.query(`DELETE FROM destination_reservation`);
+  await pool.query(`DELETE FROM room_reservation`);
   await pool.query(`DELETE FROM policy_evaluation_result`);
   await pool.query(`DELETE FROM policy_evaluation`);
   await pool.query(`DELETE FROM policy_rule`);
@@ -257,7 +257,7 @@ async function requestPass(student: SessionFixture, key: string = randomUUID()) 
     method: 'POST',
     url: '/api/v1/me/passes',
     headers: authHeaders(student, key),
-    payload: { destinationId: destinationA },
+    payload: { destinationRoomId: destinationA },
   });
 }
 
@@ -337,16 +337,16 @@ beforeAll(async () => {
     [tenantA, schoolA, session],
   );
   const locationA = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Room 214') RETURNING id`,
+    `INSERT INTO room (tenant_id, organization_id, name) VALUES ($1, $2, 'Room 214') RETURNING id`,
     [tenantA, schoolA],
   );
   const categoryA = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Restrooms', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Restrooms', 'primary') RETURNING id`,
     [tenantA, schoolA],
   );
   destinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'restroom', 'Restroom B') RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name) VALUES ($1, $2, $3, true, 'Restroom B') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
 
   const block = await insertReturningId(
@@ -370,11 +370,11 @@ beforeAll(async () => {
     );
   }
   await pool.query(
-    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, location_id) VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, room_id) VALUES ($1, $2, $3, $4, $5)`,
     [tenantA, schoolA, sectionA1, block, locationA],
   );
   await pool.query(
-    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, location_id) VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, room_id) VALUES ($1, $2, $3, $4, $5)`,
     [tenantA, schoolA, sectionA2, block, locationA],
   );
 
@@ -422,10 +422,7 @@ describe('initial request policy integration', () => {
     expect(requiredEtag(created)).toContain(':2"');
     expect(await tableCount('policy_evaluation')).toBe(1);
     expect(
-      await tableCount(
-        'destination_reservation',
-        `WHERE pass_id = '${pass.id}' AND released_at IS NULL`,
-      ),
+      await tableCount('room_reservation', `WHERE pass_id = '${pass.id}' AND released_at IS NULL`),
     ).toBe(1);
     expect((await passEvents(pass.id)).map((entry) => entry.event_type)).toEqual([
       'pass.requested',
@@ -554,10 +551,7 @@ describe('standard approval workflow', () => {
     expect(body.movement.readyUntil).not.toBeNull();
     expect(requiredEtag(resolved)).toContain(':3"');
     expect(
-      await tableCount(
-        'destination_reservation',
-        `WHERE pass_id = '${pass.id}' AND released_at IS NULL`,
-      ),
+      await tableCount('room_reservation', `WHERE pass_id = '${pass.id}' AND released_at IS NULL`),
     ).toBe(1);
     // A resolved approval cannot be resolved again.
     const retry = await app.inject({
@@ -1083,7 +1077,8 @@ describe('Phase 8 policy rule administration', () => {
         kind: 'organization',
         organizationId: schoolA,
         sectionId: null,
-        destinationId: null,
+        roomId: null,
+        roomCategoryId: null,
       },
       priority: 0,
       configuration,
@@ -1154,7 +1149,8 @@ describe('Phase 8 policy rule administration', () => {
             kind: 'section',
             organizationId: null,
             sectionId: sectionA1,
-            destinationId: null,
+            roomId: null,
+            roomCategoryId: null,
           },
           priority: 0,
           configuration: { ...VALID_APPROVAL, approver: 'principal' },
@@ -1172,7 +1168,8 @@ describe('Phase 8 policy rule administration', () => {
             kind: 'section',
             organizationId: null,
             sectionId: sectionA1,
-            destinationId: null,
+            roomId: null,
+            roomCategoryId: null,
           },
           priority: 0,
           configuration: { schemaVersion: 1, requestSources: ['student_web'] },
@@ -1206,7 +1203,8 @@ describe('Phase 8 policy rule administration', () => {
         kind: 'section',
         organizationId: null,
         sectionId: sectionA1,
-        destinationId: null,
+        roomId: null,
+        roomCategoryId: null,
       },
       priority: 0,
       configuration: VALID_APPROVAL,

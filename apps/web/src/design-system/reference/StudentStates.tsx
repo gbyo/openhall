@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { ConnectionStatus } from '../patterns/ConnectionStatus';
-import { DestinationRow } from '../patterns/DestinationRow';
+import { RoomRow } from '../patterns/RoomRow';
 import { PassCard } from '../patterns/PassCard';
 import { QueuePosition } from '../patterns/QueuePosition';
 import { Route, RouteStop } from '../patterns/Route';
@@ -30,10 +30,10 @@ export function NoActivePassState() {
     <StudentFrame label="No active pass">
       <h3 className="wf-type-page-title">Where do you need to go?</h3>
       <div className="wf-destination-list">
-        <DestinationRow name="Restroom" />
-        <DestinationRow name="Nurse" />
-        <DestinationRow name="Front office" />
-        <DestinationRow name="Counselor" />
+        <RoomRow name="Restroom" />
+        <RoomRow name="Nurse" />
+        <RoomRow name="Front office" />
+        <RoomRow name="Counselor" />
       </div>
       <aside className="wf-upcoming-pass">
         <p className="wf-type-label">Upcoming</p>

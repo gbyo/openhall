@@ -229,7 +229,7 @@ function liveWindow(nowMs: number = Date.now()): { validFrom: string; validUntil
 async function clearPolicy(): Promise<void> {
   await pool.query(`DELETE FROM pass_approval`);
   await pool.query(`DELETE FROM queue_entry`);
-  await pool.query(`DELETE FROM destination_reservation`);
+  await pool.query(`DELETE FROM room_reservation`);
   await pool.query(`DELETE FROM policy_evaluation_result`);
   await pool.query(`DELETE FROM policy_evaluation`);
   await pool.query(`DELETE FROM policy_rule`);
@@ -246,13 +246,13 @@ interface AuthBody {
   id: string;
   organizationId: string;
   studentId: string;
-  destinationId: string;
+  destinationRoomId: string;
   validFrom: string;
   validUntil: string;
   status: string;
   approvalMode: string;
   originStrategy: string;
-  originLocationId: string | null;
+  originRoomId: string | null;
   revision: string;
   createdByAccountId: string | null;
   createdAt: string;
@@ -284,7 +284,7 @@ function authPayload(
 ): Record<string, unknown> {
   return {
     studentId,
-    destinationId: destinationA,
+    destinationRoomId: destinationA,
     ...liveWindow(),
     approvalMode: 'approval_required',
     origin: { strategy: 'expected' },
@@ -375,20 +375,20 @@ beforeAll(async () => {
     );
   }
   locationA = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Room 3') RETURNING id`,
+    `INSERT INTO room (tenant_id, organization_id, name) VALUES ($1, $2, 'Room 3') RETURNING id`,
     [tenantA, schoolA],
   );
   await pool.query(
-    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, location_id) VALUES ($1, $2, $3, $4, $5)`,
+    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, room_id) VALUES ($1, $2, $3, $4, $5)`,
     [tenantA, schoolA, sectionA1, block, locationA],
   );
   const categoryA = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
     [tenantA, schoolA],
   );
   destinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse') RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name) VALUES ($1, $2, $3, true, 'Nurse') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
 }, 120000);
 
@@ -418,22 +418,39 @@ describe('scheduled authorization administration', () => {
     expect(body.status).toBe('active');
     expect(body.revision).toBe('1');
     expect(body.originStrategy).toBe('expected');
-    expect(body.originLocationId).toBeNull();
+    expect(body.originRoomId).toBeNull();
     expect(body.createdByAccountId).toBe(requireAdmin().accountId);
     expect(requiredEtag(created)).toBe(`"scheduled-authorization:${body.id}:1"`);
 
     const specific = await createAuth(
       requireAdmin(),
       schoolA,
-      authPayload(student.personId, { origin: { strategy: 'specific', locationId: locationA } }),
+      authPayload(student.personId, { origin: { strategy: 'specific', roomId: locationA } }),
     );
     expect(specific.statusCode).toBe(201);
-    expect(specific.json<{ authorization: AuthBody }>().authorization.originLocationId).toBe(
-      locationA,
-    );
+    expect(specific.json<{ authorization: AuthBody }>().authorization.originRoomId).toBe(locationA);
   });
 
-  it('validates windows, targets, and destinations', async () => {
+  it('refuses a manually chosen origin the school made unselectable', async () => {
+    const student = await makeMember(tenantA, schoolA, 'student', 'Unselectable Origin');
+    const hidden = await insertReturningId(
+      `INSERT INTO room (tenant_id, organization_id, name, status, origin_selectable)
+       VALUES ($1, $2, 'Supply Closet', 'open', false) RETURNING id`,
+      [tenantA, schoolA],
+    );
+    const rejected = await createAuth(
+      requireAdmin(),
+      schoolA,
+      authPayload(student.personId, { origin: { strategy: 'specific', roomId: hidden } }),
+    );
+    expect(rejected.statusCode).toBe(409);
+
+    // The schedule-derived origin is unaffected: it never names a room.
+    const expectedOrigin = await createAuth(requireAdmin(), schoolA, authPayload(student.personId));
+    expect(expectedOrigin.statusCode).toBe(201);
+  });
+
+  it('validates windows, targets, and rooms', async () => {
     const student = await makeMember(tenantA, schoolA, 'student', 'Windowed');
     const { year, month, day } = nyParts(Date.now());
     const base = liveWindow();
@@ -487,17 +504,17 @@ describe('scheduled authorization administration', () => {
     expect(missing.statusCode).toBe(404);
 
     const archivedCategory = await insertReturningId(
-      `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Archived Cat') RETURNING id`,
+      `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Archived Cat') RETURNING id`,
       [tenantA, schoolA],
     );
     const archived = await insertReturningId(
-      `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name, status) VALUES ($1, $2, $3, $4, 'office', 'Archived', 'archived') RETURNING id`,
-      [tenantA, schoolA, locationA, archivedCategory],
+      `INSERT INTO room (tenant_id, organization_id, category_id, name, status) VALUES ($1, $2, $3, 'Archived', 'archived') RETURNING id`,
+      [tenantA, schoolA, archivedCategory],
     );
     const archivedDest = await createAuth(
       requireAdmin(),
       schoolA,
-      authPayload(student.personId, { destinationId: archived }),
+      authPayload(student.personId, { destinationRoomId: archived }),
     );
     expect(archivedDest.statusCode).toBe(409);
 
@@ -505,7 +522,7 @@ describe('scheduled authorization administration', () => {
       requireAdmin(),
       schoolA,
       authPayload(student.personId, {
-        origin: { strategy: 'expected', locationId: locationA },
+        origin: { strategy: 'expected', roomId: locationA },
       }),
     );
     expect(expectedWithLocation.statusCode).toBe(400);
@@ -636,7 +653,7 @@ describe('scheduled start', () => {
     });
     expect(mine.statusCode).toBe(200);
     const mineBody = mine.json<{
-      authorizations: { id: string; destination: object; originLocation: null }[];
+      authorizations: { id: string; destination: object; originRoom: null }[];
     }>();
     expect(mineBody.authorizations.map((entry) => entry.id)).toContain(body.id);
 

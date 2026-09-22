@@ -17,6 +17,7 @@ export const CAPABILITIES = [
   'pass.progress.self',
   'pass.create.student',
   'pass.approve.section',
+  'pass.approve.room',
   'pass.override.request.self',
   'pass.override.request.student',
   'pass.override.resolve.section',
@@ -27,8 +28,8 @@ export const CAPABILITIES = [
 
   'scheduled_authorization.manage',
 
-  'destination.station.manage',
-  'destination.manage',
+  'room.station.manage',
+  'room.manage',
 
   'schedule.view',
   'schedule.manage',

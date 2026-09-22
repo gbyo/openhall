@@ -56,7 +56,7 @@ describe('expected placement public mapping', () => {
       kind: 'resolved',
       block: { id: 'block-1', code: 'P3' },
       section: { id: 'sec-1', code: 'HIST-3', title: 'US History' },
-      expectedLocation: { id: 'room-1', name: 'Room 101' },
+      expectedRoom: { id: 'room-1', name: 'Room 101' },
     });
     expect(JSON.stringify(body)).not.toContain('Teacher One');
     expect(JSON.stringify(body)).not.toContain('t1');
@@ -67,7 +67,7 @@ describe('expected placement public mapping', () => {
     const body = toPublicExpectedPlacement(result);
     expect(body).toMatchObject({ kind: 'block_only', block: { id: 'block-1' } });
     expect(body).not.toHaveProperty('section');
-    expect(body).not.toHaveProperty('expectedLocation');
+    expect(body).not.toHaveProperty('expectedRoom');
   });
 
   it('maps every remaining state and hides internals', () => {

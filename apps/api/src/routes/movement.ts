@@ -14,7 +14,7 @@ import {
   type Principal,
 } from '@openhall/application';
 import {
-  DestinationStationViewSchema,
+  RoomStationViewSchema,
   PassResponseSchema,
   ProblemDetailsSchema,
   QueueStatusSchema,
@@ -35,14 +35,11 @@ const COOKIE_CSRF_SECURITY = [{ cookieAuth: [] as string[], csrfHeader: [] as st
 const PassIdParamsSchema = Type.Object({ passId: UuidSchema }, { additionalProperties: false });
 
 const StationParamsSchema = Type.Object(
-  { destinationId: UuidSchema, passId: UuidSchema },
+  { roomId: UuidSchema, passId: UuidSchema },
   { additionalProperties: false },
 );
 
-const DestinationParamsSchema = Type.Object(
-  { destinationId: UuidSchema },
-  { additionalProperties: false },
-);
+const RoomParamsSchema = Type.Object({ roomId: UuidSchema }, { additionalProperties: false });
 
 const MovementHeadersSchema = Type.Object({
   'idempotency-key': Type.String({ minLength: 1, maxLength: 255 }),
@@ -92,11 +89,11 @@ const MOVEMENT_ERRORS = {
     content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
   },
   404: {
-    description: 'Concealed pass, destination, or station resource',
+    description: 'Concealed pass, room, or station resource',
     content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
   },
   409: {
-    description: 'Invalid movement state, expired offer, or destination conflict',
+    description: 'Invalid movement state, expired offer, or room conflict',
     content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
   },
   412: {
@@ -255,13 +252,13 @@ export function registerMovementRoutes(
   );
 
   interface StationMutationInput extends PassMutationInput {
-    readonly destinationId: string;
+    readonly roomId: string;
   }
 
   async function runStationMutation(
     request: FastifyRequest,
     reply: FastifyReply,
-    params: { destinationId: string; passId: string },
+    params: { roomId: string; passId: string },
     command: (
       input: StationMutationInput,
       dependencies: PassDependencies['progress'],
@@ -276,7 +273,7 @@ export function registerMovementRoutes(
       const result = await command(
         {
           principal,
-          destinationId: params.destinationId,
+          roomId: params.roomId,
           passId: params.passId,
           idempotencyKey: request.headers['idempotency-key'],
           ifMatch: request.headers['if-match'],
@@ -328,23 +325,23 @@ export function registerMovementRoutes(
   }
 
   stationMutationRoute(
-    '/api/v1/destinations/:destinationId/passes/:passId/check-in',
+    '/api/v1/rooms/:roomId/passes/:passId/check-in',
     'stationCheckInPass',
-    'Destination station records arrival for optional/required destinations. The pass destination must equal the route destination. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store.',
+    'Room station records arrival for optional/required rooms. The pass destination must equal the route destination. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store.',
     stationCheckInPass,
   );
 
   stationMutationRoute(
-    '/api/v1/destinations/:destinationId/passes/:passId/begin-return',
+    '/api/v1/rooms/:roomId/passes/:passId/begin-return',
     'stationBeginReturnPass',
-    'Destination station records that the student left the destination. Releases capacity. The pass destination must equal the route destination. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store.',
+    'Room station records that the student left the room. Releases capacity. The pass destination must equal the route destination. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store.',
     stationBeginReturnPass,
   );
 
   stationMutationRoute(
-    '/api/v1/destinations/:destinationId/passes/:passId/complete',
+    '/api/v1/rooms/:roomId/passes/:passId/complete',
     'stationCompletePass',
-    'Destination staff explicitly ends a movement at the destination (one-way workflows). Requires a prior explicit arrival. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store.',
+    'Room staff explicitly ends a movement at the room (one-way workflows). Requires a prior explicit arrival. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store.',
     stationCompletePass,
   );
 
@@ -397,17 +394,17 @@ export function registerMovementRoutes(
   );
 
   typedApp.get(
-    '/api/v1/destinations/:destinationId/station',
+    '/api/v1/rooms/:roomId/station',
     {
       schema: {
         operationId: 'getDestinationStation',
         tags: ['movement'],
         description:
-          'Minimized operational station view for authorized destination staff. No grants, rule JSON, or student schedule history. Dynamic aggregates carry no ETag. Cache-Control: no-store.',
+          'Minimized operational station view for authorized room staff. No grants, rule JSON, or student schedule history. Dynamic aggregates carry no ETag. Cache-Control: no-store.',
         security: COOKIE_SECURITY,
-        params: DestinationParamsSchema,
+        params: RoomParamsSchema,
         response: {
-          200: DestinationStationViewSchema,
+          200: RoomStationViewSchema,
           401: {
             description: 'Unauthenticated',
             content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
@@ -417,7 +414,7 @@ export function registerMovementRoutes(
             content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
           },
           404: {
-            description: 'Concealed destination or station resource',
+            description: 'Concealed room or station resource',
             content: { 'application/problem+json': { schema: ProblemDetailsSchema } },
           },
         },
@@ -428,7 +425,7 @@ export function registerMovementRoutes(
       const principal = request.principal;
       if (principal === undefined) return unauthenticated(reply, request);
       try {
-        const view = await getStationView(principal, request.params.destinationId, passes.reads);
+        const view = await getStationView(principal, request.params.roomId, passes.reads);
         return await reply.header('Cache-Control', 'no-store').send(view);
       } catch (error) {
         if (error instanceof PassApplicationError) {

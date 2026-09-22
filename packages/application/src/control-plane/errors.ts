@@ -1,16 +1,12 @@
 export type ControlPlaneErrorCode =
-  | 'location_not_found'
-  | 'location_in_use'
-  | 'invalid_location_parent'
-  | 'invalid_location_state'
-  | 'destination_not_found'
-  | 'destination_in_use'
-  | 'destination_category_not_found'
-  | 'destination_category_in_use'
-  | 'destination_category_exists'
-  | 'destination_already_open'
-  | 'destination_already_closed'
-  | 'invalid_destination_state'
+  | 'room_not_found'
+  | 'room_in_use'
+  | 'room_already_open'
+  | 'room_already_closed'
+  | 'invalid_room_state'
+  | 'room_category_not_found'
+  | 'room_category_in_use'
+  | 'room_category_exists'
   | 'schedule_block_not_found'
   | 'schedule_block_in_use'
   | 'schedule_block_exists'
@@ -60,9 +56,8 @@ export class ControlPlaneError extends Error {
 
 export function controlPlaneHttpStatus(code: ControlPlaneErrorCode): number {
   switch (code) {
-    case 'location_not_found':
-    case 'destination_not_found':
-    case 'destination_category_not_found':
+    case 'room_not_found':
+    case 'room_category_not_found':
     case 'schedule_block_not_found':
     case 'schedule_template_not_found':
     case 'schedule_day_not_found':
@@ -77,14 +72,12 @@ export function controlPlaneHttpStatus(code: ControlPlaneErrorCode): number {
     case 'forbidden':
     case 'recovery_session_restricted':
       return 403;
-    case 'location_in_use':
-    case 'invalid_location_state':
-    case 'destination_category_in_use':
-    case 'destination_category_exists':
-    case 'destination_in_use':
-    case 'destination_already_open':
-    case 'destination_already_closed':
-    case 'invalid_destination_state':
+    case 'room_in_use':
+    case 'room_already_open':
+    case 'room_already_closed':
+    case 'invalid_room_state':
+    case 'room_category_in_use':
+    case 'room_category_exists':
     case 'schedule_block_in_use':
     case 'schedule_block_exists':
     case 'schedule_template_in_use':

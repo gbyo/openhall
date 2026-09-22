@@ -42,9 +42,9 @@ const CancelHeadersSchema = Type.Object({
 });
 
 export const TITLE_BY_CODE: Record<PassErrorCode, string> = {
-  destination_not_found: 'Destination not found',
-  destination_unavailable: 'Destination unavailable',
-  destination_capacity_full: 'Destination capacity full',
+  room_not_found: 'Room not found',
+  room_unavailable: 'Room unavailable',
+  room_capacity_full: 'Room capacity full',
   student_not_found: 'Student not found',
   active_pass_exists: 'Active pass already exists',
   pass_not_found: 'Pass not found',
@@ -158,7 +158,7 @@ export function registerPassesRoutes(app: FastifyInstance, options: RegisterPass
         const result = await requestSelfPass(
           {
             principal,
-            destinationId: request.body.destinationId,
+            destinationRoomId: request.body.destinationRoomId,
             idempotencyKey: request.headers['idempotency-key'],
             requestId: request.id,
           },
@@ -208,7 +208,7 @@ export function registerPassesRoutes(app: FastifyInstance, options: RegisterPass
           {
             principal,
             studentId: request.params.studentId,
-            destinationId: request.body.destinationId,
+            destinationRoomId: request.body.destinationRoomId,
             idempotencyKey: request.headers['idempotency-key'],
             requestId: request.id,
           },

@@ -3,14 +3,15 @@ import { describe, expect, it } from 'vitest';
 import type { Principal } from '../src/authentication/principal.js';
 import type { Capability } from '../src/authorization/capabilities.js';
 import type {
-  AuthorizationDestinationRecord,
   AuthorizationFactsRepository,
   AuthorizationGrantFact,
   AuthorizationOrganizationRecord,
+  AuthorizationRoomRecord,
   AuthorizationSectionRecord,
   OrganizationMembershipFact,
+  RoomTeacherFact,
   SectionMembershipFact,
-  StaffedDestinationFact,
+  StaffedRoomFact,
   TeachingSectionFact,
 } from '../src/authorization/ports.js';
 import { RelationshipAuthorizationService } from '../src/authorization/service.js';
@@ -18,7 +19,7 @@ import type {
   AuthorizationDecision,
   AuthorizationRequest,
 } from '../src/authorization/decisions.js';
-import type { DestinationId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
+import type { RoomId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
 import type { TenantTransactionContext, TenantTransactionRunner } from '../src/persistence.js';
 
 const I = (value: string): Temporal.Instant => Temporal.Instant.from(value);
@@ -44,7 +45,13 @@ function principal(
 class FakeFacts implements AuthorizationFactsRepository {
   organizations = new Map<string, AuthorizationOrganizationRecord>();
   sections = new Map<string, AuthorizationSectionRecord>();
-  destinations = new Map<string, AuthorizationDestinationRecord>();
+  rooms = new Map<string, AuthorizationRoomRecord>();
+  meetings: {
+    readonly sectionId: string;
+    readonly roomId: string;
+    readonly effectiveFrom: Temporal.PlainDate | null;
+    readonly effectiveUntil: Temporal.PlainDate | null;
+  }[] = [];
   memberships = new Map<PersonId, OrganizationMembershipFact[]>();
   sectionMemberships = new Map<string, SectionMembershipFact>();
   grants = new Map<string, AuthorizationGrantFact[]>();
@@ -63,11 +70,11 @@ class FakeFacts implements AuthorizationFactsRepository {
     return Promise.resolve(this.sections.get(sectionId) ?? null);
   }
 
-  loadDestination(
+  loadRoom(
     _context: TenantTransactionContext,
-    destinationId: DestinationId,
-  ): Promise<AuthorizationDestinationRecord | null> {
-    return Promise.resolve(this.destinations.get(destinationId) ?? null);
+    roomId: RoomId,
+  ): Promise<AuthorizationRoomRecord | null> {
+    return Promise.resolve(this.rooms.get(roomId) ?? null);
   }
 
   listPersonMemberships(
@@ -126,12 +133,12 @@ class FakeFacts implements AuthorizationFactsRepository {
     return Promise.resolve(result);
   }
 
-  listStaffedDestinations(
+  listStaffedRooms(
     _context: TenantTransactionContext,
     accountId: string,
     personId: PersonId,
     organizationId: OrganizationId,
-  ): Promise<readonly StaffedDestinationFact[]> {
+  ): Promise<readonly StaffedRoomFact[]> {
     const staffActive = (this.memberships.get(personId) ?? []).some(
       (membership) =>
         membership.organizationId === organizationId &&
@@ -139,27 +146,72 @@ class FakeFacts implements AuthorizationFactsRepository {
         membership.status === 'active',
     );
     if (!staffActive) return Promise.resolve([]);
-    const result: StaffedDestinationFact[] = [];
+    const result: StaffedRoomFact[] = [];
     for (const grant of this.grants.get(accountId) ?? []) {
       if (
-        grant.role !== 'destination_staff' ||
-        grant.scopeKind !== 'destination' ||
+        grant.role !== 'room_staff' ||
+        grant.scopeKind !== 'room' ||
         grant.status !== 'active' ||
-        grant.destinationId === null
+        grant.roomId === null
       ) {
         continue;
       }
-      const destination = this.destinations.get(grant.destinationId);
-      if (destination?.organizationId !== organizationId || destination.status === 'archived') {
+      const room = this.rooms.get(grant.roomId);
+      if (room?.organizationId !== organizationId || room.status === 'archived') {
         continue;
       }
-      result.push({
-        id: destination.id,
-        displayName: destination.displayName ?? destination.serviceType,
-        serviceType: destination.serviceType,
-      });
+      result.push({ id: room.id, name: room.name });
     }
     return Promise.resolve(result);
+  }
+
+  listRoomTeachers(
+    _context: TenantTransactionContext,
+    organizationId: OrganizationId,
+    roomId: RoomId,
+  ): Promise<readonly RoomTeacherFact[]> {
+    const result: RoomTeacherFact[] = [];
+    for (const meeting of this.meetings) {
+      if (meeting.roomId !== roomId) continue;
+      const section = this.sections.get(meeting.sectionId);
+      if (section?.organizationId !== organizationId || section.status !== 'active') continue;
+      for (const [key, teacher] of this.sectionMemberships) {
+        if (!key.endsWith(`|${teacher.personId}|teacher`)) continue;
+        if (teacher.sectionId !== meeting.sectionId || teacher.status !== 'active') continue;
+        result.push({
+          personId: teacher.personId,
+          sectionId: teacher.sectionId,
+          membershipStatus: 'active',
+          startsOn: teacher.startsOn,
+          endsOn: teacher.endsOn,
+          meetingEffectiveFrom: meeting.effectiveFrom,
+          meetingEffectiveUntil: meeting.effectiveUntil,
+        });
+      }
+    }
+    return Promise.resolve(result);
+  }
+
+  listTeachingMeetingRooms(
+    _context: TenantTransactionContext,
+    personId: PersonId,
+    organizationId: OrganizationId,
+  ): Promise<readonly RoomId[]> {
+    const staffActive = (this.memberships.get(personId) ?? []).some(
+      (membership) =>
+        membership.organizationId === organizationId &&
+        membership.affiliation === 'staff' &&
+        membership.status === 'active',
+    );
+    if (!staffActive) return Promise.resolve([]);
+    const rooms = new Set<RoomId>();
+    for (const meeting of this.meetings) {
+      const section = this.sections.get(meeting.sectionId);
+      if (section?.organizationId !== organizationId || section.status !== 'active') continue;
+      const teacher = this.sectionMemberships.get(`${meeting.sectionId}|${personId}|teacher`);
+      if (teacher?.status === 'active') rooms.add(meeting.roomId);
+    }
+    return Promise.resolve([...rooms].sort());
   }
 }
 
@@ -216,7 +268,7 @@ function grant(
     role,
     scopeKind,
     organizationId: null,
-    destinationId: null,
+    roomId: null,
     status: 'active',
     validFrom: null,
     validUntil: null,
@@ -232,7 +284,7 @@ function section(
   return { id, tenantId: 'tenant-a', organizationId, status, code: id, title: `Title ${id}` };
 }
 
-/** Fully seeded fake covering student, teacher, destination, counselor, admin, and system_admin. */
+/** Fully seeded fake covering student, teacher, room staff, counselor, admin, and system_admin. */
 function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService } {
   const facts = new FakeFacts();
   facts.organizations.set('school-a', school('school-a', 'A School'));
@@ -261,33 +313,32 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
   facts.sections.set('sec-planned', section('sec-planned', 'school-a', 'planned'));
   facts.sections.set('sec-b1', { ...section('sec-b1', 'school-b'), tenantId: 'tenant-a' });
 
-  facts.destinations.set('dest-a1', {
-    id: 'dest-a1',
+  facts.rooms.set('room-a1', {
+    id: 'room-a1',
     tenantId: 'tenant-a',
     organizationId: 'school-a',
-    status: 'active',
-    displayName: 'Nurse',
-    serviceType: 'nurse',
-    locationName: 'Clinic',
+    status: 'open',
+    name: 'Health Office',
   });
-  facts.destinations.set('dest-a2', {
-    id: 'dest-a2',
+  facts.rooms.set('room-a2', {
+    id: 'room-a2',
     tenantId: 'tenant-a',
     organizationId: 'school-a',
-    status: 'active',
-    displayName: 'Library',
-    serviceType: 'library',
-    locationName: 'Library',
+    status: 'open',
+    name: 'Library',
   });
-  facts.destinations.set('dest-archived', {
-    id: 'dest-archived',
+  facts.rooms.set('room-archived', {
+    id: 'room-archived',
     tenantId: 'tenant-a',
     organizationId: 'school-a',
     status: 'archived',
-    displayName: 'Old',
-    serviceType: 'office',
-    locationName: null,
+    name: 'Old Room',
   });
+  // sec-a1 meets in room-a1; sec-a2 meets in room-a2.
+  facts.meetings.push(
+    { sectionId: 'sec-a1', roomId: 'room-a1', effectiveFrom: null, effectiveUntil: null },
+    { sectionId: 'sec-a2', roomId: 'room-a2', effectiveFrom: null, effectiveUntil: null },
+  );
 
   // Student s1 at school-a; expired membership at school-b.
   facts.memberships.set('s1', [
@@ -355,24 +406,20 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
   // Staff-only user with no powers.
   facts.memberships.set('staff1', [membership('school-a', 'staff')]);
 
-  // Destination staff d1 at dest-a1.
+  // Room staff d1 at room-a1.
   facts.memberships.set('d1', [membership('school-a', 'staff')]);
-  facts.grants.set('acct-d1', [
-    grant('g-dest-1', 'destination_staff', 'destination', { destinationId: 'dest-a1' }),
-  ]);
-  // Destination staff d2 whose grant expired, and d3 without staff membership.
+  facts.grants.set('acct-d1', [grant('g-room-1', 'room_staff', 'room', { roomId: 'room-a1' })]);
+  // Room staff d2 whose grant expired, and d3 without staff membership.
   facts.memberships.set('d2', [membership('school-a', 'staff')]);
   facts.grants.set('acct-d2', [
-    grant('g-dest-2', 'destination_staff', 'destination', {
-      destinationId: 'dest-a1',
+    grant('g-room-2', 'room_staff', 'room', {
+      roomId: 'room-a1',
       validFrom: I('2026-01-01T00:00:00Z'),
       validUntil: I('2026-06-01T00:00:00Z'),
     }),
   ]);
   facts.memberships.set('d3', []);
-  facts.grants.set('acct-d3', [
-    grant('g-dest-3', 'destination_staff', 'destination', { destinationId: 'dest-a1' }),
-  ]);
+  facts.grants.set('acct-d3', [grant('g-room-3', 'room_staff', 'room', { roomId: 'room-a1' })]);
 
   // Counselor, office staff, school admin at school-a.
   facts.memberships.set('c1', [membership('school-a', 'staff')]);
@@ -555,23 +602,23 @@ describe('phase 4 authorization matrix', () => {
     ).toMatchObject({ allowed: false });
   });
 
-  it('destination staff is assignment-scoped and time-bounded', async () => {
+  it('room staff is assignment-scoped and time-bounded', async () => {
     const { service } = seeded();
     expect(
       await decide(service, {
         principal: principal('acct-d1', 'd1'),
-        capability: 'destination.station.manage',
-        resource: { kind: 'destination', destinationId: 'dest-a1' },
+        capability: 'room.station.manage',
+        resource: { kind: 'room', roomId: 'room-a1' },
         at: AT,
       }),
     ).toMatchObject({ allowed: true, basis: { kind: 'explicit_grant' } });
 
-    // Different destination: deny.
+    // Different room: deny.
     expect(
       await decide(service, {
         principal: principal('acct-d1', 'd1'),
-        capability: 'destination.station.manage',
-        resource: { kind: 'destination', destinationId: 'dest-a2' },
+        capability: 'room.station.manage',
+        resource: { kind: 'room', roomId: 'room-a2' },
         at: AT,
       }),
     ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
@@ -580,8 +627,8 @@ describe('phase 4 authorization matrix', () => {
     expect(
       await decide(service, {
         principal: principal('acct-d2', 'd2'),
-        capability: 'destination.station.manage',
-        resource: { kind: 'destination', destinationId: 'dest-a1' },
+        capability: 'room.station.manage',
+        resource: { kind: 'room', roomId: 'room-a1' },
         at: AT,
       }),
     ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
@@ -590,18 +637,18 @@ describe('phase 4 authorization matrix', () => {
     expect(
       await decide(service, {
         principal: principal('acct-d3', 'd3'),
-        capability: 'destination.station.manage',
-        resource: { kind: 'destination', destinationId: 'dest-a1' },
+        capability: 'room.station.manage',
+        resource: { kind: 'room', roomId: 'room-a1' },
         at: AT,
       }),
     ).toMatchObject({ allowed: false, reason: 'staff_membership_required' });
 
-    // Archived destination: deny.
+    // Archived room: deny.
     expect(
       await decide(service, {
         principal: principal('acct-d1', 'd1'),
-        capability: 'destination.station.manage',
-        resource: { kind: 'destination', destinationId: 'dest-archived' },
+        capability: 'room.station.manage',
+        resource: { kind: 'room', roomId: 'room-archived' },
         at: AT,
       }),
     ).toMatchObject({ allowed: false, reason: 'resource_inactive' });
@@ -611,17 +658,17 @@ describe('phase 4 authorization matrix', () => {
     const { facts, service } = seeded();
     facts.memberships.set('db1', [membership('school-a', 'staff')]);
     facts.grants.set('acct-db1', [
-      grant('g-bound', 'destination_staff', 'destination', {
-        destinationId: 'dest-a1',
+      grant('g-bound', 'room_staff', 'room', {
+        roomId: 'room-a1',
         validFrom: I('2026-09-21T14:00:00Z'),
         validUntil: I('2026-09-22T14:00:00Z'),
       }),
     ]);
     const actor = principal('acct-db1', 'db1');
-    const request = (at: Temporal.Instant): AuthorizationRequest<'destination.station.manage'> => ({
+    const request = (at: Temporal.Instant): AuthorizationRequest<'room.station.manage'> => ({
       principal: actor,
-      capability: 'destination.station.manage',
-      resource: { kind: 'destination', destinationId: 'dest-a1' },
+      capability: 'room.station.manage',
+      resource: { kind: 'room', roomId: 'room-a1' },
       at,
     });
     expect(await decide(service, request(I('2026-09-21T13:59:59Z')))).toMatchObject({
@@ -716,7 +763,7 @@ describe('phase 4 authorization matrix', () => {
       'policy.manage',
       'authorization.manage',
       'audit.view',
-      'destination.manage',
+      'room.manage',
     ] as const satisfies readonly Capability[]) {
       expect(
         await decide(service, {
@@ -1269,5 +1316,96 @@ describe('phase 7 movement capabilities', () => {
         at: AT,
       }),
     ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
+  });
+});
+
+describe('room responsible-staff approval', () => {
+  it('grants explicit room staff and schedule-derived classroom teachers', async () => {
+    const { service } = seeded();
+    // Path A: explicit room staff.
+    expect(
+      await decide(service, {
+        principal: principal('acct-d1', 'd1'),
+        capability: 'pass.approve.room',
+        resource: { kind: 'room', roomId: 'room-a1' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: true, basis: { kind: 'explicit_grant' } });
+    // Path A is room-scoped: another room denies.
+    expect(
+      await decide(service, {
+        principal: principal('acct-d1', 'd1'),
+        capability: 'pass.approve.room',
+        resource: { kind: 'room', roomId: 'room-a2' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
+    // Path B: teacher t1 teaches sec-a1, which meets in room-a1.
+    expect(
+      await decide(service, {
+        principal: principal('acct-t1', 't1'),
+        capability: 'pass.approve.room',
+        resource: { kind: 'room', roomId: 'room-a1' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: true, basis: { kind: 'teacher_section_relationship' } });
+    // Path B is room-scoped: t1 has no section meeting in room-a2.
+    expect(
+      await decide(service, {
+        principal: principal('acct-t1', 't1'),
+        capability: 'pass.approve.room',
+        resource: { kind: 'room', roomId: 'room-a2' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
+    // Expired section relationship (t2/sec-a2) never qualifies.
+    expect(
+      await decide(service, {
+        principal: principal('acct-t2', 't2'),
+        capability: 'pass.approve.room',
+        resource: { kind: 'room', roomId: 'room-a2' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
+    // Staff membership is still required for path B (t3 is inactive staff).
+    expect(
+      await decide(service, {
+        principal: principal('acct-t3', 't3'),
+        capability: 'pass.approve.room',
+        resource: { kind: 'room', roomId: 'room-a1' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'staff_membership_required' });
+  });
+
+  it('keeps station management explicit-only', async () => {
+    const { service } = seeded();
+    expect(
+      await decide(service, {
+        principal: principal('acct-t1', 't1'),
+        capability: 'room.station.manage',
+        resource: { kind: 'room', roomId: 'room-a1' },
+        at: AT,
+      }),
+    ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
+  });
+
+  it('exposes teaching meeting rooms on the organization snapshot', async () => {
+    const { service } = seeded();
+    const context = { tenantId: 'tenant-a' } as unknown as TenantTransactionContext;
+    const teacher = await service.evaluateOrganizationSnapshot(
+      context,
+      principal('acct-t1', 't1'),
+      'school-a',
+      AT,
+    );
+    expect(teacher?.teachingMeetingRoomIds).toEqual(['room-a1']);
+    const outsider = await service.evaluateOrganizationSnapshot(
+      context,
+      principal('acct-staff1', 'staff1'),
+      'school-a',
+      AT,
+    );
+    expect(outsider?.teachingMeetingRoomIds).toEqual([]);
   });
 });

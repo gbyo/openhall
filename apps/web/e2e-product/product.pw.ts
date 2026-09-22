@@ -3,16 +3,14 @@ import { expect, test, type Page } from '@playwright/test';
 
 const ORG = '00000000-0000-4000-8000-000000000010';
 const PERSON = '00000000-0000-4000-8000-000000000011';
-const DESTINATION = '00000000-0000-4000-8000-000000000012';
+const ROOM = '00000000-0000-4000-8000-000000000012';
 const SECTION = '00000000-0000-4000-8000-000000000013';
 const PASS = '00000000-0000-4000-8000-000000000014';
-const LOCATION = '00000000-0000-4000-8000-000000000015';
-
 interface Context {
   affiliations: string[];
   capabilities: string[];
   teachingSections?: unknown[];
-  staffedDestinations?: unknown[];
+  staffedRooms?: unknown[];
 }
 
 async function shell(page: Page, context: Context): Promise<void> {
@@ -65,7 +63,7 @@ async function shell(page: Page, context: Context): Promise<void> {
         capabilities: context.capabilities,
         expectedPlacement: { kind: 'outside_schedule' },
         teachingSections: context.teachingSections ?? [],
-        staffedDestinations: context.staffedDestinations ?? [],
+        staffedRooms: context.staffedRooms ?? [],
       },
     }),
   );
@@ -85,9 +83,8 @@ function pass(state: string, mode: 'none' | 'optional' | 'required' | null = nul
     studentId: PERSON,
     policy: null,
     destination: {
-      id: DESTINATION,
-      displayName: 'Nurse',
-      serviceType: 'nurse',
+      id: ROOM,
+      name: 'Nurse',
       checkInMode: 'required',
       category: { id: 'cat-nurse', name: 'Nurse', iconKey: 'medical', toneKey: 'rose' },
     },
@@ -95,7 +92,7 @@ function pass(state: string, mode: 'none' | 'optional' | 'required' | null = nul
       placementKind: 'resolved',
       block: null,
       section: { id: SECTION, code: 'SCI-7', title: 'Science 7' },
-      location: { id: '00000000-0000-4000-8000-000000000015', name: 'Room 214' },
+      room: { id: '00000000-0000-4000-8000-000000000016', name: 'Room 214' },
     },
     requestSource: 'student_web',
     scheduledAuthorizationId: null,
@@ -117,14 +114,15 @@ async function studentApis(page: Page, active: { current: ReturnType<typeof pass
   await page.route('**/api/v1/me/passes/active', (route) =>
     route.fulfill({ json: { pass: active.current }, headers: { ETag: '"pass:test:1"' } }),
   );
-  await page.route(`**/api/v1/me/organizations/${ORG}/destinations`, (route) =>
+  await page.route(`**/api/v1/me/organizations/${ORG}/rooms`, (route) =>
     route.fulfill({
       json: {
-        destinations: [
+        rooms: [
           {
-            id: DESTINATION,
-            displayName: 'Nurse',
-            serviceType: 'nurse',
+            id: ROOM,
+            name: 'Nurse',
+            code: null,
+            floorLabel: null,
             categoryId: 'cat-nurse',
             checkInMode: 'required',
           },
@@ -132,7 +130,7 @@ async function studentApis(page: Page, active: { current: ReturnType<typeof pass
       },
     }),
   );
-  await page.route(`**/api/v1/me/organizations/${ORG}/student-destination-catalog`, (route) =>
+  await page.route(`**/api/v1/me/organizations/${ORG}/student-room-catalog`, (route) =>
     route.fulfill({
       json: {
         categories: [
@@ -141,14 +139,16 @@ async function studentApis(page: Page, active: { current: ReturnType<typeof pass
             name: 'Nurse',
             iconKey: 'medical',
             toneKey: 'rose',
-            studentSurface: 'primary',
+            pickerMode: 'list',
             sortOrder: 20,
-            destinations: [
+            rooms: [
               {
-                id: DESTINATION,
-                displayName: 'Nurse',
-                location: { id: LOCATION, name: 'Health Office' },
+                id: ROOM,
+                name: 'Nurse',
+                code: null,
+                floorLabel: null,
                 checkInMode: 'required',
+                searchContext: { teacherNames: [], sectionLabels: [], roomStaffNames: [] },
               },
             ],
           },
@@ -227,7 +227,7 @@ test('teacher can approve the oldest request and open a roster', async ({ page }
             organizationId: ORG,
             passEtag: '"pass:test:1"',
             student: { id: PERSON, displayName: 'Alex Rivera' },
-            destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+            destination: { id: ROOM, name: 'Nurse' },
             requiredSection: { id: SECTION, title: 'Science 7' },
             requestedAt: '2026-09-21T14:00:00Z',
           },
@@ -249,26 +249,24 @@ test('teacher can approve the oldest request and open a roster', async ({ page }
   expect(approved).toBe(true);
 });
 
-test('destination station uses minimized rows and exact row ETags', async ({ page }) => {
+test('room station uses minimized rows and exact row ETags', async ({ page }) => {
   await shell(page, {
     affiliations: ['staff'],
     capabilities: [],
-    staffedDestinations: [
+    staffedRooms: [
       {
-        id: DESTINATION,
-        displayName: 'Nurse',
-        serviceType: 'nurse',
-        capabilities: ['destination.station.manage'],
+        id: ROOM,
+        name: 'Nurse',
+        capabilities: ['room.station.manage'],
       },
     ],
   });
-  await page.route(`**/api/v1/destinations/${DESTINATION}/station`, (route) =>
+  await page.route(`**/api/v1/rooms/${ROOM}/station`, (route) =>
     route.fulfill({
       json: {
-        destination: {
-          id: DESTINATION,
-          displayName: 'Nurse',
-          serviceType: 'nurse',
+        room: {
+          id: ROOM,
+          name: 'Nurse',
           checkInMode: 'required',
           capacity: 3,
         },
@@ -291,14 +289,11 @@ test('destination station uses minimized rows and exact row ETags', async ({ pag
     }),
   );
   let ifMatch = '';
-  await page.route(
-    `**/api/v1/destinations/${DESTINATION}/passes/${PASS}/check-in`,
-    async (route) => {
-      ifMatch = route.request().headers()['if-match'] ?? '';
-      await route.fulfill({ json: { pass: pass('at_destination', 'required') } });
-    },
-  );
-  await page.goto(`/schools/${ORG}/stations/${DESTINATION}`);
+  await page.route(`**/api/v1/rooms/${ROOM}/passes/${PASS}/check-in`, async (route) => {
+    ifMatch = route.request().headers()['if-match'] ?? '';
+    await route.fulfill({ json: { pass: pass('at_destination', 'required') } });
+  });
+  await page.goto(`/schools/${ORG}/stations/${ROOM}`);
   await expect(page.getByRole('heading', { name: 'Nurse' })).toBeVisible();
   await expect(page.getByText('Alex Rivera')).toBeVisible();
   await page.getByRole('button', { name: 'Check in' }).click();
@@ -306,21 +301,24 @@ test('destination station uses minimized rows and exact row ETags', async ({ pag
   await expect(page.getByText(/grade|policy|email/i)).toHaveCount(0);
 });
 
-test('admin destination deep link and product shell reflow accessibly', async ({ page }) => {
+test('admin rooms deep link and product shell reflow accessibly', async ({ page }) => {
   await shell(page, {
     affiliations: ['staff'],
-    capabilities: ['destination.manage', 'pass.view.school_live'],
+    capabilities: ['room.manage', 'pass.view.school_live'],
   });
-  await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
+  await page.route(`**/api/v1/organizations/${ORG}/rooms`, (route) =>
     route.fulfill({
       json: {
-        destinations: [
+        rooms: [
           {
-            id: DESTINATION,
+            id: ROOM,
             organizationId: ORG,
-            locationId: '00000000-0000-4000-8000-000000000015',
-            serviceType: 'nurse',
-            displayName: 'Nurse',
+            categoryId: 'cat-nurse',
+            name: 'Health Office',
+            code: null,
+            floorLabel: '1',
+            studentSelfRequestable: true,
+            originSelectable: true,
             capacity: 3,
             queueEnabled: true,
             checkInMode: 'required',
@@ -328,28 +326,8 @@ test('admin destination deep link and product shell reflow accessibly', async ({
             maxDurationSeconds: 1200,
             readyClaimTimeoutSeconds: 120,
             queueTimeoutSeconds: 1800,
-            status: 'active',
+            status: 'open',
             revision: '2',
-            updatedAt: '2026-09-21T14:00:00Z',
-          },
-        ],
-      },
-    }),
-  );
-  await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
-    route.fulfill({
-      json: {
-        locations: [
-          {
-            id: '00000000-0000-4000-8000-000000000015',
-            organizationId: ORG,
-            parentLocationId: null,
-            kind: 'room',
-            name: 'Health Office',
-            code: null,
-            floorLabel: '1',
-            status: 'active',
-            revision: '1',
             createdAt: '2026-09-21T14:00:00Z',
             updatedAt: '2026-09-21T14:00:00Z',
           },
@@ -357,9 +335,33 @@ test('admin destination deep link and product shell reflow accessibly', async ({
       },
     }),
   );
+  await page.route(`**/api/v1/organizations/${ORG}/room-categories`, (route) =>
+    route.fulfill({
+      json: {
+        categories: [
+          {
+            id: 'cat-nurse',
+            organizationId: ORG,
+            name: 'Nurse',
+            iconKey: 'medical',
+            toneKey: 'rose',
+            studentSurface: 'primary',
+            pickerMode: 'list',
+            sortOrder: 20,
+            status: 'active',
+            revision: '1',
+            updatedAt: '2026-09-21T14:00:00Z',
+          },
+        ],
+      },
+    }),
+  );
+  await page.route(`**/api/v1/organizations/${ORG}/authorization-grants`, (route) =>
+    route.fulfill({ json: { grants: [] } }),
+  );
   await page.setViewportSize({ width: 320, height: 800 });
-  await page.goto(`/schools/${ORG}/admin/destinations`);
-  await expect(page.getByRole('heading', { name: 'Destinations' })).toBeVisible();
+  await page.goto(`/schools/${ORG}/admin/rooms`);
+  await expect(page.getByRole('heading', { name: 'Rooms' })).toBeVisible();
   await expect(page.getByText('Health Office')).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

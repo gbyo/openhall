@@ -3,7 +3,6 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Activity01Icon,
   BookOpen01Icon,
-  Building01Icon,
   Calendar01Icon,
   DashboardSquare01Icon,
   File01Icon,
@@ -75,8 +74,7 @@ const ITEM_ICONS: Record<string, typeof InboxIcon> = {
   'Live movement': Activity01Icon,
   'Scheduled passes': Calendar01Icon,
   Station: Location01Icon,
-  Destinations: PinLocation01Icon,
-  Locations: Building01Icon,
+  Rooms: PinLocation01Icon,
   Schedules: DashboardSquare01Icon,
   Policies: Shield01Icon,
   'Staff access': Key01Icon,
