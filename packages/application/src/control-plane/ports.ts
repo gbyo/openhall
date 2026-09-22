@@ -148,7 +148,7 @@ export type { DestinationCheckInMode };
 
 export type ScheduleBlockStatus = 'active' | 'archived';
 
-export type PolicyScopeKind = 'organization' | 'section' | 'destination';
+export type PolicyScopeKind = 'organization' | 'section' | 'destination' | 'destination_category';
 
 /** Server-owned policy rule projection. Revision is a positive integer. */
 export interface PolicyRuleRecord {
@@ -161,6 +161,7 @@ export interface PolicyRuleRecord {
   readonly scopeOrganizationId: string | null;
   readonly scopeSectionId: string | null;
   readonly scopeDestinationId: string | null;
+  readonly scopeDestinationCategoryId: string | null;
   readonly priority: number;
   readonly configuration: unknown;
   readonly overrideMode: string;
@@ -180,6 +181,7 @@ export interface PolicyRuleWrite {
   readonly scopeOrganizationId: string | null;
   readonly scopeSectionId: string | null;
   readonly scopeDestinationId: string | null;
+  readonly scopeDestinationCategoryId: string | null;
   readonly priority: number;
   readonly configuration: unknown;
   readonly overrideMode: string;

@@ -186,7 +186,7 @@ interface PassBody {
 async function seedRule(input: {
   name: string;
   ruleType: string;
-  scopeKind: 'organization' | 'section' | 'destination';
+  scopeKind: 'organization' | 'section' | 'destination' | 'destination_category';
   scopeId: string;
   priority?: number;
   configuration: unknown;
@@ -197,7 +197,9 @@ async function seedRule(input: {
       ? 'scope_organization_id'
       : input.scopeKind === 'section'
         ? 'scope_section_id'
-        : 'scope_destination_id';
+        : input.scopeKind === 'destination'
+          ? 'scope_destination_id'
+          : 'scope_destination_category_id';
   return insertReturningId(
     `INSERT INTO policy_rule (tenant_id, organization_id, name, rule_type, scope_kind, ${scopeColumn}, priority, configuration, override_mode)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
@@ -1084,6 +1086,7 @@ describe('Phase 8 policy rule administration', () => {
         organizationId: schoolA,
         sectionId: null,
         destinationId: null,
+        destinationCategoryId: null,
       },
       priority: 0,
       configuration,
@@ -1155,6 +1158,7 @@ describe('Phase 8 policy rule administration', () => {
             organizationId: null,
             sectionId: sectionA1,
             destinationId: null,
+            destinationCategoryId: null,
           },
           priority: 0,
           configuration: { ...VALID_APPROVAL, approver: 'principal' },
@@ -1173,6 +1177,7 @@ describe('Phase 8 policy rule administration', () => {
             organizationId: null,
             sectionId: sectionA1,
             destinationId: null,
+            destinationCategoryId: null,
           },
           priority: 0,
           configuration: { schemaVersion: 1, requestSources: ['student_web'] },
@@ -1207,6 +1212,7 @@ describe('Phase 8 policy rule administration', () => {
         organizationId: null,
         sectionId: sectionA1,
         destinationId: null,
+        destinationCategoryId: null,
       },
       priority: 0,
       configuration: VALID_APPROVAL,
@@ -1311,5 +1317,195 @@ describe('Phase 8 policy rule administration', () => {
       `WHERE e.pass_id = '${allowedPass.id}'`,
     );
     expect(allowedSnapshots).toBe(0);
+  });
+});
+
+describe('destination responsible-staff approval', () => {
+  const DESTINATION_APPROVAL_CONFIG = {
+    schemaVersion: 1,
+    requestSources: ['student_web'],
+    approver: 'destination_responsible_staff',
+  };
+
+  async function categoryIdByName(name: string): Promise<string> {
+    const id = (
+      await pool.query<{ id: string }>(
+        `SELECT id FROM destination_category WHERE tenant_id = $1 AND organization_id = $2 AND name = $3`,
+        [tenantA, schoolA, name],
+      )
+    ).rows[0]?.id;
+    if (id === undefined) throw new Error('Expected destination category fixture');
+    return id;
+  }
+
+  async function destinationScenario(given: string) {
+    await clearRules();
+    const categoryId = await categoryIdByName('Restrooms');
+    await seedRule({
+      name: 'room visits need destination approval',
+      ruleType: 'approval_requirement',
+      scopeKind: 'destination_category',
+      scopeId: categoryId,
+      configuration: DESTINATION_APPROVAL_CONFIG,
+      overrideMode: 'never',
+    });
+    const student = await makePassStudent(given);
+    const created = await requestPass(student);
+    expect(created.statusCode).toBe(201);
+    const pass = created.json<{ pass: PassBody }>().pass;
+    expect(pass.policy?.decision).toBe('approval_required');
+    return { student, pass, etag: requiredEtag(created) };
+  }
+
+  async function pendingApprovals(session: SessionFixture) {
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/api/v1/me/pass-approvals/pending',
+      headers: { cookie: `openhall_session_dev=${session.cookie}` },
+    });
+    expect(listed.statusCode).toBe(200);
+    return listed.json<{
+      approvals: { approvalId: string; passId: string; passEtag: string }[];
+    }>().approvals;
+  }
+
+  it('binds the pending approval to the destination with its approver kind', async () => {
+    const { pass } = await destinationScenario('DestBound');
+    const rows = (
+      await pool.query<{
+        approver_kind: string;
+        required_section_id: string | null;
+        required_destination_id: string | null;
+        decision: string;
+      }>(
+        `SELECT approver_kind, required_section_id, required_destination_id, decision FROM pass_approval WHERE pass_id = $1`,
+        [pass.id],
+      )
+    ).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      approver_kind: 'destination_responsible_staff',
+      required_section_id: null,
+      required_destination_id: destinationA,
+      decision: 'pending',
+    });
+  });
+
+  it('resolves through classroom teachers derived from the schedule', async () => {
+    if (teacher === null) throw new Error('teacher fixture missing');
+    const { pass, etag } = await destinationScenario('DestTeacher');
+    // The section-A1 teacher meets at Room 214 through the schedule: the
+    // pending destination approval is visible without any explicit grant.
+    const approvals = await pendingApprovals(teacher);
+    const target = mustFind(approvals, pass.id);
+    const resolved = await app.inject({
+      method: 'POST',
+      url: `/api/v1/pass-approvals/${target.approvalId}/approve`,
+      headers: authHeaders(teacher, randomUUID(), etag),
+    });
+    expect(resolved.statusCode).toBe(200);
+    const body = resolved.json<{ pass: PassBody }>().pass;
+    expect(body.lifecycleState).toBe('ready');
+    expect(body.policy?.decision).toBe('allow');
+  });
+
+  it('resolves through explicit destination staff', async () => {
+    if (teacher === null) throw new Error('teacher fixture missing');
+    const { pass } = await destinationScenario('DestStaff');
+    const staff = await makeStaff(tenantA, schoolA, 'Nurse');
+    await pool.query(
+      `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id) VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
+      [tenantA, staff.accountId, destinationA],
+    );
+    const approvals = await pendingApprovals(staff);
+    const target = mustFind(approvals, pass.id);
+    const denied = await app.inject({
+      method: 'POST',
+      url: `/api/v1/pass-approvals/${target.approvalId}/deny`,
+      headers: authHeaders(staff, randomUUID(), target.passEtag),
+    });
+    expect(denied.statusCode).toBe(200);
+    expect(denied.json<{ pass: PassBody }>().pass.lifecycleState).toBe('denied');
+  });
+
+  it('conceals destination approvals from uninvolved staff', async () => {
+    if (counselor === null) throw new Error('counselor fixture missing');
+    const { pass } = await destinationScenario('DestHidden');
+    expect(await pendingApprovals(counselor)).toHaveLength(0);
+    const probe = await app.inject({
+      method: 'POST',
+      url: `/api/v1/pass-approvals/${randomUUID()}/approve`,
+      headers: authHeaders(
+        counselor,
+        randomUUID(),
+        '"pass:00000000-0000-0000-0000-000000000000:1"',
+      ),
+    });
+    expect(probe.statusCode).toBe(404);
+    // The pending row survives the concealed probe untouched.
+    expect(
+      await tableCount('pass_approval', `WHERE pass_id = '${pass.id}' AND decision = 'pending'`),
+    ).toBe(1);
+  });
+
+  it('administers category scope and approver through the policy API', async () => {
+    const admin = await makeStaff(tenantA, schoolA, 'CategoryAdmin');
+    await pool.query(
+      `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, organization_id) VALUES ($1, $2, 'school_admin', 'organization', $3)`,
+      [tenantA, admin.accountId, schoolA],
+    );
+    const categoryId = await categoryIdByName('Restrooms');
+    const created = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/policy-rules`,
+      headers: authHeaders(admin, randomUUID()),
+      payload: {
+        name: 'Room visits need destination approval',
+        ruleType: 'approval_requirement',
+        scope: {
+          kind: 'destination_category',
+          organizationId: null,
+          sectionId: null,
+          destinationId: null,
+          destinationCategoryId: categoryId,
+        },
+        priority: 100,
+        configuration: DESTINATION_APPROVAL_CONFIG,
+        overrideMode: 'never',
+        validFrom: null,
+        validUntil: null,
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const rule = created.json<{ rule: { id: string; scope: Record<string, unknown> } }>().rule;
+    expect(rule.scope).toMatchObject({
+      kind: 'destination_category',
+      destinationCategoryId: categoryId,
+    });
+
+    // A category from another school is rejected, not silently scoped.
+    const foreign = await app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${schoolA}/policy-rules`,
+      headers: authHeaders(admin, randomUUID()),
+      payload: {
+        name: 'Foreign category rule',
+        ruleType: 'approval_requirement',
+        scope: {
+          kind: 'destination_category',
+          organizationId: null,
+          sectionId: null,
+          destinationId: null,
+          destinationCategoryId: randomUUID(),
+        },
+        priority: 100,
+        configuration: DESTINATION_APPROVAL_CONFIG,
+        overrideMode: 'never',
+        validFrom: null,
+        validUntil: null,
+      },
+    });
+    expect(foreign.statusCode).toBe(409);
+    expect(foreign.json<{ code: string }>().code).toBe('policy_rule_invalid');
   });
 });

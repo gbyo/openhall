@@ -8,6 +8,7 @@ import type {
   AuthorizationGrantFact,
   AuthorizationOrganizationRecord,
   AuthorizationSectionRecord,
+  LocationTeacherFact,
   OrganizationMembershipFact,
   SectionMembershipFact,
   StaffedDestinationFact,
@@ -48,6 +49,9 @@ class FakeFacts implements AuthorizationFactsRepository {
   memberships = new Map<PersonId, OrganizationMembershipFact[]>();
   sectionMemberships = new Map<string, SectionMembershipFact>();
   grants = new Map<string, AuthorizationGrantFact[]>();
+  locationTeachers: { organizationId: string; locationId: string; fact: LocationTeacherFact }[] =
+    [];
+  teachingMeetingLocations: { personId: string; organizationId: string; locationId: string }[] = [];
 
   loadOrganization(
     _context: TenantTransactionContext,
@@ -124,6 +128,30 @@ class FakeFacts implements AuthorizationFactsRepository {
       }
     }
     return Promise.resolve(result);
+  }
+
+  listLocationTeachers(
+    _context: TenantTransactionContext,
+    organizationId: OrganizationId,
+    locationId: string,
+  ): Promise<readonly LocationTeacherFact[]> {
+    return Promise.resolve(
+      this.locationTeachers
+        .filter((row) => row.organizationId === organizationId && row.locationId === locationId)
+        .map((row) => row.fact),
+    );
+  }
+
+  listTeachingMeetingLocations(
+    _context: TenantTransactionContext,
+    personId: PersonId,
+    organizationId: OrganizationId,
+  ): Promise<readonly string[]> {
+    return Promise.resolve(
+      this.teachingMeetingLocations
+        .filter((row) => row.personId === personId && row.organizationId === organizationId)
+        .map((row) => row.locationId),
+    );
   }
 
   listStaffedDestinations(
@@ -268,6 +296,7 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
     status: 'active',
     displayName: 'Nurse',
     serviceType: 'nurse',
+    locationId: 'loc-clinic',
     locationName: 'Clinic',
   });
   facts.destinations.set('dest-a2', {
@@ -277,6 +306,7 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
     status: 'active',
     displayName: 'Library',
     serviceType: 'library',
+    locationId: 'loc-library',
     locationName: 'Library',
   });
   facts.destinations.set('dest-archived', {
@@ -286,6 +316,7 @@ function seeded(): { facts: FakeFacts; service: RelationshipAuthorizationService
     status: 'archived',
     displayName: 'Old',
     serviceType: 'office',
+    locationId: null,
     locationName: null,
   });
 
@@ -1269,5 +1300,104 @@ describe('phase 7 movement capabilities', () => {
         at: AT,
       }),
     ).toMatchObject({ allowed: false, reason: 'no_applicable_grant' });
+  });
+});
+
+describe('destination responsible-staff approval capability', () => {
+  function withClinicTeacher(facts: FakeFacts): void {
+    facts.locationTeachers.push({
+      organizationId: 'school-a',
+      locationId: 'loc-clinic',
+      fact: {
+        personId: 't1',
+        sectionId: 'sec-a1',
+        membershipStatus: 'active',
+        startsOn: null,
+        endsOn: null,
+        meetingEffectiveFrom: null,
+        meetingEffectiveUntil: null,
+      },
+    });
+  }
+
+  function approvalRequest(
+    person: Principal,
+    destinationId: string,
+  ): AuthorizationRequest<'pass.approve.destination'> {
+    return {
+      principal: person,
+      capability: 'pass.approve.destination',
+      resource: { kind: 'destination', destinationId },
+      at: AT,
+    };
+  }
+
+  it('allows explicit destination staff for their exact destination', async () => {
+    const { service } = seeded();
+    const allowed = await decide(service, approvalRequest(principal('acct-d1', 'd1'), 'dest-a1'));
+    expect(allowed.allowed).toBe(true);
+    expect(allowed.basis).toMatchObject({ kind: 'explicit_grant', role: 'destination_staff' });
+  });
+
+  it('denies explicit staff at another destination', async () => {
+    const { service } = seeded();
+    const denied = await decide(service, approvalRequest(principal('acct-d1', 'd1'), 'dest-a2'));
+    expect(denied).toEqual({ allowed: false, reason: 'no_applicable_grant' });
+  });
+
+  it('allows classroom teachers meeting at the destination location', async () => {
+    const { facts, service } = seeded();
+    withClinicTeacher(facts);
+    const allowed = await decide(service, approvalRequest(principal('acct-t1', 't1'), 'dest-a1'));
+    expect(allowed.allowed).toBe(true);
+    expect(allowed.basis).toEqual({ kind: 'teacher_section_relationship' });
+  });
+
+  it('denies classroom teachers outside their meeting windows', async () => {
+    const { facts, service } = seeded();
+    facts.locationTeachers.push({
+      organizationId: 'school-a',
+      locationId: 'loc-clinic',
+      fact: {
+        personId: 't2',
+        sectionId: 'sec-a2',
+        membershipStatus: 'active',
+        startsOn: D('2026-01-01'),
+        endsOn: D('2026-06-01'),
+        meetingEffectiveFrom: null,
+        meetingEffectiveUntil: null,
+      },
+    });
+    const denied = await decide(service, approvalRequest(principal('acct-t2', 't2'), 'dest-a1'));
+    expect(denied).toEqual({ allowed: false, reason: 'no_applicable_grant' });
+  });
+
+  it('denies unassigned staff and counselors', async () => {
+    const { facts, service } = seeded();
+    withClinicTeacher(facts);
+    const staff = await decide(
+      service,
+      approvalRequest(principal('acct-staff1', 'staff1'), 'dest-a1'),
+    );
+    expect(staff).toEqual({ allowed: false, reason: 'no_applicable_grant' });
+    const counselor = await decide(service, approvalRequest(principal('acct-c1', 'c1'), 'dest-a1'));
+    expect(counselor).toEqual({ allowed: false, reason: 'no_applicable_grant' });
+  });
+
+  it('retains canonical school and system administration', async () => {
+    const { service } = seeded();
+    const admin = await decide(service, approvalRequest(principal('acct-a1', 'a1'), 'dest-a1'));
+    expect(admin.allowed).toBe(true);
+    expect(admin.basis).toMatchObject({ kind: 'explicit_grant', role: 'school_admin' });
+    const sys = await decide(service, approvalRequest(principal('acct-sys', 'sys'), 'dest-a1'));
+    expect(sys.allowed).toBe(true);
+    expect(sys.basis).toMatchObject({ kind: 'system_admin' });
+  });
+
+  it('fails closed for teachers when no responsible staff resolves', async () => {
+    const { service } = seeded();
+    // dest-a2 has no grants and no location-teacher rows covering t1.
+    const denied = await decide(service, approvalRequest(principal('acct-t1', 't1'), 'dest-a2'));
+    expect(denied).toEqual({ allowed: false, reason: 'no_applicable_grant' });
   });
 });

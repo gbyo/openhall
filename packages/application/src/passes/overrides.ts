@@ -224,6 +224,8 @@ export async function requestPassOverride(
         }
       }
 
+      const overrideDestination = await passes.loadDestination(context, row.destinationId);
+      const destinationCategoryId = overrideDestination?.categoryId ?? null;
       const passFacts = {
         id: row.id,
         revision: row.revision,
@@ -240,6 +242,7 @@ export async function requestPassOverride(
       const overrides = await policy.listOverridesForPass(context, row.id);
       const current = evaluatePolicy({
         pass: passFacts,
+        destinationCategoryId,
         at: now,
         currentPlacement: placement,
         rules,
@@ -302,6 +305,7 @@ export async function requestPassOverride(
         await evaluateAndPersistPolicy(context, policy, {
           pass: passFacts,
           placement,
+          destinationCategoryId,
           at: now,
           stage: 'override',
         });

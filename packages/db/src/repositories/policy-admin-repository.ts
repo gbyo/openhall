@@ -19,7 +19,10 @@ function toJsonb(value: unknown): JsonObject {
 }
 
 function scopeKind(value: string): PolicyScopeKind {
-  return value === 'section' ? 'section' : value === 'destination' ? 'destination' : 'organization';
+  if (value === 'section') return 'section';
+  if (value === 'destination') return 'destination';
+  if (value === 'destination_category') return 'destination_category';
+  return 'organization';
 }
 
 interface PolicyRow {
@@ -32,6 +35,7 @@ interface PolicyRow {
   scope_organization_id: string | null;
   scope_section_id: string | null;
   scope_destination_id: string | null;
+  scope_destination_category_id: string | null;
   priority: number;
   configuration: unknown;
   override_mode: string;
@@ -55,6 +59,7 @@ function toRecord(row: PolicyRow): PolicyRuleRecord {
     scopeOrganizationId: row.scope_organization_id,
     scopeSectionId: row.scope_section_id,
     scopeDestinationId: row.scope_destination_id,
+    scopeDestinationCategoryId: row.scope_destination_category_id,
     priority: row.priority,
     configuration: row.configuration,
     overrideMode: row.override_mode,
@@ -132,6 +137,7 @@ export class PostgresPolicyAdminRepository implements PolicyAdminRepository {
         scope_organization_id: input.scopeOrganizationId,
         scope_section_id: input.scopeSectionId,
         scope_destination_id: input.scopeDestinationId,
+        scope_destination_category_id: input.scopeDestinationCategoryId,
         priority: input.priority,
         configuration: toJsonb(input.configuration),
         override_mode: input.overrideMode,
@@ -161,6 +167,7 @@ export class PostgresPolicyAdminRepository implements PolicyAdminRepository {
         scope_organization_id: input.scopeOrganizationId,
         scope_section_id: input.scopeSectionId,
         scope_destination_id: input.scopeDestinationId,
+        scope_destination_category_id: input.scopeDestinationCategoryId,
         priority: input.priority,
         configuration: toJsonb(input.configuration),
         override_mode: input.overrideMode,

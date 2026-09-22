@@ -14,7 +14,7 @@ import type {
 import type { TenantTransactionContext } from '@openhall/application';
 import type { PolicyRuleInput } from '@openhall/application';
 import type { PolicyContribution, PolicyDecision, PolicyRuleOutcome } from '@openhall/application';
-import type { PolicyOverrideMode } from '@openhall/application';
+import type { PolicyApprover, PolicyOverrideMode } from '@openhall/application';
 import type { PolicyReasonCode } from '@openhall/application';
 import {
   isOverrideCategory,
@@ -42,6 +42,7 @@ function toRuleInput(row: {
   scope_organization_id: string | null;
   scope_section_id: string | null;
   scope_destination_id: string | null;
+  scope_destination_category_id: string | null;
   priority: number;
   configuration: unknown;
   override_mode: string;
@@ -53,7 +54,8 @@ function toRuleInput(row: {
   const scopeKind =
     row.scope_kind === 'organization' ||
     row.scope_kind === 'section' ||
-    row.scope_kind === 'destination'
+    row.scope_kind === 'destination' ||
+    row.scope_kind === 'destination_category'
       ? row.scope_kind
       : 'organization';
   return {
@@ -65,6 +67,7 @@ function toRuleInput(row: {
     scopeOrganizationId: row.scope_organization_id,
     scopeSectionId: row.scope_section_id,
     scopeDestinationId: row.scope_destination_id,
+    scopeDestinationCategoryId: row.scope_destination_category_id,
     priority: row.priority,
     configuration: row.configuration,
     overrideMode: row.override_mode,
@@ -110,6 +113,13 @@ function toOverrideCategory(value: string): OverrideCategory {
 function toOverrideMode(value: string): PolicyOverrideMode {
   if (isPolicyOverrideMode(value)) return value;
   throw new Error(`Unknown persisted override mode: ${value}`);
+}
+
+function toApproverKind(value: string): PolicyApprover {
+  if (value === 'current_section_teacher' || value === 'destination_responsible_staff') {
+    return value;
+  }
+  throw new Error(`Unknown persisted approver kind: ${value}`);
 }
 
 function toReasonCode(value: string): PolicyReasonCode {
@@ -257,19 +267,38 @@ export class PostgresPolicyRepository implements PolicyRepository {
     passId: string,
     ruleId: string,
     ruleRevision: number,
-    requiredSectionId: string,
+    requirement: {
+      readonly requiredSectionId: string | null;
+      readonly requiredDestinationId: string | null;
+    },
   ): Promise<PolicyApprovalRecord | null> {
     const connection = connectionFor(context);
-    const row = await connection
+    let query = connection
       .selectFrom('pass_approval')
       .selectAll()
       .where('tenant_id', '=', context.tenantId)
       .where('pass_id', '=', passId)
       .where('policy_rule_id', '=', ruleId)
       .where('policy_rule_revision', '=', ruleRevision)
-      .where('required_section_id', '=', requiredSectionId)
-      .where('decision', '=', 'pending')
-      .executeTakeFirst();
+      .where('decision', '=', 'pending');
+    // NULL never equals NULL in SQL: match the exactly-one-bound requirement
+    // with an equality on the bound side and IS NULL on the other.
+    if (requirement.requiredSectionId !== null) {
+      query = query
+        .where('required_section_id', '=', requirement.requiredSectionId)
+        .where('required_destination_id', 'is', null);
+    } else if (requirement.requiredDestinationId !== null) {
+      query = query
+        .where('required_section_id', 'is', null)
+        .where('required_destination_id', '=', requirement.requiredDestinationId);
+    } else {
+      // Degenerate input binds no requirement; match nothing persistable
+      // (the CHECK constraint forbids rows with both sides NULL).
+      query = query
+        .where('required_section_id', 'is', null)
+        .where('required_destination_id', 'is', null);
+    }
+    const row = await query.executeTakeFirst();
     return row === undefined ? null : toApprovalRecord(row);
   }
 
@@ -288,7 +317,9 @@ export class PostgresPolicyRepository implements PolicyRepository {
           origin_evaluation_result_id: input.originEvaluationResultId,
           policy_rule_id: input.ruleId,
           policy_rule_revision: input.ruleRevision,
+          approver_kind: input.approverKind,
           required_section_id: input.requiredSectionId,
+          required_destination_id: input.requiredDestinationId,
           decision: 'pending',
         })
         .returningAll()
@@ -301,7 +332,10 @@ export class PostgresPolicyRepository implements PolicyRepository {
         input.passId,
         input.ruleId,
         input.ruleRevision,
-        input.requiredSectionId,
+        {
+          requiredSectionId: input.requiredSectionId,
+          requiredDestinationId: input.requiredDestinationId,
+        },
       );
       if (existing === null) throw error;
       return existing;
@@ -573,7 +607,7 @@ export class PostgresPolicyRepository implements PolicyRepository {
           .onRef('destination.tenant_id', '=', 'pass_approval.tenant_id')
           .onRef('destination.id', '=', 'pass.destination_id'),
       )
-      .innerJoin('section', (join) =>
+      .leftJoin('section', (join) =>
         join
           .onRef('section.tenant_id', '=', 'pass_approval.tenant_id')
           .onRef('section.id', '=', 'pass_approval.required_section_id'),
@@ -583,6 +617,7 @@ export class PostgresPolicyRepository implements PolicyRepository {
         'pass_approval.pass_id as pass_id',
         'pass_approval.organization_id as organization_id',
         'pass_approval.required_section_id as required_section_id',
+        'pass_approval.required_destination_id as required_destination_id',
         'pass_approval.created_at as requested_at',
         'pass.revision as pass_revision',
         'pass.student_id as student_id',
@@ -609,6 +644,7 @@ export class PostgresPolicyRepository implements PolicyRepository {
       destinationDisplayName: row.destination_display_name ?? '',
       destinationServiceType: row.destination_service_type,
       requiredSectionId: row.required_section_id,
+      requiredDestinationId: row.required_destination_id,
       sectionCode: row.section_code,
       sectionTitle: row.section_title,
       requestedAt: fromDatabaseInstant(row.requested_at),
@@ -686,7 +722,9 @@ function toApprovalRecord(row: {
   origin_evaluation_result_id: string;
   policy_rule_id: string;
   policy_rule_revision: number;
-  required_section_id: string;
+  approver_kind: string;
+  required_section_id: string | null;
+  required_destination_id: string | null;
   decision: string;
   decision_actor_kind: string | null;
   decided_by_person_id: string | null;
@@ -700,7 +738,9 @@ function toApprovalRecord(row: {
     originEvaluationResultId: row.origin_evaluation_result_id,
     policyRuleId: row.policy_rule_id,
     policyRuleRevision: row.policy_rule_revision,
+    approverKind: toApproverKind(row.approver_kind),
     requiredSectionId: row.required_section_id,
+    requiredDestinationId: row.required_destination_id,
     decision: toEvidenceDecision(row.decision),
     decisionActorKind: toActorKind(row.decision_actor_kind),
     decidedByPersonId: row.decided_by_person_id,

@@ -21,6 +21,7 @@ function rule(overrides: Partial<PolicyRuleInput> = {}): PolicyRuleInput {
     scopeOrganizationId: SCHOOL,
     scopeSectionId: null,
     scopeDestinationId: null,
+    scopeDestinationCategoryId: null,
     priority: 0,
     configuration: {
       schemaVersion: 1,
@@ -104,6 +105,7 @@ function contextAt(
       originLocationId: null,
     },
     at,
+    destinationCategoryId: null,
     currentPlacement: placement ?? resolvedPlacement(at),
     rules,
     approvals: [],
@@ -240,7 +242,12 @@ describe('policy combination', () => {
     const outcome = evaluatePolicy(contextAt('2026-09-21T12:30:00Z', [approvalRule('a', 0)]));
     expect(outcome.decision).toBe('approval_required');
     expect(outcome.approvalRequirements).toEqual([
-      { ruleId: 'a', ruleRevision: 1, requiredSectionId: SECTION_P3 },
+      {
+        ruleId: 'a',
+        ruleRevision: 1,
+        requiredSectionId: SECTION_P3,
+        requiredDestinationId: null,
+      },
     ]);
   });
 
@@ -352,7 +359,9 @@ describe('approval evidence binding', () => {
       passId: 'pass-1',
       policyRuleId: 'appr',
       policyRuleRevision: 1,
+      approverKind: 'current_section_teacher' as const,
       requiredSectionId: SECTION_P3,
+      requiredDestinationId: null,
       decision: 'approved' as const,
     };
     expect(evaluatePolicy(withApprovals([good])).decision).toBe('allow');
@@ -369,7 +378,9 @@ describe('approval evidence binding', () => {
       passId: 'pass-1',
       policyRuleId: 'appr',
       policyRuleRevision: 1,
+      approverKind: 'current_section_teacher' as const,
       requiredSectionId: SECTION_P3,
+      requiredDestinationId: null,
       decision: 'denied' as const,
     };
     const outcome = evaluatePolicy(withApprovals([denied]));
@@ -419,8 +430,161 @@ describe('combinePolicyDecision', () => {
       contribution: 'approval_required' as const,
       reasonCode: 'current_section_teacher_approval_required' as const,
       requiredSectionId: SECTION_P3,
+      requiredDestinationId: null,
     };
     expect(combinePolicyDecision([])).toBe('allow');
     expect(combinePolicyDecision([approval])).toBe('approval_required');
+  });
+});
+
+const CATEGORY_ROOM = 'cat-room-visits';
+
+function destinationApprovalRule(overrides: Partial<PolicyRuleInput> = {}): PolicyRuleInput {
+  return rule({
+    id: 'dest-approval-rule',
+    ruleType: 'approval_requirement',
+    configuration: {
+      schemaVersion: 1,
+      requestSources: ['student_web'],
+      approver: 'destination_responsible_staff',
+    },
+    ...overrides,
+  });
+}
+
+function blockOnlyPlacement(at: Temporal.Instant): ExpectedPlacementResult {
+  const resolved = resolvedPlacement(at);
+  if (resolved.kind !== 'resolved') throw new Error('fixture must resolve');
+  return {
+    kind: 'block_only',
+    school: resolved.school,
+    schoolDate: resolved.schoolDate,
+    schoolTime: resolved.schoolTime,
+    calendarDay: resolved.calendarDay,
+    slot: resolved.slot,
+    block: resolved.block,
+    beginsAt: resolved.beginsAt,
+    endsAt: resolved.endsAt,
+    elapsedSeconds: resolved.elapsedSeconds,
+    remainingSeconds: resolved.remainingSeconds,
+  };
+}
+
+describe('destination responsible-staff approval', () => {
+  function destinationContext(
+    instant: string,
+    rules: readonly PolicyRuleInput[],
+    approvals: PolicyEvaluationContext['approvals'] = [],
+    placement?: ExpectedPlacementResult,
+  ): PolicyEvaluationContext {
+    const base = contextAt(instant, rules, placement);
+    return { ...base, approvals };
+  }
+
+  it('requires destination approval bound to the pass destination without a classroom', () => {
+    const at = Temporal.Instant.from('2026-09-21T12:30:00Z');
+    const outcome = evaluatePolicy(
+      destinationContext(
+        '2026-09-21T12:30:00Z',
+        [destinationApprovalRule()],
+        [],
+        blockOnlyPlacement(at),
+      ),
+    );
+    expect(outcome.decision).toBe('approval_required');
+    expect(outcome.results[0]?.reasonCode).toBe('destination_responsible_staff_approval_required');
+    expect(outcome.results[0]?.requiredSectionId).toBeNull();
+    expect(outcome.results[0]?.requiredDestinationId).toBe(DESTINATION);
+    expect(outcome.approvalRequirements).toEqual([
+      {
+        ruleId: 'dest-approval-rule',
+        ruleRevision: 1,
+        requiredSectionId: null,
+        requiredDestinationId: DESTINATION,
+      },
+    ]);
+  });
+
+  it('satisfies only the exact destination-bound approval', () => {
+    const matching = {
+      passId: 'pass-1',
+      policyRuleId: 'dest-approval-rule',
+      policyRuleRevision: 1,
+      approverKind: 'destination_responsible_staff' as const,
+      requiredSectionId: null,
+      requiredDestinationId: DESTINATION,
+      decision: 'approved' as const,
+    };
+    expect(
+      evaluatePolicy(
+        destinationContext('2026-09-21T12:30:00Z', [destinationApprovalRule()], [matching]),
+      ).decision,
+    ).toBe('allow');
+
+    // Section-bound evidence for the same rule never satisfies a destination requirement.
+    const sectionBound = {
+      ...matching,
+      requiredSectionId: SECTION_P3,
+      requiredDestinationId: null,
+    };
+    expect(
+      evaluatePolicy(
+        destinationContext('2026-09-21T12:30:00Z', [destinationApprovalRule()], [sectionBound]),
+      ).decision,
+    ).toBe('approval_required');
+
+    // Evidence for another destination never satisfies this requirement.
+    const otherDestination = { ...matching, requiredDestinationId: 'dest-other' };
+    expect(
+      evaluatePolicy(
+        destinationContext('2026-09-21T12:30:00Z', [destinationApprovalRule()], [otherDestination]),
+      ).decision,
+    ).toBe('approval_required');
+  });
+
+  it('treats a denied destination approval as deny', () => {
+    const denied = {
+      passId: 'pass-1',
+      policyRuleId: 'dest-approval-rule',
+      policyRuleRevision: 1,
+      approverKind: 'destination_responsible_staff' as const,
+      requiredSectionId: null,
+      requiredDestinationId: DESTINATION,
+      decision: 'denied' as const,
+    };
+    const outcome = evaluatePolicy(
+      destinationContext('2026-09-21T12:30:00Z', [destinationApprovalRule()], [denied]),
+    );
+    expect(outcome.decision).toBe('deny');
+    expect(outcome.results[0]?.reasonCode).toBe('approval_denied');
+  });
+});
+
+describe('destination_category policy scope', () => {
+  function categoryRule(): PolicyRuleInput {
+    return destinationApprovalRule({
+      id: 'room-visit-rule',
+      scopeKind: 'destination_category',
+      scopeOrganizationId: null,
+      scopeDestinationCategoryId: CATEGORY_ROOM,
+    });
+  }
+
+  it('applies when the pass destination category matches', () => {
+    const base = contextAt('2026-09-21T12:30:00Z', [categoryRule()]);
+    const outcome = evaluatePolicy({ ...base, destinationCategoryId: CATEGORY_ROOM });
+    expect(outcome.decision).toBe('approval_required');
+    expect(outcome.results[0]?.reasonCode).toBe('destination_responsible_staff_approval_required');
+  });
+
+  it('stays not_applicable on unknown or mismatched category', () => {
+    const base = contextAt('2026-09-21T12:30:00Z', [categoryRule()]);
+    const unknown = evaluatePolicy({ ...base, destinationCategoryId: null });
+    expect(unknown.decision).toBe('allow');
+    expect(unknown.results[0]?.outcome).toBe('not_applicable');
+
+    const mismatched = evaluatePolicy({ ...base, destinationCategoryId: 'cat-restroom' });
+    expect(mismatched.decision).toBe('allow');
+    expect(mismatched.results[0]?.outcome).toBe('not_applicable');
   });
 });

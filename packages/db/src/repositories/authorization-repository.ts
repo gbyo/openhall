@@ -6,6 +6,7 @@ import type {
   AuthorizationGrantFact,
   AuthorizationOrganizationRecord,
   AuthorizationSectionRecord,
+  LocationTeacherFact,
   OrganizationMembershipFact,
   SectionMembershipFact,
   StaffedDestinationFact,
@@ -93,6 +94,7 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
         'destination.status',
         'destination.display_name',
         'destination.service_type',
+        'destination.location_id',
         'location.name as location_name',
       ])
       .where('destination.tenant_id', '=', context.tenantId)
@@ -108,6 +110,7 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
       status,
       displayName: row.display_name,
       serviceType: row.service_type,
+      locationId: row.location_id,
       locationName: row.location_name,
     };
   }
@@ -305,5 +308,100 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
       }
     }
     return [...seen.values()];
+  }
+
+  async listTeachingMeetingLocations(
+    context: TenantTransactionContext,
+    personId: PersonId,
+    organizationId: OrganizationId,
+  ): Promise<readonly string[]> {
+    const connection = connectionFor(context);
+    const rows = await connection
+      .selectFrom('section_membership as membership')
+      .innerJoin('section as section_row', (join) =>
+        join
+          .onRef('section_row.tenant_id', '=', 'membership.tenant_id')
+          .onRef('section_row.id', '=', 'membership.section_id'),
+      )
+      .innerJoin('section_meeting as meeting', (join) =>
+        join
+          .onRef('meeting.tenant_id', '=', 'section_row.tenant_id')
+          .onRef('meeting.organization_id', '=', 'section_row.organization_id')
+          .onRef('meeting.section_id', '=', 'section_row.id'),
+      )
+      .innerJoin('organization_membership as staff_membership', (join) =>
+        join
+          .onRef('staff_membership.tenant_id', '=', 'membership.tenant_id')
+          .onRef('staff_membership.organization_id', '=', 'section_row.organization_id')
+          .onRef('staff_membership.person_id', '=', 'membership.person_id'),
+      )
+      .select('meeting.location_id')
+      .distinct()
+      .where('membership.tenant_id', '=', context.tenantId)
+      .where('membership.person_id', '=', personId)
+      .where('membership.role', '=', 'teacher')
+      .where('membership.status', '=', 'active')
+      .where('staff_membership.affiliation', '=', 'staff')
+      .where('staff_membership.status', '=', 'active')
+      .where('section_row.organization_id', '=', organizationId)
+      .where('meeting.organization_id', '=', organizationId)
+      .where('section_row.status', '=', 'active')
+      .where('meeting.location_id', 'is not', null)
+      .execute();
+    // IS NOT NULL narrows rows at runtime; the guard below narrows the type.
+    return rows
+      .map((row) => row.location_id)
+      .filter((locationId): locationId is string => locationId !== null);
+  }
+
+  async listLocationTeachers(
+    context: TenantTransactionContext,
+    organizationId: OrganizationId,
+    locationId: string,
+  ): Promise<readonly LocationTeacherFact[]> {
+    const connection = connectionFor(context);
+    const rows = await connection
+      .selectFrom('section_membership as membership')
+      .innerJoin('section as section_row', (join) =>
+        join
+          .onRef('section_row.tenant_id', '=', 'membership.tenant_id')
+          .onRef('section_row.id', '=', 'membership.section_id'),
+      )
+      .innerJoin('section_meeting as meeting', (join) =>
+        join
+          .onRef('meeting.tenant_id', '=', 'section_row.tenant_id')
+          .onRef('meeting.organization_id', '=', 'section_row.organization_id')
+          .onRef('meeting.section_id', '=', 'section_row.id'),
+      )
+      .select([
+        'membership.person_id',
+        'membership.section_id',
+        'membership.status',
+        'membership.starts_on',
+        'membership.ends_on',
+        'meeting.effective_from',
+        'meeting.effective_until',
+      ])
+      .where('membership.tenant_id', '=', context.tenantId)
+      .where('section_row.organization_id', '=', organizationId)
+      .where('meeting.organization_id', '=', organizationId)
+      .where('meeting.location_id', '=', locationId)
+      .where('membership.role', '=', 'teacher')
+      .where('membership.status', '=', 'active')
+      .where('section_row.status', '=', 'active')
+      .execute();
+    // One row per (teacher, section, meeting window); the caller dedupes by
+    // person after applying date windows on the school local date.
+    return rows.map((row) => ({
+      personId: row.person_id,
+      sectionId: row.section_id,
+      membershipStatus: row.status === 'active' ? 'active' : 'inactive',
+      startsOn: row.starts_on === null ? null : postgresDateToPlainDate(row.starts_on),
+      endsOn: row.ends_on === null ? null : postgresDateToPlainDate(row.ends_on),
+      meetingEffectiveFrom:
+        row.effective_from === null ? null : postgresDateToPlainDate(row.effective_from),
+      meetingEffectiveUntil:
+        row.effective_until === null ? null : postgresDateToPlainDate(row.effective_until),
+    }));
   }
 }

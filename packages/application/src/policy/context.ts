@@ -1,6 +1,6 @@
 import type { Temporal } from '@js-temporal/polyfill';
 import type { ExpectedPlacementResult } from '../scheduling/index.js';
-import type { PolicyOverrideMode, PolicyRuleType } from './configurations.js';
+import type { PolicyApprover, PolicyOverrideMode, PolicyRuleType } from './configurations.js';
 
 /** Typed rule as loaded for evaluation (configuration validated by the engine). */
 export interface PolicyRuleInput {
@@ -8,10 +8,11 @@ export interface PolicyRuleInput {
   readonly organizationId: string;
   readonly name: string;
   readonly ruleType: string;
-  readonly scopeKind: 'organization' | 'section' | 'destination';
+  readonly scopeKind: 'organization' | 'section' | 'destination' | 'destination_category';
   readonly scopeOrganizationId: string | null;
   readonly scopeSectionId: string | null;
   readonly scopeDestinationId: string | null;
+  readonly scopeDestinationCategoryId: string | null;
   readonly priority: number;
   readonly configuration: unknown;
   readonly overrideMode: string;
@@ -26,7 +27,11 @@ export interface PolicyApprovalEvidence {
   readonly passId: string;
   readonly policyRuleId: string;
   readonly policyRuleRevision: number;
-  readonly requiredSectionId: string;
+  /** Requirement kind; consistent with exactly one non-null binding. */
+  readonly approverKind: PolicyApprover;
+  /** Exactly one requirement binding is non-null. */
+  readonly requiredSectionId: string | null;
+  readonly requiredDestinationId: string | null;
   readonly decision: 'pending' | 'approved' | 'denied' | 'cancelled' | 'expired';
 }
 
@@ -68,6 +73,12 @@ export interface PolicyPassFacts {
  */
 export interface PolicyEvaluationContext {
   readonly pass: PolicyPassFacts;
+  /**
+   * Category of the pass destination at evaluation time. Null when the
+   * destination row is missing; `destination_category` rules stay
+   * not_applicable instead of failing closed on unknown category.
+   */
+  readonly destinationCategoryId: string | null;
   /** The single injected command instant shared by the whole command. */
   readonly at: Temporal.Instant;
   readonly currentPlacement: ExpectedPlacementResult;

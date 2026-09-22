@@ -9,6 +9,7 @@ export interface RealtimeSubscriberContext {
   readonly capabilities: readonly Capability[];
   readonly teachingSectionIds: readonly string[];
   readonly staffedDestinationIds: readonly string[];
+  readonly teachingLocationIds: readonly string[];
 }
 
 export type RealtimeMessage =
@@ -76,6 +77,8 @@ export function topicsFor(
   const destinationId = stringField(payload, 'destinationId');
   const originSectionId = stringField(payload, 'originSectionId');
   const requiredSectionId = stringField(payload, 'requiredSectionId');
+  const requiredDestinationId = stringField(payload, 'requiredDestinationId');
+  const requiredDestinationLocationId = stringField(payload, 'requiredDestinationLocationId');
 
   if (event.aggregateKind === 'pass') {
     if (studentId === subscriber.personId) topics.add('self-pass');
@@ -94,6 +97,21 @@ export function topicsFor(
       topics.add(`station:${destinationId}`);
     }
     if (requiredSectionId !== null && subscriber.teachingSectionIds.includes(requiredSectionId)) {
+      topics.add('requests');
+    }
+    if (
+      requiredDestinationId !== null &&
+      subscriber.staffedDestinationIds.includes(requiredDestinationId)
+    ) {
+      topics.add('requests');
+    }
+    // Schedule-derived classroom teachers: the destination's Place
+    // location falls where their active sections meet. Invalidation only;
+    // the pending-approvals endpoint stays the exact eligibility gate.
+    if (
+      requiredDestinationLocationId !== null &&
+      subscriber.teachingLocationIds.includes(requiredDestinationLocationId)
+    ) {
       topics.add('requests');
     }
   } else if (event.aggregateKind === 'scheduled_authorization') {

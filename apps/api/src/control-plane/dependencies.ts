@@ -141,6 +141,7 @@ export function createControlPlaneDependencies(
       authorization,
       policies: new PostgresPolicyAdminRepository(),
       destinations: destinationsRepo,
+      categories: destinationCategoriesRepo,
       idempotency,
       audit,
       outbox,

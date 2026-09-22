@@ -55,7 +55,12 @@ export async function reevaluatePersistAndApply(
 ): Promise<WorkflowTailResult> {
   const { passes, flow, policy, outbox } = dependencies;
   const { workflowRow, placement, at, stage } = input;
+  // Live destination category for `destination_category` scope matching.
+  // Null when the destination row is gone; category rules then stay
+  // not_applicable instead of failing closed on unknown category.
+  const tailDestination = await passes.loadDestination(context, workflowRow.destinationId);
   const decided = await evaluateAndPersistPolicy(context, policy, {
+    destinationCategoryId: tailDestination?.categoryId ?? null,
     pass: {
       id: workflowRow.id,
       revision: workflowRow.revision,
@@ -118,7 +123,10 @@ export async function reevaluatePersistAndApply(
         passId: workflowRow.id,
         organizationId: input.schoolId,
         studentId: input.studentId,
+        approverKind: approval.approverKind,
         requiredSectionId: approval.requiredSectionId,
+        requiredDestinationId: approval.requiredDestinationId,
+        requiredDestinationLocationId: tailDestination?.locationId ?? null,
         passRevision: revisionText,
       },
     });

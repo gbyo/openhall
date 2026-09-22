@@ -34,10 +34,11 @@ interface PolicyBody {
   name: string;
   ruleType: 'schedule_boundary' | 'approval_requirement';
   scope: {
-    kind: 'organization' | 'section' | 'destination';
+    kind: 'organization' | 'section' | 'destination' | 'destination_category';
     organizationId: string | null;
     sectionId: string | null;
     destinationId: string | null;
+    destinationCategoryId: string | null;
   };
   priority: number;
   configuration: Record<string, unknown>;
@@ -50,6 +51,7 @@ interface PolicyDraft {
   name: string;
   scopeKind: PolicyBody['scope']['kind'];
   scopeId: string;
+  approver: 'current_section_teacher' | 'destination_responsible_staff';
   priority: number;
   overrideMode: PolicyBody['overrideMode'];
   firstMinutes: number;
@@ -97,10 +99,16 @@ function instant(value: string, timeZone: string): string | null {
 
 function draftFor(rule: PolicyRule, timeZone: string): PolicyDraft {
   const configuration = rule.configuration;
+  const approver = configuration.approver;
   return {
     name: rule.name,
     scopeKind: rule.scope.kind,
-    scopeId: rule.scope.sectionId ?? rule.scope.destinationId ?? '',
+    scopeId:
+      rule.scope.sectionId ?? rule.scope.destinationId ?? rule.scope.destinationCategoryId ?? '',
+    approver:
+      approver === 'destination_responsible_staff'
+        ? 'destination_responsible_staff'
+        : 'current_section_teacher',
     priority: rule.priority,
     overrideMode: rule.overrideMode,
     firstMinutes: typeof configuration.firstMinutes === 'number' ? configuration.firstMinutes : 5,
@@ -155,6 +163,16 @@ export function Component() {
     queryFn: () =>
       confirmed(
         api.GET('/api/v1/organizations/{organizationId}/destinations', {
+          params: { path: { organizationId } },
+        }),
+      ),
+  });
+  const categories = useQuery({
+    queryKey: queryKeys.destinationCategories(organizationId),
+    enabled: draft?.scopeKind === 'destination_category',
+    queryFn: () =>
+      confirmed(
+        api.GET('/api/v1/organizations/{organizationId}/destination-categories', {
           params: { path: { organizationId } },
         }),
       ),
@@ -225,6 +243,7 @@ export function Component() {
       organizationId: draft.scopeKind === 'organization' ? organizationId : null,
       sectionId: draft.scopeKind === 'section' ? draft.scopeId : null,
       destinationId: draft.scopeKind === 'destination' ? draft.scopeId : null,
+      destinationCategoryId: draft.scopeKind === 'destination_category' ? draft.scopeId : null,
     },
     priority: draft.priority,
     configuration:
@@ -239,7 +258,7 @@ export function Component() {
         : {
             schemaVersion: 1,
             requestSources: draft.requestSources,
-            approver: 'current_section_teacher',
+            approver: draft.approver,
           },
     overrideMode: draft.overrideMode,
     validFrom: instant(draft.validFrom, context.organization.timeZone),
@@ -262,7 +281,9 @@ export function Component() {
         description={
           rule.ruleType === 'schedule_boundary'
             ? "Don't allow selected pass requests during the protected part of class."
-            : "Require the student's current classroom teacher to approve these requests."
+            : draft.approver === 'destination_responsible_staff'
+              ? 'Require the destination responsible staff to approve these requests.'
+              : "Require the student's current classroom teacher to approve these requests."
         }
         breadcrumb={
           <Link
@@ -339,12 +360,19 @@ export function Component() {
                 <NativeSelectOption value="organization">Whole school</NativeSelectOption>
                 <NativeSelectOption value="section">One class</NativeSelectOption>
                 <NativeSelectOption value="destination">One destination</NativeSelectOption>
+                <NativeSelectOption value="destination_category">
+                  One pass category
+                </NativeSelectOption>
               </NativeSelect>
             </Field>
             {draft.scopeKind !== 'organization' && (
               <Field>
                 <FieldLabel htmlFor="policy-detail-scope-id">
-                  {draft.scopeKind === 'section' ? 'Class' : 'Destination'}
+                  {draft.scopeKind === 'section'
+                    ? 'Class'
+                    : draft.scopeKind === 'destination_category'
+                      ? 'Pass category'
+                      : 'Destination'}
                 </FieldLabel>
                 <NativeSelect
                   id="policy-detail-scope-id"
@@ -361,11 +389,17 @@ export function Component() {
                           {section.title}
                         </NativeSelectOption>
                       ))
-                    : destinations.data?.destinations.map((destination) => (
-                        <NativeSelectOption key={destination.id} value={destination.id}>
-                          {destination.displayName ?? destination.serviceType}
-                        </NativeSelectOption>
-                      ))}
+                    : draft.scopeKind === 'destination_category'
+                      ? categories.data?.categories.map((category) => (
+                          <NativeSelectOption key={category.id} value={category.id}>
+                            {category.name}
+                          </NativeSelectOption>
+                        ))
+                      : destinations.data?.destinations.map((destination) => (
+                          <NativeSelectOption key={destination.id} value={destination.id}>
+                            {destination.displayName ?? destination.serviceType}
+                          </NativeSelectOption>
+                        ))}
                 </NativeSelect>
               </Field>
             )}
@@ -411,6 +445,28 @@ export function Component() {
                   ))}
                 </fieldset>
               </>
+            )}
+            {rule.ruleType === 'approval_requirement' && (
+              <Field>
+                <FieldLabel htmlFor="policy-detail-approver">Approver</FieldLabel>
+                <NativeSelect
+                  id="policy-detail-approver"
+                  value={draft.approver}
+                  onChange={(event) => {
+                    setDraft({
+                      ...draft,
+                      approver: event.target.value as PolicyDraft['approver'],
+                    });
+                  }}
+                >
+                  <NativeSelectOption value="current_section_teacher">
+                    Current classroom teacher
+                  </NativeSelectOption>
+                  <NativeSelectOption value="destination_responsible_staff">
+                    Destination responsible staff
+                  </NativeSelectOption>
+                </NativeSelect>
+              </Field>
             )}
             <fieldset className="grid gap-2 sm:col-span-2">
               <legend className="text-sm font-medium">Requests this policy affects</legend>

@@ -28,6 +28,7 @@ export interface AuthorizationDestinationRecord {
   readonly status: 'active' | 'closed' | 'archived';
   readonly displayName: string | null;
   readonly serviceType: string;
+  readonly locationId: string | null;
   readonly locationName: string | null;
 }
 
@@ -69,6 +70,21 @@ export interface StaffedDestinationFact {
   readonly id: DestinationId;
   readonly displayName: string;
   readonly serviceType: string;
+}
+
+/**
+ * Candidate classroom teacher for a Place location: a teacher membership
+ * on a section meeting at the location. Status is filtered by the query;
+ * date windows are applied by the caller on the school local date.
+ */
+export interface LocationTeacherFact {
+  readonly personId: PersonId;
+  readonly sectionId: SectionId;
+  readonly membershipStatus: 'active' | 'inactive';
+  readonly startsOn: Temporal.PlainDate | null;
+  readonly endsOn: Temporal.PlainDate | null;
+  readonly meetingEffectiveFrom: Temporal.PlainDate | null;
+  readonly meetingEffectiveUntil: Temporal.PlainDate | null;
 }
 
 /**
@@ -134,4 +150,29 @@ export interface AuthorizationFactsRepository {
     personId: PersonId,
     organizationId: OrganizationId,
   ): Promise<readonly StaffedDestinationFact[]>;
+
+  /**
+   * Candidate classroom teachers for a Place location: teacher memberships
+   * (active status only) on active sections with a meeting at the
+   * location. Membership and meeting date windows are applied by the
+   * caller on the school local date.
+   */
+  listLocationTeachers(
+    context: TenantTransactionContext,
+    organizationId: OrganizationId,
+    locationId: string,
+  ): Promise<readonly LocationTeacherFact[]>;
+
+  /**
+   * Distinct Place locations where the caller's active teacher memberships
+   * meet on active sections. Status-only: membership and meeting date
+   * windows stay the evaluator's job. Feeds realtime request
+   * invalidation; the pending-approvals endpoint remains the exact
+   * eligibility gate.
+   */
+  listTeachingMeetingLocations(
+    context: TenantTransactionContext,
+    personId: PersonId,
+    organizationId: OrganizationId,
+  ): Promise<readonly string[]>;
 }

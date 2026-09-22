@@ -10,6 +10,7 @@ const subscriber: RealtimeSubscriberContext = {
   capabilities: ['pass.view.school_live', 'schedule.view', 'audit.view'],
   teachingSectionIds: ['section-a'],
   staffedDestinationIds: ['destination-a'],
+  teachingLocationIds: ['location-a'],
 };
 
 function event(overrides: Partial<ObservedOutboxEvent> = {}): ObservedOutboxEvent {
@@ -43,6 +44,48 @@ describe('realtime topic isolation', () => {
   it('reveals nothing across tenant or school boundaries', () => {
     expect(topicsFor(event({ tenantId: 'tenant-b' }), subscriber)).toEqual([]);
     expect(topicsFor(event({ organizationId: 'school-b' }), subscriber)).toEqual([]);
+  });
+
+  it('invalidates requests for the required destination staff', () => {
+    const approval = event({
+      eventType: 'pass.approval_required',
+      payload: {
+        studentId: 'other-student',
+        originSectionId: 'section-other',
+        requiredSectionId: null,
+        requiredDestinationId: 'destination-a',
+      },
+    });
+    expect(topicsFor(approval, subscriber)).toContain('requests');
+    const unstaffed = { ...subscriber, staffedDestinationIds: [] as string[] };
+    expect(topicsFor(approval, unstaffed)).not.toContain('requests');
+  });
+
+  it('invalidates requests for schedule-derived classroom teachers', () => {
+    // A classroom teacher with no explicit destination grant still
+    // approves when their sections meet at the destination's location.
+    const scheduleTeacher: RealtimeSubscriberContext = {
+      ...subscriber,
+      teachingSectionIds: ['section-b'],
+      staffedDestinationIds: [],
+      teachingLocationIds: ['location-room-214'],
+    };
+    const approval = event({
+      eventType: 'pass.approval_required',
+      payload: {
+        studentId: 'other-student',
+        originSectionId: 'section-other',
+        requiredSectionId: null,
+        requiredDestinationId: 'destination-room-214',
+        requiredDestinationLocationId: 'location-room-214',
+      },
+    });
+    expect(topicsFor(approval, scheduleTeacher)).toContain('requests');
+    const elsewhere = {
+      ...scheduleTeacher,
+      teachingLocationIds: ['location-gym'],
+    };
+    expect(topicsFor(approval, elsewhere)).not.toContain('requests');
   });
 
   it('uses authorized broad section invalidation when legacy pass metadata lacks origin', () => {

@@ -2751,6 +2751,12 @@
                           {
                             "type": "string",
                             "enum": [
+                              "pass.approve.destination"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
                               "pass.override.request.self"
                             ]
                           },
@@ -3342,6 +3348,12 @@
                                 {
                                   "type": "string",
                                   "enum": [
+                                    "pass.approve.destination"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
                                     "pass.override.request.self"
                                   ]
                                 },
@@ -3568,6 +3580,12 @@
                                   "type": "string",
                                   "enum": [
                                     "pass.approve.section"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "pass.approve.destination"
                                   ]
                                 },
                                 {
@@ -6482,6 +6500,7 @@
                           "student",
                           "destination",
                           "requiredSection",
+                          "requiredDestination",
                           "requestedAt"
                         ],
                         "properties": {
@@ -6544,32 +6563,66 @@
                             "additionalProperties": false
                           },
                           "requiredSection": {
-                            "type": "object",
-                            "required": [
-                              "id",
-                              "code",
-                              "title"
-                            ],
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "format": "uuid"
-                              },
-                              "code": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "code",
+                                  "title"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
                                   },
-                                  {
-                                    "type": "null"
+                                  "code": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "title": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
-                                ]
+                                },
+                                "additionalProperties": false
                               },
-                              "title": {
-                                "type": "string"
+                              {
+                                "type": "null"
                               }
-                            },
-                            "additionalProperties": false
+                            ]
+                          },
+                          "requiredDestination": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "required": [
+                                  "id"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "requestedAt": {
                             "type": "string",
@@ -9934,6 +9987,12 @@
                                 "type": "string",
                                 "enum": [
                                   "current_section_teacher_approval_required"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "destination_responsible_staff_approval_required"
                                 ]
                               },
                               {
@@ -34386,7 +34445,8 @@
                               "kind",
                               "organizationId",
                               "sectionId",
-                              "destinationId"
+                              "destinationId",
+                              "destinationCategoryId"
                             ],
                             "properties": {
                               "kind": {
@@ -34407,6 +34467,12 @@
                                     "type": "string",
                                     "enum": [
                                       "destination"
+                                    ]
+                                  },
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "destination_category"
                                     ]
                                   }
                                 ]
@@ -34434,6 +34500,17 @@
                                 ]
                               },
                               "destinationId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "destinationCategoryId": {
                                 "anyOf": [
                                   {
                                     "type": "string",
@@ -34722,7 +34799,8 @@
                       "kind",
                       "organizationId",
                       "sectionId",
-                      "destinationId"
+                      "destinationId",
+                      "destinationCategoryId"
                     ],
                     "properties": {
                       "kind": {
@@ -34743,6 +34821,12 @@
                             "type": "string",
                             "enum": [
                               "destination"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "destination_category"
                             ]
                           }
                         ]
@@ -34770,6 +34854,17 @@
                         ]
                       },
                       "destinationId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "destinationCategoryId": {
                         "anyOf": [
                           {
                             "type": "string",
@@ -34942,7 +35037,8 @@
                             "kind",
                             "organizationId",
                             "sectionId",
-                            "destinationId"
+                            "destinationId",
+                            "destinationCategoryId"
                           ],
                           "properties": {
                             "kind": {
@@ -34963,6 +35059,12 @@
                                   "type": "string",
                                   "enum": [
                                     "destination"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "destination_category"
                                   ]
                                 }
                               ]
@@ -34990,6 +35092,17 @@
                               ]
                             },
                             "destinationId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "destinationCategoryId": {
                               "anyOf": [
                                 {
                                   "type": "string",
@@ -35496,7 +35609,8 @@
                             "kind",
                             "organizationId",
                             "sectionId",
-                            "destinationId"
+                            "destinationId",
+                            "destinationCategoryId"
                           ],
                           "properties": {
                             "kind": {
@@ -35517,6 +35631,12 @@
                                   "type": "string",
                                   "enum": [
                                     "destination"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "destination_category"
                                   ]
                                 }
                               ]
@@ -35544,6 +35664,17 @@
                               ]
                             },
                             "destinationId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "destinationCategoryId": {
                               "anyOf": [
                                 {
                                   "type": "string",
@@ -35830,7 +35961,8 @@
                       "kind",
                       "organizationId",
                       "sectionId",
-                      "destinationId"
+                      "destinationId",
+                      "destinationCategoryId"
                     ],
                     "properties": {
                       "kind": {
@@ -35851,6 +35983,12 @@
                             "type": "string",
                             "enum": [
                               "destination"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "enum": [
+                              "destination_category"
                             ]
                           }
                         ]
@@ -35878,6 +36016,17 @@
                         ]
                       },
                       "destinationId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "destinationCategoryId": {
                         "anyOf": [
                           {
                             "type": "string",
@@ -36050,7 +36199,8 @@
                             "kind",
                             "organizationId",
                             "sectionId",
-                            "destinationId"
+                            "destinationId",
+                            "destinationCategoryId"
                           ],
                           "properties": {
                             "kind": {
@@ -36071,6 +36221,12 @@
                                   "type": "string",
                                   "enum": [
                                     "destination"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "destination_category"
                                   ]
                                 }
                               ]
@@ -36098,6 +36254,17 @@
                               ]
                             },
                             "destinationId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "destinationCategoryId": {
                               "anyOf": [
                                 {
                                   "type": "string",
@@ -36624,7 +36791,8 @@
                             "kind",
                             "organizationId",
                             "sectionId",
-                            "destinationId"
+                            "destinationId",
+                            "destinationCategoryId"
                           ],
                           "properties": {
                             "kind": {
@@ -36645,6 +36813,12 @@
                                   "type": "string",
                                   "enum": [
                                     "destination"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "destination_category"
                                   ]
                                 }
                               ]
@@ -36672,6 +36846,17 @@
                               ]
                             },
                             "destinationId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "destinationCategoryId": {
                               "anyOf": [
                                 {
                                   "type": "string",
@@ -37198,7 +37383,8 @@
                             "kind",
                             "organizationId",
                             "sectionId",
-                            "destinationId"
+                            "destinationId",
+                            "destinationCategoryId"
                           ],
                           "properties": {
                             "kind": {
@@ -37219,6 +37405,12 @@
                                   "type": "string",
                                   "enum": [
                                     "destination"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "destination_category"
                                   ]
                                 }
                               ]
@@ -37246,6 +37438,17 @@
                               ]
                             },
                             "destinationId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "destinationCategoryId": {
                               "anyOf": [
                                 {
                                   "type": "string",
@@ -37772,7 +37975,8 @@
                             "kind",
                             "organizationId",
                             "sectionId",
-                            "destinationId"
+                            "destinationId",
+                            "destinationCategoryId"
                           ],
                           "properties": {
                             "kind": {
@@ -37793,6 +37997,12 @@
                                   "type": "string",
                                   "enum": [
                                     "destination"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "destination_category"
                                   ]
                                 }
                               ]
@@ -37820,6 +38030,17 @@
                               ]
                             },
                             "destinationId": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "destinationCategoryId": {
                               "anyOf": [
                                 {
                                   "type": "string",

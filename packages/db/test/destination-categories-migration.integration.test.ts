@@ -66,7 +66,7 @@ interface CategoryRow {
 }
 
 describe('migration 010 destination categories', () => {
-  it('migrates a blank database 001 -> 010 with category invariants', async () => {
+  it('migrates a blank database 001 -> 011 with category invariants', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
@@ -74,7 +74,7 @@ describe('migration 010 destination categories', () => {
       const names = (
         await scratch.query<{ name: string }>('SELECT name FROM kysely_migration ORDER BY name')
       ).rows.map((row) => row.name);
-      expect(names[names.length - 1]).toBe('010_destination_categories');
+      expect(names[names.length - 1]).toBe('011_destination_approval_generalization');
       const table = await scratch.query<{ column_name: string; is_nullable: string }>(
         `SELECT column_name, is_nullable FROM information_schema.columns
          WHERE table_name = 'destination_category' ORDER BY 1`,

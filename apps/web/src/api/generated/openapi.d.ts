@@ -2594,7 +2594,7 @@ export interface operations {
                             timeZone: string;
                         };
                         affiliations: ("student" | "staff" | "other")[];
-                        capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
+                        capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.approve.destination" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
                         expectedPlacement: ({
                             /** @enum {string} */
                             kind: "resolved";
@@ -2667,14 +2667,14 @@ export interface operations {
                             id: string;
                             code: string | null;
                             title: string;
-                            capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
+                            capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.approve.destination" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
                         }[];
                         staffedDestinations: {
                             /** Format: uuid */
                             id: string;
                             displayName: string;
                             serviceType: string;
-                            capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
+                            capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.approve.destination" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
                         }[];
                     };
                 };
@@ -3488,8 +3488,12 @@ export interface operations {
                                 /** Format: uuid */
                                 id: string;
                                 code: string | null;
-                                title: string;
-                            };
+                                title: string | null;
+                            } | null;
+                            requiredDestination: {
+                                /** Format: uuid */
+                                id: string;
+                            } | null;
                             /** Format: date-time */
                             requestedAt: string;
                         }[];
@@ -4452,7 +4456,7 @@ export interface operations {
                             };
                             category: "urgent" | "private" | "safety" | "staff_directed";
                             overrideMode: "never" | "authorized" | "approval_required";
-                            reasonCode: "no_violation" | "schedule_boundary_blackout" | "current_section_teacher_approval_required" | "approval_context_unavailable" | "approval_satisfied" | "scheduled_preapproval_satisfied" | "approval_denied" | "override_denied" | "rule_overridden" | "policy_configuration_error";
+                            reasonCode: "no_violation" | "schedule_boundary_blackout" | "current_section_teacher_approval_required" | "destination_responsible_staff_approval_required" | "approval_context_unavailable" | "approval_satisfied" | "scheduled_preapproval_satisfied" | "approval_denied" | "override_denied" | "rule_overridden" | "policy_configuration_error";
                             /** Format: date-time */
                             requestedAt: string;
                         }[];
@@ -12059,10 +12063,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "destination" | "destination_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
                                 destinationId: string | null;
+                                destinationCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12156,10 +12161,11 @@ export interface operations {
                     name: string;
                     ruleType: "schedule_boundary" | "approval_requirement";
                     scope: {
-                        kind: "organization" | "section" | "destination";
+                        kind: "organization" | "section" | "destination" | "destination_category";
                         organizationId: string | null;
                         sectionId: string | null;
                         destinationId: string | null;
+                        destinationCategoryId: string | null;
                     };
                     priority: number;
                     configuration: {
@@ -12187,10 +12193,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "destination" | "destination_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
                                 destinationId: string | null;
+                                destinationCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12364,10 +12371,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "destination" | "destination_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
                                 destinationId: string | null;
+                                destinationCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12461,10 +12469,11 @@ export interface operations {
                     name: string;
                     ruleType: "schedule_boundary" | "approval_requirement";
                     scope: {
-                        kind: "organization" | "section" | "destination";
+                        kind: "organization" | "section" | "destination" | "destination_category";
                         organizationId: string | null;
                         sectionId: string | null;
                         destinationId: string | null;
+                        destinationCategoryId: string | null;
                     };
                     priority: number;
                     configuration: {
@@ -12492,10 +12501,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "destination" | "destination_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
                                 destinationId: string | null;
+                                destinationCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12672,10 +12682,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "destination" | "destination_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
                                 destinationId: string | null;
+                                destinationCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12852,10 +12863,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "destination" | "destination_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
                                 destinationId: string | null;
+                                destinationCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -13032,10 +13044,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "destination" | "destination_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
                                 destinationId: string | null;
+                                destinationCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {

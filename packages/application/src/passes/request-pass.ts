@@ -358,6 +358,7 @@ export async function createPassInTransaction(
       originLocationId: row.originLocationId,
     },
     placement,
+    destinationCategoryId: destination.categoryId,
     at: now,
     stage: 'request',
     scheduledPreapprovals: scheduled?.scheduledPreapprovals ?? [],
@@ -446,7 +447,10 @@ export async function createPassInTransaction(
         passId: row.id,
         organizationId: schoolId,
         studentId: targetStudentId,
+        approverKind: approval.approverKind,
         requiredSectionId: approval.requiredSectionId,
+        requiredDestinationId: approval.requiredDestinationId,
+        requiredDestinationLocationId: destination.locationId,
         passRevision: '1',
       },
     });
