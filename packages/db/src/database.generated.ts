@@ -182,6 +182,7 @@ export interface DestinationCategory {
   id: Generated<string>;
   name: string;
   organization_id: string;
+  picker_mode: Generated<string>;
   revision: Generated<Int8>;
   sort_order: Generated<number>;
   status: Generated<string>;

@@ -80,6 +80,7 @@ export interface StudentCatalogCategory {
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary';
+  readonly pickerMode: 'auto' | 'list' | 'search';
   readonly sortOrder: number;
   readonly destinations: readonly StudentCatalogDestination[];
 }
@@ -462,6 +463,7 @@ export async function listMyStudentDestinationCatalog(
         iconKey: category.iconKey,
         toneKey: category.toneKey,
         studentSurface: category.studentSurface,
+        pickerMode: category.pickerMode,
         sortOrder: category.sortOrder,
         destinations: eligible,
       });

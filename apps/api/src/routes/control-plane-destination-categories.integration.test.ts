@@ -138,6 +138,7 @@ interface CategoryBody {
   iconKey: string;
   toneKey: string;
   studentSurface: string;
+  pickerMode: string;
   sortOrder: number;
   status: string;
   revision: string;
@@ -412,6 +413,56 @@ describe('destination-category administration', () => {
     });
     expect(concealed.statusCode).toBe(404);
     expect(concealed.json<{ code: string }>().code).toBe('destination_category_not_found');
+  });
+
+  it('defaults picker mode to auto and round-trips explicit modes', async () => {
+    const implicit = await createCategory(requireAdmin(), schoolA, { name: 'Implicit Picker' });
+    expect(implicit.response.statusCode).toBe(201);
+    expect(implicit.category.pickerMode).toBe('auto');
+
+    const searching = await createCategory(requireAdmin(), schoolA, {
+      name: 'Search Picker',
+      pickerMode: 'search',
+    });
+    expect(searching.response.statusCode).toBe(201);
+    expect(searching.category.pickerMode).toBe('search');
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: `/api/v1/organizations/${schoolA}/destination-categories`,
+      headers: authHeaders(requireAdmin()),
+    });
+    const modes = new Map(
+      listed.json<{ categories: CategoryBody[] }>().categories.map((c) => [c.name, c.pickerMode]),
+    );
+    expect(modes.get('Implicit Picker')).toBe('auto');
+    expect(modes.get('Search Picker')).toBe('search');
+
+    const relisted = await app.inject({
+      method: 'PUT',
+      url: `/api/v1/destination-categories/${searching.category.id}`,
+      headers: authHeaders(requireAdmin(), randomUUID(), searching.etag),
+      payload: { name: 'Search Picker', ...categoryPayload, pickerMode: 'list' },
+    });
+    expect(relisted.statusCode).toBe(200);
+    expect(relisted.json<{ category: CategoryBody }>().category.pickerMode).toBe('list');
+
+    const catalog = await app.inject({
+      method: 'GET',
+      url: `/api/v1/me/organizations/${schoolA}/student-destination-catalog`,
+      headers: authHeaders(requireStudent()),
+    });
+    expect(catalog.statusCode).toBe(200);
+    for (const entry of catalog.json<{
+      categories: { name: string; pickerMode: string }[];
+    }>().categories) {
+      expect(['auto', 'list', 'search']).toContain(entry.pickerMode);
+    }
+  });
+
+  it('rejects unknown picker modes with a closed vocabulary', async () => {
+    const bad = await createCategory(requireAdmin(), schoolA, { pickerMode: 'Room visits' });
+    expect(bad.response.statusCode).toBe(400);
   });
 
   it('requires destination.manage and replays idempotent creates', async () => {

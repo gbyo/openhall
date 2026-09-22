@@ -1493,6 +1493,17 @@ export const DestinationCatalogEntrySchema = Type.Object(
  * destinations. Presentation travels as safe product keys; the frontend
  * owns the single centralized key -> icon/class mapping.
  */
+/**
+ * Generic destination picker mode: `auto` chooses a simple list for a few
+ * choices and search for larger sets; `list` and `search` force one
+ * presentation. Never derived from category names.
+ */
+export const DestinationCategoryPickerModeSchema = Type.Union([
+  Type.Literal('auto'),
+  Type.Literal('list'),
+  Type.Literal('search'),
+]);
+
 export const DestinationCategorySchema = Type.Object(
   {
     id: UuidSchema,
@@ -1505,6 +1516,7 @@ export const DestinationCategorySchema = Type.Object(
       Type.Literal('secondary'),
       Type.Literal('hidden'),
     ]),
+    pickerMode: DestinationCategoryPickerModeSchema,
     sortOrder: Type.Integer({ minimum: 0 }),
     status: Type.Union([Type.Literal('active'), Type.Literal('archived')]),
     revision: Type.String({ pattern: '^[1-9][0-9]*$' }),
@@ -1533,6 +1545,7 @@ export const DestinationCategoryWriteBodySchema = Type.Object(
       Type.Literal('secondary'),
       Type.Literal('hidden'),
     ]),
+    pickerMode: Type.Optional(DestinationCategoryPickerModeSchema),
     sortOrder: Type.Integer({ minimum: 0, maximum: 100000 }),
   },
   { $id: 'DestinationCategoryWriteBody', additionalProperties: false },
@@ -1560,6 +1573,7 @@ export const StudentDestinationCatalogCategorySchema = Type.Object(
     iconKey: Type.String(),
     toneKey: Type.String(),
     studentSurface: Type.Union([Type.Literal('primary'), Type.Literal('secondary')]),
+    pickerMode: DestinationCategoryPickerModeSchema,
     sortOrder: Type.Integer({ minimum: 0 }),
     destinations: Type.Array(StudentDestinationCatalogDestinationSchema),
   },

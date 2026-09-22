@@ -11,6 +11,7 @@ import type {
 } from '../persistence.js';
 import {
   isDestinationCategoryIconKey,
+  isDestinationCategoryPickerMode,
   isDestinationCategorySurface,
   isDestinationCategoryToneKey,
 } from './destination-category-presentation.js';
@@ -42,6 +43,7 @@ export interface DestinationCategoryView {
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly pickerMode: 'auto' | 'list' | 'search';
   readonly sortOrder: number;
   readonly status: 'active' | 'archived';
   readonly revision: string;
@@ -56,6 +58,7 @@ export function toDestinationCategoryView(row: DestinationCategoryRecord): Desti
     iconKey: row.iconKey,
     toneKey: row.toneKey,
     studentSurface: row.studentSurface,
+    pickerMode: row.pickerMode,
     sortOrder: row.sortOrder,
     status: row.status,
     revision: row.revision.toString(10),
@@ -78,6 +81,7 @@ export interface DestinationCategoryConfigBody {
   readonly iconKey: unknown;
   readonly toneKey: unknown;
   readonly studentSurface: unknown;
+  readonly pickerMode: unknown;
   readonly sortOrder: unknown;
 }
 
@@ -109,6 +113,7 @@ interface CanonicalCategoryConfig {
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly pickerMode: 'auto' | 'list' | 'search';
   readonly sortOrder: number;
 }
 
@@ -144,6 +149,14 @@ function cleanSurface(value: unknown): 'primary' | 'secondary' | 'hidden' {
   return value;
 }
 
+function cleanPickerMode(value: unknown): 'auto' | 'list' | 'search' {
+  if (value === undefined || value === null) return 'auto';
+  if (typeof value !== 'string' || !isDestinationCategoryPickerMode(value)) {
+    throw new ControlPlaneError('invalid_precondition', 'Invalid destination picker mode.');
+  }
+  return value;
+}
+
 function cleanSortOrder(value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 100000) {
     throw new ControlPlaneError('invalid_precondition', 'Invalid display order.');
@@ -163,6 +176,7 @@ function canonicalCategoryConfig(body: DestinationCategoryConfigBody): Canonical
     iconKey: cleanIconKey(body.iconKey),
     toneKey: cleanToneKey(body.toneKey),
     studentSurface: cleanSurface(body.studentSurface),
+    pickerMode: cleanPickerMode(body.pickerMode),
     sortOrder: cleanSortOrder(body.sortOrder),
   };
 }
@@ -173,6 +187,7 @@ function fingerprintComponents(config: CanonicalCategoryConfig): string[] {
     config.iconKey,
     config.toneKey,
     config.studentSurface,
+    config.pickerMode,
     String(config.sortOrder),
   ];
 }

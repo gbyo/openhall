@@ -23,6 +23,7 @@ CREATE TABLE destination_category (
   icon_key text NOT NULL DEFAULT 'generic' CHECK (length(btrim(icon_key)) > 0 AND length(icon_key) <= 40),
   tone_key text NOT NULL DEFAULT 'neutral' CHECK (length(btrim(tone_key)) > 0 AND length(tone_key) <= 40),
   student_surface text NOT NULL DEFAULT 'secondary' CHECK (student_surface IN ('primary', 'secondary', 'hidden')),
+  picker_mode text NOT NULL DEFAULT 'auto' CHECK (picker_mode IN ('auto', 'list', 'search')),
   sort_order integer NOT NULL DEFAULT 0 CHECK (sort_order >= 0),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
   revision bigint NOT NULL DEFAULT 1 CHECK (revision > 0),

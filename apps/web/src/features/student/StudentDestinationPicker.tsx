@@ -1,4 +1,13 @@
+import { useMemo } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox';
 import {
   Item,
   ItemContent,
@@ -7,8 +16,15 @@ import {
   ItemMedia,
   ItemTitle,
 } from '@/components/ui/item';
-import type { CategoryIcon } from '../../lib/destination-category-presentation.js';
-import type { StudentCatalogDestination, StudentCategory } from './student-intents.js';
+import {
+  normalizeDestinationQuery,
+  type CategoryIcon,
+} from '../../lib/destination-category-presentation.js';
+import {
+  pickerForCategory,
+  type StudentCatalogDestination,
+  type StudentCategory,
+} from './student-intents.js';
 
 interface StudentDestinationPickerProps {
   /** Secondary categories for the generated More list. */
@@ -87,6 +103,9 @@ export function StudentDestinationPicker({
     );
   }
   if (!category) return null;
+  if (pickerForCategory(category) === 'search') {
+    return <StudentDestinationSearch category={category} onPickDestination={onPickDestination} />;
+  }
   // Show the physical location only when it adds useful distinction between
   // same-category destinations (e.g. three restrooms in different wings).
   const locations = new Set(category.destinations.map((entry) => entry.location.name));
@@ -108,6 +127,60 @@ export function StudentDestinationPicker({
           />
         ))}
       </ItemGroup>
+    </div>
+  );
+}
+/**
+ * Searchable destination picker. Typing filters locally only; selecting a
+ * result yields its Destination ID. Arbitrary typed text can never be
+ * submitted as a destination.
+ */
+function StudentDestinationSearch({
+  category,
+  onPickDestination,
+}: {
+  category: StudentCategory;
+  onPickDestination: (destination: StudentCatalogDestination) => void;
+}) {
+  const items = useMemo(() => [...category.destinations], [category]);
+  return (
+    <div className="flex flex-col gap-3">
+      <Combobox
+        items={items}
+        value={null}
+        onValueChange={(option: StudentCatalogDestination | null) => {
+          if (option) onPickDestination(option);
+        }}
+        filter={(item: StudentCatalogDestination, rawQuery: string) => {
+          const tokens = normalizeDestinationQuery(rawQuery).split(' ').filter(Boolean);
+          if (tokens.length === 0) return true;
+          const haystack = normalizeDestinationQuery(`${item.displayName} ${item.location.name}`);
+          return tokens.every((token) => haystack.includes(token));
+        }}
+      >
+        <ComboboxInput
+          aria-label={`Search ${category.name.toLowerCase()}`}
+          placeholder="Search teacher or room"
+        />
+        <ComboboxContent>
+          <ComboboxList>
+            {(item: StudentCatalogDestination) => (
+              <ComboboxItem key={item.id} value={item}>
+                <span className="flex flex-col items-start gap-0.5">
+                  <span className="text-sm font-medium">{item.displayName}</span>
+                  {item.location.name && item.location.name !== item.displayName ? (
+                    <span className="text-xs text-muted-foreground">{item.location.name}</span>
+                  ) : null}
+                </span>
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+          <ComboboxEmpty>No matching destination.</ComboboxEmpty>
+        </ComboboxContent>
+      </Combobox>
+      <p className="text-xs text-muted-foreground">
+        {`${String(category.destinations.length)} places available. Type to filter.`}
+      </p>
     </div>
   );
 }

@@ -397,6 +397,7 @@ export function orgCategories() {
         iconKey: 'medical',
         toneKey: 'rose',
         studentSurface: 'primary',
+        pickerMode: 'auto',
         sortOrder: 20,
         status: 'active',
         revision: '1',

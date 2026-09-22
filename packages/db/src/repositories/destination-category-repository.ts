@@ -22,6 +22,11 @@ function studentSurface(value: string): DestinationCategoryRecord['studentSurfac
   return 'secondary';
 }
 
+function pickerMode(value: string): DestinationCategoryRecord['pickerMode'] {
+  if (value === 'list' || value === 'search') return value;
+  return 'auto';
+}
+
 interface DestinationCategoryRow {
   id: string;
   tenant_id: string;
@@ -30,6 +35,7 @@ interface DestinationCategoryRow {
   icon_key: string;
   tone_key: string;
   student_surface: string;
+  picker_mode: string;
   sort_order: number;
   status: string;
   revision: string | bigint | number;
@@ -46,6 +52,7 @@ function toDestinationCategoryRecord(row: DestinationCategoryRow): DestinationCa
     iconKey: row.icon_key,
     toneKey: row.tone_key,
     studentSurface: studentSurface(row.student_surface),
+    pickerMode: pickerMode(row.picker_mode),
     sortOrder: row.sort_order,
     status: categoryStatus(row.status),
     revision: toBigInt(row.revision),
@@ -116,6 +123,7 @@ export class PostgresDestinationCategoryRepository implements DestinationCategor
         icon_key: input.iconKey,
         tone_key: input.toneKey,
         student_surface: input.studentSurface,
+        picker_mode: input.pickerMode,
         sort_order: input.sortOrder,
       })
       .returningAll()
@@ -138,6 +146,7 @@ export class PostgresDestinationCategoryRepository implements DestinationCategor
         icon_key: update.iconKey,
         tone_key: update.toneKey,
         student_surface: update.studentSurface,
+        picker_mode: update.pickerMode,
         sort_order: update.sortOrder,
         revision: String(expectedRevision + 1n),
         updated_at: toDatabaseInstant(at),

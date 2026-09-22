@@ -17,6 +17,7 @@ import {
   FieldLabel,
   FieldSet,
 } from '@/components/ui/field';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
@@ -29,12 +30,14 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  CATEGORY_ICON_OPTIONS,
+  CATEGORY_PICKER_MODE_OPTIONS,
   CATEGORY_TONE_OPTIONS,
   iconForCategoryKey,
   surfaceLabel,
   tileTone,
+  type CategoryPickerMode,
 } from '../../../lib/destination-category-presentation.js';
+import { DestinationCategoryIconPicker } from './DestinationCategoryIconPicker.js';
 import { cn } from 'cn';
 import type { DestinationCategory } from '../../../api/types.js';
 
@@ -43,6 +46,7 @@ export interface CategoryFormValue {
   iconKey: string;
   toneKey: string;
   studentSurface: 'primary' | 'secondary' | 'hidden';
+  pickerMode: CategoryPickerMode;
   sortOrder: number;
 }
 
@@ -55,6 +59,10 @@ export function categoryFormValue(category: DestinationCategory | null): Categor
       category?.studentSurface === 'primary' || category?.studentSurface === 'hidden'
         ? category.studentSurface
         : 'secondary',
+    pickerMode:
+      category?.pickerMode === 'list' || category?.pickerMode === 'search'
+        ? category.pickerMode
+        : 'auto',
     sortOrder: category?.sortOrder ?? 0,
   };
 }
@@ -122,7 +130,7 @@ export function DestinationCategoryDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{editing ? 'Edit category' : 'New category'}</DialogTitle>
+          <DialogTitle>{editing ? 'Edit pass category' : 'New pass category'}</DialogTitle>
           <DialogDescription>
             Categories group destinations on the student WayPass home. Renaming never changes
             destination internals.
@@ -145,23 +153,14 @@ export function DestinationCategoryDialog({
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel htmlFor="category-icon">Icon</FieldLabel>
-                <Select
+                <DestinationCategoryIconPicker
+                  id="category-icon"
                   value={form.iconKey}
-                  onValueChange={(value: string | null) => {
-                    if (value) setForm({ ...form, iconKey: value });
+                  onValueChange={(iconKey) => {
+                    setForm({ ...form, iconKey });
                   }}
-                >
-                  <SelectTrigger id="category-icon">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORY_ICON_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
+                <FieldDescription>Type to search icons by name.</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="category-tone">Color</FieldLabel>
@@ -232,6 +231,39 @@ export function DestinationCategoryDialog({
                 ))}
               </RadioGroup>
             </Field>
+            <Collapsible>
+              <Field>
+                <CollapsibleTrigger render={<Button variant="ghost" size="sm" type="button" />}>
+                  Advanced
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <FieldLabel id="category-picker-label">Destination picker</FieldLabel>
+                  <RadioGroup
+                    aria-labelledby="category-picker-label"
+                    value={form.pickerMode}
+                    onValueChange={(value: string) => {
+                      if (value === 'auto' || value === 'list' || value === 'search')
+                        setForm({ ...form, pickerMode: value });
+                    }}
+                  >
+                    {CATEGORY_PICKER_MODE_OPTIONS.map((mode) => (
+                      <div key={mode.value} className="flex items-start gap-2">
+                        <RadioGroupItem value={mode.value} id={`category-picker-${mode.value}`} />
+                        <div className="flex flex-col gap-0.5">
+                          <label
+                            htmlFor={`category-picker-${mode.value}`}
+                            className="text-sm font-medium"
+                          >
+                            {mode.label}
+                          </label>
+                          <FieldDescription>{mode.description}</FieldDescription>
+                        </div>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </CollapsibleContent>
+              </Field>
+            </Collapsible>
             <Field>
               <FieldLabel htmlFor="category-order">Display order</FieldLabel>
               <FieldDescription>

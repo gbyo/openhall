@@ -25402,6 +25402,7 @@
                           "iconKey",
                           "toneKey",
                           "studentSurface",
+                          "pickerMode",
                           "sortOrder",
                           "status",
                           "revision",
@@ -25449,6 +25450,28 @@
                                 "type": "string",
                                 "enum": [
                                   "hidden"
+                                ]
+                              }
+                            ]
+                          },
+                          "pickerMode": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "auto"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "list"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "search"
                                 ]
                               }
                             ]
@@ -25686,6 +25709,28 @@
                       }
                     ]
                   },
+                  "pickerMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "auto"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "list"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "search"
+                        ]
+                      }
+                    ]
+                  },
                   "sortOrder": {
                     "type": "integer",
                     "minimum": 0,
@@ -25744,6 +25789,7 @@
                         "iconKey",
                         "toneKey",
                         "studentSurface",
+                        "pickerMode",
                         "sortOrder",
                         "status",
                         "revision",
@@ -25791,6 +25837,28 @@
                               "type": "string",
                               "enum": [
                                 "hidden"
+                              ]
+                            }
+                          ]
+                        },
+                        "pickerMode": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "list"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "search"
                               ]
                             }
                           ]
@@ -26193,6 +26261,7 @@
                         "iconKey",
                         "toneKey",
                         "studentSurface",
+                        "pickerMode",
                         "sortOrder",
                         "status",
                         "revision",
@@ -26240,6 +26309,28 @@
                               "type": "string",
                               "enum": [
                                 "hidden"
+                              ]
+                            }
+                          ]
+                        },
+                        "pickerMode": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "list"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "search"
                               ]
                             }
                           ]
@@ -26475,6 +26566,28 @@
                       }
                     ]
                   },
+                  "pickerMode": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "auto"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "list"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "search"
+                        ]
+                      }
+                    ]
+                  },
                   "sortOrder": {
                     "type": "integer",
                     "minimum": 0,
@@ -26542,6 +26655,7 @@
                         "iconKey",
                         "toneKey",
                         "studentSurface",
+                        "pickerMode",
                         "sortOrder",
                         "status",
                         "revision",
@@ -26589,6 +26703,28 @@
                               "type": "string",
                               "enum": [
                                 "hidden"
+                              ]
+                            }
+                          ]
+                        },
+                        "pickerMode": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "list"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "search"
                               ]
                             }
                           ]
@@ -27011,6 +27147,7 @@
                         "iconKey",
                         "toneKey",
                         "studentSurface",
+                        "pickerMode",
                         "sortOrder",
                         "status",
                         "revision",
@@ -27058,6 +27195,28 @@
                               "type": "string",
                               "enum": [
                                 "hidden"
+                              ]
+                            }
+                          ]
+                        },
+                        "pickerMode": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "auto"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "list"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "search"
                               ]
                             }
                           ]
@@ -27461,6 +27620,7 @@
                           "iconKey",
                           "toneKey",
                           "studentSurface",
+                          "pickerMode",
                           "sortOrder",
                           "destinations"
                         ],
@@ -27490,6 +27650,28 @@
                                 "type": "string",
                                 "enum": [
                                   "secondary"
+                                ]
+                              }
+                            ]
+                          },
+                          "pickerMode": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "auto"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "list"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "search"
                                 ]
                               }
                             ]

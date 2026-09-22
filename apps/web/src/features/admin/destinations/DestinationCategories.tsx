@@ -154,7 +154,7 @@ export function DestinationCategories() {
   return (
     <section aria-labelledby="categories-title" className="flex flex-col gap-4">
       <PageHeader
-        title="Categories"
+        title="Pass categories"
         description="School-defined groupings shown on the student WayPass home."
         actions={
           <Button
@@ -163,7 +163,7 @@ export function DestinationCategories() {
               setDialog({ category: null });
             }}
           >
-            New category
+            New pass category
           </Button>
         }
       />
@@ -204,14 +204,14 @@ export function DestinationCategories() {
       ) : (categories.data?.categories ?? []).length === 0 ? (
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>No categories yet.</EmptyTitle>
+            <EmptyTitle>No pass categories yet.</EmptyTitle>
             <EmptyDescription>
-              Create the first category with New category, then assign destinations to it.
+              Create the first pass category with New category, then assign destinations to it.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
-        <ItemGroup aria-label="Destination categories">
+        <ItemGroup aria-label="Pass categories">
           {(categories.data?.categories ?? []).map((category) => (
             <Item key={category.id} variant="outline">
               <ItemMedia variant="icon">

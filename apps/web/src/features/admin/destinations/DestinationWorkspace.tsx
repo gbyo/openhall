@@ -14,7 +14,7 @@ export function DestinationWorkspace() {
     >
       <TabsList variant="line" aria-label="Destination administration">
         <TabsTrigger value="destinations">Destinations</TabsTrigger>
-        <TabsTrigger value="categories">Categories</TabsTrigger>
+        <TabsTrigger value="categories">Pass categories</TabsTrigger>
       </TabsList>
       <TabsContent value="destinations">
         <DestinationsPage />

@@ -286,6 +286,43 @@ describe('migration 010 destination categories', () => {
     }
   });
 
+  it('defaults picker mode to auto and enforces its closed vocabulary', async () => {
+    const { url, pool: scratch } = await freshDatabase();
+    const handle = createDatabase(url, { max: 1 });
+    try {
+      await migrateToLatest(handle.database);
+      const tenantId = idOf(
+        await scratch.query(`INSERT INTO tenant (name, slug) VALUES ('T', 'tpicker') RETURNING id`),
+      );
+      const school = idOf(
+        await scratch.query(
+          `INSERT INTO organization (tenant_id, kind, name, slug, time_zone) VALUES ($1, 'school', 'S', 'spicker', 'America/New_York') RETURNING id`,
+          [tenantId],
+        ),
+      );
+      const row = (
+        await scratch.query<{ picker_mode: string }>(
+          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Room visits') RETURNING picker_mode`,
+          [tenantId, school],
+        )
+      ).rows[0];
+      expect(row?.picker_mode).toBe('auto');
+      await scratch.query(
+        `UPDATE destination_category SET picker_mode = 'search' WHERE tenant_id = $1 AND organization_id = $2`,
+        [tenantId, school],
+      );
+      await expect(
+        scratch.query(
+          `UPDATE destination_category SET picker_mode = 'Room visits' WHERE tenant_id = $1 AND organization_id = $2`,
+          [tenantId, school],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
+    } finally {
+      await handle.destroy();
+      await scratch.end();
+    }
+  });
+
   it('rejects duplicate active names but allows archived reuse', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });

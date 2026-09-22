@@ -811,13 +811,13 @@ test('admin categories create from the Categories tab', async ({ page }) => {
     route.fulfill({ json: orgLocations() }),
   );
   await page.goto(`/schools/${ORG}/admin/destinations`);
-  await page.getByRole('tab', { name: 'Categories' }).click();
-  await expect(page.getByRole('heading', { name: 'Categories' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Pass categories' }).click();
+  await expect(page.getByRole('heading', { name: 'Pass categories' })).toBeVisible();
   await expect(
-    page.getByRole('list', { name: 'Destination categories' }).getByText('Nurse'),
+    page.getByRole('list', { name: 'Pass categories' }).getByText('Nurse'),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'New category' }).click();
-  const dialog = page.getByRole('dialog', { name: 'New category' });
+  await page.getByRole('button', { name: 'New pass category' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New pass category' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel('Name')).toBeVisible();
   await expect(dialog.getByLabel('Icon')).toBeVisible();

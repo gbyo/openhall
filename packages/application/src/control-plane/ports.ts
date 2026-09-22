@@ -446,6 +446,7 @@ export interface DestinationCategoryRecord {
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly pickerMode: 'auto' | 'list' | 'search';
   readonly sortOrder: number;
   readonly status: 'active' | 'archived';
   readonly revision: bigint;
@@ -459,6 +460,7 @@ export interface NewDestinationCategory {
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly pickerMode: 'auto' | 'list' | 'search';
   readonly sortOrder: number;
 }
 
@@ -467,6 +469,7 @@ export interface DestinationCategoryUpdate {
   readonly iconKey: string;
   readonly toneKey: string;
   readonly studentSurface: 'primary' | 'secondary' | 'hidden';
+  readonly pickerMode: 'auto' | 'list' | 'search';
   readonly sortOrder: number;
 }
 
