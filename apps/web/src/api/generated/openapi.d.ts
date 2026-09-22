@@ -993,6 +993,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizations/{organizationId}/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List school Places (location rows) with derived class usage and pass-destination summaries. Requires destination.manage on the exact school. Cache-Control: no-store. */
+        get: operations["listPlaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/places/{locationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one Place with its classes and pass destinations. Authorized against the canonical school. Cache-Control: no-store. */
+        get: operations["getPlace"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{organizationId}/destinations/bulk-create-from-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Idempotent classroom-visit setup: one ordinary closed destination per selected Place in the given pass category. Already-covered Places are skipped, never duplicated. Requires Idempotency-Key. Cache-Control: no-store. */
+        post: operations["bulkCreateDestinationsFromLocations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/organizations/{organizationId}/audit-events": {
         parameters: {
             query?: never;
@@ -9884,6 +9935,12 @@ export interface operations {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
+                                    code: string | null;
+                                    floorLabel: string | null;
+                                };
+                                searchContext: {
+                                    staffDisplayNames: string[];
+                                    sectionLabels: string[];
                                 };
                                 checkInMode: "none" | "optional" | "required";
                             }[];
@@ -9929,6 +9986,422 @@ export interface operations {
             };
             /** @description Concealed or missing school resource */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    listPlaces: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        places: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            name: string;
+                            kind: string;
+                            code: string | null;
+                            floorLabel: string | null;
+                            parentLocationId: string | null;
+                            parentName: string | null;
+                            status: "active" | "inactive" | "archived";
+                            classUsage: {
+                                sectionCount: number;
+                                teacherNames: string[];
+                                classes: {
+                                    title: string;
+                                    code: string | null;
+                                    teacherNames: string[];
+                                }[];
+                            };
+                            destinationSummary: {
+                                count: number;
+                                destinations: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    displayName: string;
+                                    /** Format: uuid */
+                                    categoryId: string;
+                                    status: "active" | "closed" | "archived";
+                                    studentSelfRequestable: boolean;
+                                }[];
+                            };
+                            revision: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    getPlace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                locationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        place: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            name: string;
+                            kind: string;
+                            code: string | null;
+                            floorLabel: string | null;
+                            parentLocationId: string | null;
+                            parentName: string | null;
+                            status: "active" | "inactive" | "archived";
+                            classUsage: {
+                                sectionCount: number;
+                                teacherNames: string[];
+                                classes: {
+                                    title: string;
+                                    code: string | null;
+                                    teacherNames: string[];
+                                }[];
+                            };
+                            destinationSummary: {
+                                count: number;
+                                destinations: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    displayName: string;
+                                    /** Format: uuid */
+                                    categoryId: string;
+                                    status: "active" | "closed" | "archived";
+                                    studentSelfRequestable: boolean;
+                                }[];
+                            };
+                            revision: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    bulkCreateDestinationsFromLocations: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+            };
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    locationIds: string[];
+                    /** Format: uuid */
+                    categoryId: string;
+                    studentSelfRequestable: boolean;
+                    checkInMode?: "none" | "optional" | "required";
+                    capacity?: number | null;
+                    defaultDurationSeconds?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Default Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            organizationId: string;
+                            /** Format: uuid */
+                            locationId: string;
+                            /** Format: uuid */
+                            categoryId: string;
+                            studentSelfRequestable: boolean;
+                            serviceType: string;
+                            displayName: string | null;
+                            capacity: number | null;
+                            queueEnabled: boolean;
+                            checkInMode: "none" | "optional" | "required";
+                            defaultDurationSeconds: number | null;
+                            maxDurationSeconds: number | null;
+                            readyClaimTimeoutSeconds: number;
+                            queueTimeoutSeconds: number;
+                            status: "active" | "closed" | "archived";
+                            revision: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        }[];
+                        skippedLocationIds: string[];
+                    };
+                };
+            };
+            /** @description Malformed input, invalid precondition, or invalid idempotency key */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Forbidden or recovery session restricted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Concealed or missing school resource */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Resource in use, duplicate, or invalid state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description Stale resource revision */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** Format: uri-reference */
+                        type: string;
+                        title: string;
+                        status: number;
+                        detail?: string;
+                        instance?: string;
+                        code: string;
+                        requestId: string;
+                    };
+                };
+            };
+            /** @description If-Match required */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };

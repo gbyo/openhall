@@ -48,8 +48,7 @@ describe('buildWorkspaceNav', () => {
       'Scheduled passes',
     ]);
     expect(labels(buildWorkspaceNav(administrator), 'administration')).toEqual([
-      'Destinations',
-      'Locations',
+      'Places',
       'Schedules',
       'Policies',
       'Staff access',
@@ -148,8 +147,7 @@ describe('buildWorkspaceNav', () => {
     });
     const groups = buildWorkspaceNav(ctx);
     expect(labels(groups, 'administration')).toEqual([
-      'Destinations',
-      'Locations',
+      'Places',
       'Schedules',
       'Policies',
       'Staff access',

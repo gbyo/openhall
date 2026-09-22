@@ -2205,3 +2205,34 @@ export const CATEGORY_TONE_OPTIONS: { value: CategoryToneKey; label: string }[] 
 export function normalizeDestinationQuery(value: string): string {
   return normalizeIconQuery(value);
 }
+
+export interface DestinationSearchEntry {
+  readonly displayName: string;
+  readonly locationName: string;
+  readonly locationCode: string | null;
+  readonly floorLabel: string | null;
+  readonly staffDisplayNames: readonly string[];
+  readonly sectionLabels: readonly string[];
+}
+
+/**
+ * Generic destination search matching: every normalized query token must
+ * appear somewhere in the normalized destination text (name, room, code,
+ * floor, staff display names, section labels). Case, whitespace, and
+ * punctuation insensitive. Never branches on category names.
+ */
+export function matchDestinationSearch(entry: DestinationSearchEntry, rawQuery: string): boolean {
+  const tokens = normalizeDestinationQuery(rawQuery).split(' ').filter(Boolean);
+  if (tokens.length === 0) return true;
+  const haystack = normalizeDestinationQuery(
+    [
+      entry.displayName,
+      entry.locationName,
+      entry.locationCode ?? '',
+      entry.floorLabel ?? '',
+      ...entry.staffDisplayNames,
+      ...entry.sectionLabels,
+    ].join(' '),
+  );
+  return tokens.every((token) => haystack.includes(token));
+}

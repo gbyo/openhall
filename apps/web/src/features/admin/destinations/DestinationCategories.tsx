@@ -7,6 +7,7 @@ import { productMessage, UncertainCommandError } from '../../../api/problems';
 import { queryKeys } from '../../../api/query-keys';
 import { getCsrfToken } from '../../../api/session';
 import type { DestinationCategory } from '../../../api/types.js';
+import { Link } from 'react-router';
 import { useSchool } from '../../../app/school/SchoolShell';
 import { PageHeader } from '../../../components/workspace/PageHeader';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -21,6 +22,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -155,6 +164,19 @@ export function DestinationCategories() {
     <section aria-labelledby="categories-title" className="flex flex-col gap-4">
       <PageHeader
         title="Pass categories"
+        breadcrumb={
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink render={<Link to=".." />}>Places</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Pass categories</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        }
         description="School-defined groupings shown on the student WayPass home."
         actions={
           <Button

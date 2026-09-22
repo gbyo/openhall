@@ -17,7 +17,7 @@ import {
   ItemTitle,
 } from '@/components/ui/item';
 import {
-  normalizeDestinationQuery,
+  matchDestinationSearch,
   type CategoryIcon,
 } from '../../lib/destination-category-presentation.js';
 import {
@@ -151,12 +151,19 @@ function StudentDestinationSearch({
         onValueChange={(option: StudentCatalogDestination | null) => {
           if (option) onPickDestination(option);
         }}
-        filter={(item: StudentCatalogDestination, rawQuery: string) => {
-          const tokens = normalizeDestinationQuery(rawQuery).split(' ').filter(Boolean);
-          if (tokens.length === 0) return true;
-          const haystack = normalizeDestinationQuery(`${item.displayName} ${item.location.name}`);
-          return tokens.every((token) => haystack.includes(token));
-        }}
+        filter={(item: StudentCatalogDestination, rawQuery: string) =>
+          matchDestinationSearch(
+            {
+              displayName: item.displayName,
+              locationName: item.location.name,
+              locationCode: item.location.code,
+              floorLabel: item.location.floorLabel,
+              staffDisplayNames: item.searchContext.staffDisplayNames,
+              sectionLabels: item.searchContext.sectionLabels,
+            },
+            rawQuery,
+          )
+        }
       >
         <ComboboxInput
           aria-label={`Search ${category.name.toLowerCase()}`}
@@ -164,16 +171,25 @@ function StudentDestinationSearch({
         />
         <ComboboxContent>
           <ComboboxList>
-            {(item: StudentCatalogDestination) => (
-              <ComboboxItem key={item.id} value={item}>
-                <span className="flex flex-col items-start gap-0.5">
-                  <span className="text-sm font-medium">{item.displayName}</span>
-                  {item.location.name && item.location.name !== item.displayName ? (
-                    <span className="text-xs text-muted-foreground">{item.location.name}</span>
-                  ) : null}
-                </span>
-              </ComboboxItem>
-            )}
+            {(item: StudentCatalogDestination) => {
+              const context = [
+                ...item.searchContext.staffDisplayNames,
+                ...item.searchContext.sectionLabels,
+              ]
+                .filter((entry) => entry.trim() !== '')
+                .slice(0, 2)
+                .join(' · ');
+              return (
+                <ComboboxItem key={item.id} value={item}>
+                  <span className="flex flex-col items-start gap-0.5">
+                    <span className="text-sm font-medium">{item.displayName}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {[item.location.name, context].filter((entry) => entry !== '').join(' · ')}
+                    </span>
+                  </span>
+                </ComboboxItem>
+              );
+            }}
           </ComboboxList>
           <ComboboxEmpty>No matching destination.</ComboboxEmpty>
         </ComboboxContent>

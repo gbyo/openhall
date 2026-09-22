@@ -3,12 +3,15 @@ import { expect, test } from '@playwright/test';
 import {
   APPROVAL_PENDING,
   DESTINATION,
+  LOCATION,
   mockPass,
   ORG,
   ORG_B,
   orgCategories,
   orgDestinations,
   orgLocations,
+  orgPlaces,
+  placeDetail,
   PASS,
   PERSON,
   SECTION,
@@ -771,47 +774,47 @@ test('admin staff access shows duties in school language', async ({ page }) => {
   await expect(dialog).toBeHidden();
 });
 
-test('admin destinations create in a dialog over the list', async ({ page }) => {
+test('admin places list links to pass categories and place detail adds destinations', async ({
+  page,
+}) => {
   await shell(page, ADMIN);
-  await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
-    route.fulfill({ json: orgDestinations() }),
+  await page.route(`**/api/v1/organizations/${ORG}/places`, (route) =>
+    route.fulfill({ json: orgPlaces() }),
+  );
+  await page.route(`**/api/v1/places/${LOCATION}`, (route) =>
+    route.fulfill({ json: placeDetail() }),
   );
   await page.route(`**/api/v1/organizations/${ORG}/destination-categories`, (route) =>
     route.fulfill({ json: orgCategories() }),
   );
-  await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
-    route.fulfill({ json: orgLocations() }),
-  );
-  await page.goto(`/schools/${ORG}/admin/destinations`);
-  await expect(page.getByRole('heading', { name: 'Destinations' })).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Destinations' }).getByText('Nurse')).toBeVisible();
-  await page.getByRole('button', { name: 'New destination' }).click();
-  const dialog = page.getByRole('dialog', { name: 'New destination' });
+  await page.goto(`/schools/${ORG}/admin/places`);
+  await expect(page.getByRole('heading', { name: 'Places' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Places' }).getByText('Room 214')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Pass categories' })).toBeVisible();
+  await page.getByRole('link', { name: 'Room 214' }).click();
+  await expect(page.getByRole('heading', { name: 'Room 214' })).toBeVisible();
+  await expect(page.getByText('Algebra II · ALG-2')).toBeVisible();
+  await page.getByRole('button', { name: 'Add pass destination' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add pass destination' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel('Display name')).toBeVisible();
-  await expect(dialog.getByLabel('Category')).toBeVisible();
-  await expect(dialog.getByLabel('Location')).toBeVisible();
-  await expect(dialog.getByText('Students can request this destination')).toBeVisible();
-  await dialog.getByRole('button', { name: 'Advanced' }).click();
-  await expect(dialog.getByLabel('Internal type')).toBeVisible();
+  await expect(dialog.getByLabel('Name')).toBeVisible();
+  await expect(dialog.getByLabel('Pass category')).toBeVisible();
+  await expect(dialog.getByText('Students can request')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });
 
-test('admin categories create from the Categories tab', async ({ page }) => {
+test('admin categories create from the Places page', async ({ page }) => {
   await shell(page, ADMIN);
-  await page.route(`**/api/v1/organizations/${ORG}/destinations`, (route) =>
-    route.fulfill({ json: orgDestinations() }),
+  await page.route(`**/api/v1/organizations/${ORG}/places`, (route) =>
+    route.fulfill({ json: orgPlaces() }),
   );
   const categories = orgCategories().categories;
   await page.route(`**/api/v1/organizations/${ORG}/destination-categories`, (route) =>
     route.fulfill({ json: { categories } }),
   );
-  await page.route(`**/api/v1/organizations/${ORG}/locations`, (route) =>
-    route.fulfill({ json: orgLocations() }),
-  );
-  await page.goto(`/schools/${ORG}/admin/destinations`);
-  await page.getByRole('tab', { name: 'Pass categories' }).click();
+  await page.goto(`/schools/${ORG}/admin/places`);
+  await page.getByRole('link', { name: 'Pass categories' }).click();
   await expect(page.getByRole('heading', { name: 'Pass categories' })).toBeVisible();
   await expect(
     page.getByRole('list', { name: 'Pass categories' }).getByText('Nurse'),

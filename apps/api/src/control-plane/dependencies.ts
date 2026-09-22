@@ -9,6 +9,7 @@ import type {
   IdentityDirectory,
   LocationDependencies,
   PeopleDependencies,
+  PlaceDependencies,
   PolicyDependencies,
   RequestPassDependencies,
   ScheduledDependencies,
@@ -27,6 +28,7 @@ import {
   PostgresIdempotencyRepository,
   PostgresLocationRepository,
   PostgresOutboxWriter,
+  PostgresPlacesRepository,
   PostgresPeopleRepository,
   PostgresPolicyAdminRepository,
   PostgresScheduleAdminRepository,
@@ -41,6 +43,7 @@ export interface ControlPlaneDependencies {
   readonly locations: LocationDependencies;
   readonly destinations: DestinationDependencies;
   readonly destinationCategories: DestinationCategoryDependencies;
+  readonly places: PlaceDependencies;
   readonly schedules: ScheduleDependencies;
   readonly policies: PolicyDependencies;
   readonly grants: GrantDependencies;
@@ -71,6 +74,7 @@ export function createControlPlaneDependencies(
   const authorization = new RelationshipAuthorizationService(facts, runner);
   const locationsRepo = new PostgresLocationRepository();
   const destinationsRepo = new PostgresDestinationRepository();
+  const placesRepo = new PostgresPlacesRepository();
   const schedulesRepo = new PostgresScheduleAdminRepository();
   const peopleRepo = new PostgresPeopleRepository();
   const flow = new PostgresDestinationFlowRepository(database);
@@ -94,7 +98,20 @@ export function createControlPlaneDependencies(
       destinations: destinationsRepo,
       categories: destinationCategoriesRepo,
       locations: locationsRepo,
+      places: placesRepo,
       flow,
+      idempotency,
+      audit,
+      outbox,
+    },
+    places: {
+      clock,
+      runner,
+      authorization,
+      locations: locationsRepo,
+      destinations: destinationsRepo,
+      categories: destinationCategoriesRepo,
+      places: placesRepo,
       idempotency,
       audit,
       outbox,
