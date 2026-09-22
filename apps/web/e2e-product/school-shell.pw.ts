@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { DESTINATION, ORG, ORG_B, shell, studentApis } from './fixtures';
+import { ORG, ORG_B, ROOM, shell, studentApis } from './fixtures';
 
 const STUDENT = {
   affiliations: ['student'],
@@ -94,7 +94,7 @@ test('scheduled start renders no action before the appointment window opens', as
       status: 'active',
       validFrom: opensAt,
       validUntil: closesAt,
-      destination: { id: DESTINATION, displayName: 'Nurse', serviceType: 'nurse' },
+      destination: { id: ROOM, name: 'Nurse' },
       authorizationEtag: '"auth:test:2"',
     },
   ]);

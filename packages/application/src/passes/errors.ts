@@ -1,7 +1,7 @@
 export type PassErrorCode =
-  | 'destination_not_found'
-  | 'destination_unavailable'
-  | 'destination_capacity_full'
+  | 'room_not_found'
+  | 'room_unavailable'
+  | 'room_capacity_full'
   | 'student_not_found'
   | 'active_pass_exists'
   | 'pass_not_found'
@@ -38,7 +38,7 @@ export class PassApplicationError extends Error {
 
 export function passHttpStatus(code: PassErrorCode): number {
   switch (code) {
-    case 'destination_not_found':
+    case 'room_not_found':
     case 'student_not_found':
     case 'pass_not_found':
     case 'approval_not_found':
@@ -50,8 +50,8 @@ export function passHttpStatus(code: PassErrorCode): number {
     case 'active_pass_exists':
     case 'idempotency_key_reused':
     case 'invalid_pass_transition':
-    case 'destination_unavailable':
-    case 'destination_capacity_full':
+    case 'room_unavailable':
+    case 'room_capacity_full':
     case 'invalid_approval_state':
     case 'override_not_available':
     case 'invalid_override_state':

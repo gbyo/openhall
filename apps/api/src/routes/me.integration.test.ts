@@ -169,17 +169,13 @@ beforeAll(async () => {
     [tenantA, schoolA, session],
   );
 
-  const location = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic') RETURNING id`,
-    [tenantA, schoolA],
-  );
   const categoryA1 = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Nurse', 'primary') RETURNING id`,
     [tenantA, schoolA],
   );
   destinationA1 = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name) VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse') RETURNING id`,
-    [tenantA, schoolA, location, categoryA1],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name) VALUES ($1, $2, $3, true, 'Nurse') RETURNING id`,
+    [tenantA, schoolA, categoryA1],
   );
 
   // Student at school A.
@@ -213,7 +209,7 @@ beforeAll(async () => {
     [tenantA, schoolA, nurse.personId],
   );
   await pool.query(
-    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id) VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
+    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id) VALUES ($1, $2, 'room_staff', 'room', $3)`,
     [tenantA, nurse.accountId, destinationA1],
   );
   destinationStaffCookie = await mintSessionCookie(tenantA, nurse.accountId);
@@ -317,7 +313,7 @@ describe('GET /api/v1/me/organizations/:organizationId/context', () => {
       capabilities: string[];
       expectedPlacement: { kind: string } | null;
       teachingSections: unknown[];
-      staffedDestinations: unknown[];
+      staffedRooms: unknown[];
     }>();
     expect(body.affiliations).toEqual(['student']);
     expect(body.capabilities).toEqual([
@@ -374,11 +370,11 @@ describe('GET /api/v1/me/organizations/:organizationId/context', () => {
     expect(response.statusCode).toBe(200);
     const body = response.json<{
       capabilities: string[];
-      staffedDestinations: { id: string; displayName: string; capabilities: string[] }[];
+      staffedRooms: { id: string; displayName: string; capabilities: string[] }[];
     }>();
     expect(body.capabilities).toEqual(['organization.context.read']);
-    expect(body.staffedDestinations.map((destination) => destination.id)).toEqual([destinationA1]);
-    expect(body.staffedDestinations[0]?.capabilities).toEqual(['destination.station.manage']);
+    expect(body.staffedRooms.map((destination) => destination.id)).toEqual([destinationA1]);
+    expect(body.staffedRooms[0]?.capabilities).toEqual(['room.station.manage']);
   });
 
   it('conceals inaccessible schools as 404, including cross-tenant UUIDs', async () => {

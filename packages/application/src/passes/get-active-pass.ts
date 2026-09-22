@@ -1,7 +1,7 @@
 import type { Principal } from '../authentication/principal.js';
 import type { TenantTransactionRunner } from '../persistence.js';
-import type { DestinationFlowRepository } from '../destination-flow/ports.js';
-import { loadMovementForRow } from '../destination-flow/projections.js';
+import type { RoomFlowRepository } from '../room-flow/ports.js';
+import { loadMovementForRow } from '../room-flow/projections.js';
 import { buildPolicyProjection, type PolicyRepository } from '../policy/index.js';
 import { PassApplicationError } from './errors.js';
 import type { PassRepository } from './ports.js';
@@ -10,7 +10,7 @@ import { etagForPass, toPassRepresentation, type PassRepresentation } from './re
 export interface ActivePassDependencies {
   readonly runner: TenantTransactionRunner;
   readonly passes: PassRepository;
-  readonly flow: DestinationFlowRepository;
+  readonly flow: RoomFlowRepository;
   readonly policy: PolicyRepository;
 }
 

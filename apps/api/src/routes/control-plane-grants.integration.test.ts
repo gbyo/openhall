@@ -186,8 +186,8 @@ interface GrantBody {
   role: string;
   scopeKind: string;
   organizationId: string | null;
-  destinationId: string | null;
-  destination: { id: string; displayName: string } | null;
+  roomId: string | null;
+  room: { id: string; name: string } | null;
   status: string;
   validFrom: string | null;
   validUntil: string | null;
@@ -261,33 +261,25 @@ beforeAll(async () => {
   await grantSchoolAdmin(tenantB, adminBPerson.accountId, schoolB);
   adminB = adminBPerson;
 
-  const locationA = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Grant Room') RETURNING id`,
-    [tenantA, schoolA],
-  );
   const categoryA = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Grant Nurse Cat') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Grant Nurse Cat') RETURNING id`,
     [tenantA, schoolA],
   );
   destinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'Grant Nurse') RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Grant Nurse') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   archivedDestinationA = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name, status) VALUES ($1, $2, $3, $4, 'office', 'Grant Archive', 'archived') RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
-  );
-  const locationB = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Grant B Room') RETURNING id`,
-    [tenantB, schoolB],
+    `INSERT INTO room (tenant_id, organization_id, category_id, name, status) VALUES ($1, $2, $3, 'Grant Archive', 'archived') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   const categoryB = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Grant B Cat') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Grant B Cat') RETURNING id`,
     [tenantB, schoolB],
   );
   destinationB = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'Grant B Nurse') RETURNING id`,
-    [tenantB, schoolB, locationB, categoryB],
+    `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Grant B Nurse') RETURNING id`,
+    [tenantB, schoolB, categoryB],
   );
 }, 120000);
 
@@ -316,7 +308,7 @@ describe('control-plane authorization grants', () => {
     const response = await issueGrant(requireAdmin(), schoolA, {
       personId,
       role: 'counselor',
-      destinationId: null,
+      roomId: null,
       validFrom: null,
       validUntil: null,
     });
@@ -326,7 +318,7 @@ describe('control-plane authorization grants', () => {
     expect(grant.role).toBe('counselor');
     expect(grant.scopeKind).toBe('organization');
     expect(grant.organizationId).toBe(schoolA);
-    expect(grant.destinationId).toBeNull();
+    expect(grant.roomId).toBeNull();
     expect(grant.status).toBe('active');
     expect(grant.revision).toBe('1');
     expect(grant.createdByAccountId).toBe(requireAdmin().accountId);
@@ -356,7 +348,7 @@ describe('control-plane authorization grants', () => {
     const payload = {
       personId: target.personId,
       role: 'office_staff',
-      destinationId: null,
+      roomId: null,
       validFrom: null,
       validUntil: null,
     };
@@ -400,7 +392,7 @@ describe('control-plane authorization grants', () => {
       const response = await issueGrant(
         requireAdmin(),
         schoolA,
-        { personId, role: 'counselor', destinationId: null, validFrom: null, validUntil: null },
+        { personId, role: 'counselor', roomId: null, validFrom: null, validUntil: null },
         randomUUID(),
       );
       expect(response.statusCode, `${label}: status`).toBe(409);
@@ -410,15 +402,15 @@ describe('control-plane authorization grants', () => {
     }
   });
 
-  it('scopes destination duties to live same-school destinations', async () => {
+  it('scopes room duties to live same-school rooms', async () => {
     const target = await makeStaff(tenantA, schoolA, 'Stationed');
     const missing = await issueGrant(
       requireAdmin(),
       schoolA,
       {
         personId: target.personId,
-        role: 'destination_staff',
-        destinationId: null,
+        role: 'room_staff',
+        roomId: null,
         validFrom: null,
         validUntil: null,
       },
@@ -432,8 +424,8 @@ describe('control-plane authorization grants', () => {
       schoolA,
       {
         personId: target.personId,
-        role: 'destination_staff',
-        destinationId: destinationB,
+        role: 'room_staff',
+        roomId: destinationB,
         validFrom: null,
         validUntil: null,
       },
@@ -447,8 +439,8 @@ describe('control-plane authorization grants', () => {
       schoolA,
       {
         personId: target.personId,
-        role: 'destination_staff',
-        destinationId: archivedDestinationA,
+        role: 'room_staff',
+        roomId: archivedDestinationA,
         validFrom: null,
         validUntil: null,
       },
@@ -463,7 +455,7 @@ describe('control-plane authorization grants', () => {
       {
         personId: target.personId,
         role: 'counselor',
-        destinationId: destinationA,
+        roomId: destinationA,
         validFrom: null,
         validUntil: null,
       },
@@ -479,8 +471,8 @@ describe('control-plane authorization grants', () => {
       schoolA,
       {
         personId: target.personId,
-        role: 'destination_staff',
-        destinationId: destinationA,
+        role: 'room_staff',
+        roomId: destinationA,
         validFrom: null,
         validUntil: null,
       },
@@ -488,9 +480,9 @@ describe('control-plane authorization grants', () => {
     );
     expect(created.statusCode).toBe(201);
     const grant = created.json<{ grant: GrantBody }>().grant;
-    expect(grant.scopeKind).toBe('destination');
+    expect(grant.scopeKind).toBe('room');
     expect(grant.organizationId).toBeNull();
-    expect(grant.destinationId).toBe(destinationA);
+    expect(grant.roomId).toBe(destinationA);
   });
 
   it('validates the duty validity interval', async () => {
@@ -501,7 +493,7 @@ describe('control-plane authorization grants', () => {
       {
         personId: target.personId,
         role: 'counselor',
-        destinationId: null,
+        roomId: null,
         validFrom: '2027-01-02T00:00:00Z',
         validUntil: '2027-01-01T00:00:00Z',
       },
@@ -516,7 +508,7 @@ describe('control-plane authorization grants', () => {
       {
         personId: target.personId,
         role: 'counselor',
-        destinationId: null,
+        roomId: null,
         validFrom: '2027-01-01T00:00:00Z',
         validUntil: '2027-02-01T00:00:00Z',
       },
@@ -531,7 +523,7 @@ describe('control-plane authorization grants', () => {
     const created = await issueGrant(requireAdmin(), schoolA, {
       personId: target.personId,
       role: 'office_staff',
-      destinationId: null,
+      roomId: null,
       validFrom: null,
       validUntil: null,
     });
@@ -607,7 +599,7 @@ describe('control-plane authorization grants', () => {
     for (const grant of grants) {
       expect(grant).not.toHaveProperty('updatedAt');
       expect(grant.person.displayName).toBeTruthy();
-      if (grant.destinationId !== null) expect(grant.destination?.displayName).toBeTruthy();
+      if (grant.roomId !== null) expect(grant.room?.name).toBeTruthy();
     }
 
     if (adminB === null) throw new Error('admin fixture missing');
@@ -640,7 +632,7 @@ describe('control-plane authorization grants', () => {
       payload: {
         personId: pupil.personId,
         role: 'counselor',
-        destinationId: null,
+        roomId: null,
         validFrom: null,
         validUntil: null,
       },
@@ -656,7 +648,7 @@ describe('control-plane authorization grants', () => {
       {
         personId: target.personId,
         role: 'system_admin',
-        destinationId: null,
+        roomId: null,
         validFrom: null,
         validUntil: null,
       },

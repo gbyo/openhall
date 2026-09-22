@@ -20,7 +20,8 @@ function rule(overrides: Partial<PolicyRuleInput> = {}): PolicyRuleInput {
     scopeKind: 'organization',
     scopeOrganizationId: SCHOOL,
     scopeSectionId: null,
-    scopeDestinationId: null,
+    scopeRoomId: null,
+    scopeRoomCategoryId: null,
     priority: 0,
     configuration: {
       schemaVersion: 1,
@@ -97,11 +98,12 @@ function contextAt(
       revision: 1n,
       organizationId: SCHOOL,
       studentId: STUDENT,
-      destinationId: DESTINATION,
+      destinationRoomId: DESTINATION,
+      destinationRoomCategoryId: null,
       requestSource: 'student_web',
       originBlockId: 'block-1',
       originSectionId: SECTION_P3,
-      originLocationId: null,
+      originRoomId: null,
     },
     at,
     currentPlacement: placement ?? resolvedPlacement(at),
@@ -117,7 +119,7 @@ describe('scheduled preapproval evaluation', () => {
     {
       scheduledAuthorizationId: 'scheduled-1',
       studentId: STUDENT,
-      destinationId: DESTINATION,
+      destinationRoomId: DESTINATION,
     },
   ] as const;
 
@@ -135,7 +137,7 @@ describe('scheduled preapproval evaluation', () => {
         {
           scheduledAuthorizationId: 'scheduled-2',
           studentId: STUDENT,
-          destinationId: 'different-destination',
+          destinationRoomId: 'different-destination',
         },
       ]),
     );
@@ -240,7 +242,13 @@ describe('policy combination', () => {
     const outcome = evaluatePolicy(contextAt('2026-09-21T12:30:00Z', [approvalRule('a', 0)]));
     expect(outcome.decision).toBe('approval_required');
     expect(outcome.approvalRequirements).toEqual([
-      { ruleId: 'a', ruleRevision: 1, requiredSectionId: SECTION_P3 },
+      {
+        ruleId: 'a',
+        ruleRevision: 1,
+        approverKind: 'current_section_teacher',
+        requiredSectionId: SECTION_P3,
+        requiredRoomId: null,
+      },
     ]);
   });
 
@@ -352,7 +360,9 @@ describe('approval evidence binding', () => {
       passId: 'pass-1',
       policyRuleId: 'appr',
       policyRuleRevision: 1,
+      approverKind: 'current_section_teacher' as const,
       requiredSectionId: SECTION_P3,
+      requiredRoomId: null,
       decision: 'approved' as const,
     };
     expect(evaluatePolicy(withApprovals([good])).decision).toBe('allow');
@@ -369,7 +379,9 @@ describe('approval evidence binding', () => {
       passId: 'pass-1',
       policyRuleId: 'appr',
       policyRuleRevision: 1,
+      approverKind: 'current_section_teacher' as const,
       requiredSectionId: SECTION_P3,
+      requiredRoomId: null,
       decision: 'denied' as const,
     };
     const outcome = evaluatePolicy(withApprovals([denied]));
@@ -419,6 +431,7 @@ describe('combinePolicyDecision', () => {
       contribution: 'approval_required' as const,
       reasonCode: 'current_section_teacher_approval_required' as const,
       requiredSectionId: SECTION_P3,
+      requiredRoomId: null,
     };
     expect(combinePolicyDecision([])).toBe('allow');
     expect(combinePolicyDecision([approval])).toBe('approval_required');

@@ -26,7 +26,7 @@ import {
 } from './idempotency.js';
 import type {
   CalendarDayRecord,
-  LocationRepository,
+  RoomRepository,
   ScheduleAdminRepository,
   ScheduleBlockRecord,
   ScheduleConfigurationRecord,
@@ -40,7 +40,7 @@ export interface ScheduleDependencies {
   readonly runner: TenantTransactionRunner;
   readonly authorization: RelationshipAuthorizationService;
   readonly schedules: ScheduleAdminRepository;
-  readonly locations: LocationRepository;
+  readonly rooms: RoomRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
   readonly outbox: OutboxWriter;
@@ -244,7 +244,7 @@ async function todayForSchool(
   organizationId: string,
   now: Temporal.Instant,
 ): Promise<string> {
-  const timeZone = await dependencies.locations.loadSchoolTimeZone(context, organizationId);
+  const timeZone = await dependencies.rooms.loadSchoolTimeZone(context, organizationId);
   const date = timeZone === null ? null : schoolDateFor(now, timeZone);
   if (date === null) {
     throw new ControlPlaneError('invalid_precondition', 'School time zone is unusable.');

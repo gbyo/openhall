@@ -209,23 +209,23 @@ function TaskDialogExample() {
 
   return (
     <Dialog>
-      <DialogTrigger render={<Button />}>New destination</DialogTrigger>
+      <DialogTrigger render={<Button />}>New room</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New destination</DialogTitle>
+          <DialogTitle>New room</DialogTitle>
           <DialogDescription>
             Bounded create tasks stay over the workspace and preserve context.
           </DialogDescription>
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="reference-destination-name">Name</FieldLabel>
-            <Input id="reference-destination-name" defaultValue="Library" />
+            <FieldLabel htmlFor="reference-room-name">Name</FieldLabel>
+            <Input id="reference-room-name" defaultValue="Library" />
           </Field>
           <Field>
-            <FieldLabel htmlFor="reference-destination-mode">Check-in mode</FieldLabel>
+            <FieldLabel htmlFor="reference-room-mode">Check-in mode</FieldLabel>
             <Select defaultValue="optional">
-              <SelectTrigger id="reference-destination-mode" className="w-full">
+              <SelectTrigger id="reference-room-mode" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -248,7 +248,7 @@ function TaskDialogExample() {
             }}
           >
             {isPending ? <Spinner data-icon="inline-start" /> : null}
-            {isPending ? 'Creating…' : 'Create destination'}
+            {isPending ? 'Creating…' : 'Create room'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -361,13 +361,13 @@ export function UIReferencePage() {
                   </FieldDescription>
                 </Field>
                 <Field data-invalid="true">
-                  <FieldLabel htmlFor="reference-destination">Destination</FieldLabel>
+                  <FieldLabel htmlFor="reference-room">Room</FieldLabel>
                   <Input
-                    id="reference-destination"
+                    id="reference-room"
                     aria-invalid="true"
-                    aria-describedby="reference-destination-error"
+                    aria-describedby="reference-room-error"
                   />
-                  <FieldError id="reference-destination-error">Choose a destination.</FieldError>
+                  <FieldError id="reference-room-error">Choose a room.</FieldError>
                 </Field>
               </FieldGroup>
             </ReferenceExample>
@@ -401,7 +401,7 @@ export function UIReferencePage() {
 
             <ReferenceExample title="Choice semantics">
               <FieldSet>
-                <FieldLegend variant="label">Destination settings</FieldLegend>
+                <FieldLegend variant="label">Room settings</FieldLegend>
                 <Field orientation="horizontal">
                   <Checkbox id="reference-notify" defaultChecked />
                   <FieldLabel htmlFor="reference-notify">
@@ -435,12 +435,7 @@ export function UIReferencePage() {
               title="Initial loading"
               description="Skeletons match the eventual item shape."
             >
-              <div
-                className="space-y-3"
-                role="status"
-                aria-label="Loading destinations"
-                aria-busy="true"
-              >
+              <div className="space-y-3" role="status" aria-label="Loading rooms" aria-busy="true">
                 {[0, 1, 2].map((row) => (
                   <div className="flex items-center gap-3" key={row}>
                     <Skeleton className="size-10 rounded-xl" />
@@ -551,7 +546,7 @@ export function UIReferencePage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Student</TableHead>
-                      <TableHead>Destination</TableHead>
+                      <TableHead>Room</TableHead>
                       <TableHead>State</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -608,8 +603,8 @@ export function UIReferencePage() {
                 </DrawerHeader>
                 <div className="px-4 pb-6">
                   <Field>
-                    <FieldLabel htmlFor="reference-mobile-destination">Destination</FieldLabel>
-                    <Input id="reference-mobile-destination" defaultValue="Library" />
+                    <FieldLabel htmlFor="reference-mobile-room">Room</FieldLabel>
+                    <Input id="reference-mobile-room" defaultValue="Library" />
                   </Field>
                 </div>
                 <DrawerFooter>
@@ -672,8 +667,8 @@ export function UIReferencePage() {
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Row actions</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>Edit destination</DropdownMenuItem>
-                  <DropdownMenuItem variant="destructive">Archive destination</DropdownMenuItem>
+                  <DropdownMenuItem>Edit room</DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive">Archive room</DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>

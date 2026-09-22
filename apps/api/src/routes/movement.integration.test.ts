@@ -194,7 +194,7 @@ interface PassBody {
   id: string;
   organizationId: string;
   studentId: string;
-  destination: { id: string; displayName: string; serviceType: string; checkInMode: string };
+  destination: { id: string; name: string; checkInMode: string };
   lifecycleState: string;
   revision: string;
   policy: { decision: string } | null;
@@ -213,32 +213,23 @@ interface PassBody {
  * positions or fill capacity here.
  */
 async function makeDestination(input: {
-  serviceType?: string;
-  displayName?: string;
+  name?: string;
   capacity?: number | null;
   queueEnabled?: boolean;
   checkInMode?: 'none' | 'optional' | 'required';
   defaultDurationSeconds?: number | null;
 }): Promise<string> {
-  const locationId = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', $3) RETURNING id`,
-    [tenantA, schoolA, `Room ${randomUUID().slice(0, 8)}`],
-  );
   const categoryId = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, $3, 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, $3, 'primary') RETURNING id`,
     [tenantA, schoolA, `Cat ${randomUUID().slice(0, 8)}`],
   );
   return insertReturningId(
-    `INSERT INTO destination
-       (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled, check_in_mode, default_duration_seconds)
-     VALUES ($1, $2, $3, $4, true, $5, $6, $7, $8, $9, $10) RETURNING id`,
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name, capacity, queue_enabled, check_in_mode, default_duration_seconds, status) VALUES ($1, $2, $3, true, $4, $5, $6, $7, $8, 'open') RETURNING id`,
     [
       tenantA,
       schoolA,
-      locationId,
       categoryId,
-      input.serviceType ?? 'office',
-      input.displayName ?? `Dest ${randomUUID().slice(0, 8)}`,
+      input.name ?? `Room ${randomUUID().slice(0, 8)}`,
       input.capacity ?? null,
       input.queueEnabled ?? false,
       input.checkInMode ?? 'none',
@@ -249,44 +240,42 @@ async function makeDestination(input: {
 
 /** Fresh capacity-1 queue-enabled optional office with station staff assigned. */
 async function makeOfficeStation(staff: SessionFixture): Promise<string> {
-  const destinationId = await makeDestination({
-    serviceType: 'office',
+  const destinationRoomId = await makeDestination({
     capacity: 1,
     queueEnabled: true,
     checkInMode: 'optional',
   });
   await pool.query(
-    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id) VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
-    [tenantA, staff.accountId, destinationId],
+    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id) VALUES ($1, $2, 'room_staff', 'room', $3)`,
+    [tenantA, staff.accountId, destinationRoomId],
   );
-  return destinationId;
+  return destinationRoomId;
 }
 
 /** Fresh capacity-2 queue-enabled required nurse with station staff assigned. */
 async function makeNurseStation(staff: SessionFixture): Promise<string> {
-  const destinationId = await makeDestination({
-    serviceType: 'nurse',
+  const destinationRoomId = await makeDestination({
     capacity: 2,
     queueEnabled: true,
     checkInMode: 'required',
   });
   await pool.query(
-    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id) VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
-    [tenantA, staff.accountId, destinationId],
+    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id) VALUES ($1, $2, 'room_staff', 'room', $3)`,
+    [tenantA, staff.accountId, destinationRoomId],
   );
-  return destinationId;
+  return destinationRoomId;
 }
 
 /** Requests a pass for a student and returns the ready pass body + ETag. */
 async function requestReadyPass(
   student: SessionFixture,
-  destinationId: string,
+  destinationRoomId: string,
 ): Promise<{ pass: PassBody; etag: string }> {
   const created = await app.inject({
     method: 'POST',
     url: '/api/v1/me/passes',
     headers: authHeaders(student, randomUUID()),
-    payload: { destinationId },
+    payload: { destinationRoomId },
   });
   expect(created.statusCode).toBe(201);
   const pass = created.json<{ pass: PassBody }>().pass;
@@ -359,68 +348,49 @@ beforeAll(async () => {
     [tenantA, schoolA, session],
   );
 
-  const locationA = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Room 214') RETURNING id`,
-    [tenantA, schoolA],
-  );
-  const clinicA = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic A') RETURNING id`,
+  const meetingRoomA = await insertReturningId(
+    `INSERT INTO room (tenant_id, organization_id, name) VALUES ($1, $2, 'Room 214') RETURNING id`,
     [tenantA, schoolA],
   );
   const categoryA = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
     [tenantA, schoolA],
   );
   const categoryB = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
     [tenantA, schoolB],
   );
   const categoryTB = await insertReturningId(
-    `INSERT INTO destination_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
+    `INSERT INTO room_category (tenant_id, organization_id, name, student_surface) VALUES ($1, $2, 'Movement Cats', 'primary') RETURNING id`,
     [tenantB, tenantBSchool],
   );
   restroom = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, default_duration_seconds)
-     VALUES ($1, $2, $3, $4, true, 'restroom', 'Restroom B', 600) RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name, default_duration_seconds) VALUES ($1, $2, $3, true, 'Restroom B', 600) RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   nurse = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled, check_in_mode)
-     VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse A', 2, true, 'required') RETURNING id`,
-    [tenantA, schoolA, clinicA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name, capacity, queue_enabled, check_in_mode) VALUES ($1, $2, $3, true, 'Nurse A', 2, true, 'required') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   office = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled, check_in_mode)
-     VALUES ($1, $2, $3, $4, true, 'office', 'Office A', 1, true, 'optional') RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name, capacity, queue_enabled, check_in_mode) VALUES ($1, $2, $3, true, 'Office A', 1, true, 'optional') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   closet = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, capacity, queue_enabled)
-     VALUES ($1, $2, $3, $4, true, 'storage', 'Closet', 1, false) RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name, capacity, queue_enabled) VALUES ($1, $2, $3, true, 'Closet', 1, false) RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   closedRestroom = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name, status)
-     VALUES ($1, $2, $3, $4, true, 'restroom', 'Closed Restroom', 'closed') RETURNING id`,
-    [tenantA, schoolA, locationA, categoryA],
-  );
-  const locationB = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic B') RETURNING id`,
-    [tenantA, schoolB],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name, status) VALUES ($1, $2, $3, true, 'Closed Restroom', 'closed') RETURNING id`,
+    [tenantA, schoolA, categoryA],
   );
   otherSchoolNurse = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name)
-     VALUES ($1, $2, $3, $4, true, 'nurse', 'Nurse B') RETURNING id`,
-    [tenantA, schoolB, locationB, categoryB],
-  );
-  const tenantBLocation = await insertReturningId(
-    `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'TB Clinic') RETURNING id`,
-    [tenantB, tenantBSchool],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name) VALUES ($1, $2, $3, true, 'Nurse B') RETURNING id`,
+    [tenantA, schoolB, categoryB],
   );
   crossTenantDestination = await insertReturningId(
-    `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, student_self_requestable, service_type, display_name)
-     VALUES ($1, $2, $3, $4, true, 'nurse', 'TB Nurse') RETURNING id`,
-    [tenantB, tenantBSchool, tenantBLocation, categoryTB],
+    `INSERT INTO room (tenant_id, organization_id, category_id, student_self_requestable, name) VALUES ($1, $2, $3, true, 'TB Nurse') RETURNING id`,
+    [tenantB, tenantBSchool, categoryTB],
   );
 
   // Schedule fixtures so Expected Placement resolves for section members.
@@ -445,12 +415,12 @@ beforeAll(async () => {
     );
   }
   await pool.query(
-    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, location_id) VALUES ($1, $2, $3, $4, $5)`,
-    [tenantA, schoolA, sectionA1, block, locationA],
+    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, room_id) VALUES ($1, $2, $3, $4, $5)`,
+    [tenantA, schoolA, sectionA1, block, meetingRoomA],
   );
   await pool.query(
-    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, location_id) VALUES ($1, $2, $3, $4, $5)`,
-    [tenantA, schoolA, sectionA2, block, locationA],
+    `INSERT INTO section_meeting (tenant_id, organization_id, section_id, schedule_block_id, room_id) VALUES ($1, $2, $3, $4, $5)`,
+    [tenantA, schoolA, sectionA2, block, meetingRoomA],
   );
 
   teacher = await makeStaff(tenantA, schoolA, 'Teacher');
@@ -467,13 +437,13 @@ beforeAll(async () => {
 
   nurseStaff = await makeStaff(tenantA, schoolA, 'Nurse practical');
   await pool.query(
-    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id) VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
+    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id) VALUES ($1, $2, 'room_staff', 'room', $3)`,
     [tenantA, nurseStaff.accountId, nurse],
   );
 
   officeStaff = await makeStaff(tenantA, schoolA, 'Office manager');
   await pool.query(
-    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id) VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
+    `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id) VALUES ($1, $2, 'room_staff', 'room', $3)`,
     [tenantA, officeStaff.accountId, office],
   );
 
@@ -526,7 +496,7 @@ describe('POST /api/v1/me/passes/:passId/depart', () => {
     expect(await tableCount('pass_event')).toBe(eventsBefore + 1);
     const reservation = (
       await pool.query<{ claimed_at: Date | null; released_at: Date | null }>(
-        `SELECT claimed_at, released_at FROM destination_reservation WHERE pass_id = $1`,
+        `SELECT claimed_at, released_at FROM room_reservation WHERE pass_id = $1`,
         [pass.id],
       )
     ).rows[0];
@@ -561,7 +531,7 @@ describe('POST /api/v1/me/passes/:passId/depart', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(second, randomUUID()),
-      payload: { destinationId: queuedOffice },
+      payload: { destinationRoomId: queuedOffice },
     });
     expect(created.statusCode).toBe(201);
     const queued = created.json<{ pass: PassBody }>().pass;
@@ -581,7 +551,7 @@ describe('POST /api/v1/me/passes/:passId/depart', () => {
     // Age the offer honestly: the claim window stays after the offer, both in
     // the past, so coherence checks still hold while the offer is expired.
     await pool.query(
-      `UPDATE destination_reservation
+      `UPDATE room_reservation
        SET reserved_at = statement_timestamp() - interval '120 seconds',
            ready_expires_at = statement_timestamp() - interval '60 seconds'
        WHERE pass_id = $1`,
@@ -600,7 +570,7 @@ describe('POST /api/v1/me/passes/:passId/depart', () => {
   it('rejects departure when the destination closed after allocation', async () => {
     const student = await makeStudent(tenantA, schoolA, 'Shuttered');
     const { pass, etag } = await requestReadyPass(student, restroom);
-    await pool.query(`UPDATE destination SET status = 'closed' WHERE id = $1`, [restroom]);
+    await pool.query(`UPDATE room SET status = 'closed' WHERE id = $1`, [restroom]);
     try {
       const departed = await app.inject({
         method: 'POST',
@@ -608,10 +578,10 @@ describe('POST /api/v1/me/passes/:passId/depart', () => {
         headers: authHeaders(student, randomUUID(), etag),
       });
       expect(departed.statusCode).toBe(409);
-      expect(departed.json<{ code: string }>().code).toBe('destination_unavailable');
+      expect(departed.json<{ code: string }>().code).toBe('room_unavailable');
       expect((await passLifecycle(pass.id)).state).toBe('ready');
     } finally {
-      await pool.query(`UPDATE destination SET status = 'active' WHERE id = $1`, [restroom]);
+      await pool.query(`UPDATE room SET status = 'open' WHERE id = $1`, [restroom]);
     }
   });
 
@@ -686,7 +656,7 @@ describe('POST /api/v1/me/passes/:passId/depart', () => {
 });
 
 describe('destination capacity allocation', () => {
-  it('denies with destination_capacity_full when full without a queue', async () => {
+  it('denies with room_capacity_full when full without a queue', async () => {
     const first = await makeStudent(tenantA, schoolA, 'ClosetFirst');
     await requestReadyPass(first, closet);
     const second = await makeStudent(tenantA, schoolA, 'ClosetSecond');
@@ -694,12 +664,12 @@ describe('destination capacity allocation', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(second, randomUUID()),
-      payload: { destinationId: closet },
+      payload: { destinationRoomId: closet },
     });
     expect(created.statusCode).toBe(201);
     const body = created.json<{ pass: PassBody }>().pass;
     expect(body.lifecycleState).toBe('denied');
-    expect(body.movement.reasonCode).toBe('destination_capacity_full');
+    expect(body.movement.reasonCode).toBe('room_capacity_full');
     expect(body.policy?.decision).toBe('allow');
     expect((await passEvents(body.id)).map((entry) => entry.event_type)).toEqual([
       'pass.requested',
@@ -713,10 +683,10 @@ describe('destination capacity allocation', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(student, randomUUID()),
-      payload: { destinationId: closedRestroom },
+      payload: { destinationRoomId: closedRestroom },
     });
     expect(created.statusCode).toBe(409);
-    expect(created.json<{ code: string }>().code).toBe('destination_unavailable');
+    expect(created.json<{ code: string }>().code).toBe('room_unavailable');
   });
 
   it('conceals other-school destinations with 404', async () => {
@@ -725,7 +695,7 @@ describe('destination capacity allocation', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(student, randomUUID()),
-      payload: { destinationId: otherSchoolNurse },
+      payload: { destinationRoomId: otherSchoolNurse },
     });
     expect(response.statusCode).toBe(404);
   });
@@ -782,8 +752,8 @@ describe('POST /api/v1/passes/:passId/depart', () => {
 });
 
 describe('self arrival, return, and completion', () => {
-  async function departFor(student: SessionFixture, destinationId: string) {
-    const { pass, etag } = await requestReadyPass(student, destinationId);
+  async function departFor(student: SessionFixture, destinationRoomId: string) {
+    const { pass, etag } = await requestReadyPass(student, destinationRoomId);
     const departed = await app.inject({
       method: 'POST',
       url: `/api/v1/me/passes/${pass.id}/depart`,
@@ -877,15 +847,15 @@ describe('self arrival, return, and completion', () => {
     const body = returning.json<{ pass: PassBody }>().pass;
     expect(body.lifecycleState).toBe('returning');
     const row = (
-      await pool.query<{ return_location_id: string | null }>(
-        `SELECT return_location_id FROM pass WHERE id = $1`,
+      await pool.query<{ return_room_id: string | null }>(
+        `SELECT return_room_id FROM pass WHERE id = $1`,
         [outbound.id],
       )
     ).rows[0];
-    expect(row?.return_location_id).not.toBeNull();
+    expect(row?.return_room_id).not.toBeNull();
     const reservation = (
       await pool.query<{ release_reason: string | null }>(
-        `SELECT release_reason FROM destination_reservation WHERE pass_id = $1`,
+        `SELECT release_reason FROM room_reservation WHERE pass_id = $1`,
         [outbound.id],
       )
     ).rows[0];
@@ -914,7 +884,7 @@ describe('self arrival, return, and completion', () => {
     expect(events.filter((entry) => entry.event_type === 'pass.completed')).toHaveLength(1);
     const reservation = (
       await pool.query<{ release_reason: string | null }>(
-        `SELECT release_reason FROM destination_reservation WHERE pass_id = $1`,
+        `SELECT release_reason FROM room_reservation WHERE pass_id = $1`,
         [outbound.id],
       )
     ).rows[0];
@@ -1028,7 +998,7 @@ describe('self arrival, return, and completion', () => {
       }),
       app.inject({
         method: 'POST',
-        url: `/api/v1/destinations/${raceOffice}/passes/${outbound.id}/complete`,
+        url: `/api/v1/rooms/${raceOffice}/passes/${outbound.id}/complete`,
         headers: authHeaders(officeStaff, randomUUID(), etag),
       }),
     ]);
@@ -1039,8 +1009,8 @@ describe('self arrival, return, and completion', () => {
 });
 
 describe('destination station commands', () => {
-  async function departFor(student: SessionFixture, destinationId: string) {
-    const { pass, etag } = await requestReadyPass(student, destinationId);
+  async function departFor(student: SessionFixture, destinationRoomId: string) {
+    const { pass, etag } = await requestReadyPass(student, destinationRoomId);
     const departed = await app.inject({
       method: 'POST',
       url: `/api/v1/me/passes/${pass.id}/depart`,
@@ -1057,7 +1027,7 @@ describe('destination station commands', () => {
     const outbound = await departFor(student, checkinNurse);
     const checkedIn = await app.inject({
       method: 'POST',
-      url: `/api/v1/destinations/${checkinNurse}/passes/${outbound.id}/check-in`,
+      url: `/api/v1/rooms/${checkinNurse}/passes/${outbound.id}/check-in`,
       headers: authHeaders(nurseStaff, randomUUID(), `"pass:${outbound.id}:${outbound.revision}"`),
     });
     expect(checkedIn.statusCode).toBe(200);
@@ -1076,14 +1046,14 @@ describe('destination station commands', () => {
     // Office staff operate the office station, not the nurse station.
     const forged = await app.inject({
       method: 'POST',
-      url: `/api/v1/destinations/${wrongNurse}/passes/${outbound.id}/check-in`,
+      url: `/api/v1/rooms/${wrongNurse}/passes/${outbound.id}/check-in`,
       headers: authHeaders(officeStaff, randomUUID(), etag),
     });
     expect(forged.statusCode).toBe(404);
     // A valid nurse pass is not operable from the office station either.
     const crossed = await app.inject({
       method: 'POST',
-      url: `/api/v1/destinations/${wrongOffice}/passes/${outbound.id}/check-in`,
+      url: `/api/v1/rooms/${wrongOffice}/passes/${outbound.id}/check-in`,
       headers: authHeaders(officeStaff, randomUUID(), etag),
     });
     expect(crossed.statusCode).toBe(404);
@@ -1099,20 +1069,20 @@ describe('destination station commands', () => {
     // No arrival checkpoint may be skipped: station completion needs one.
     const early = await app.inject({
       method: 'POST',
-      url: `/api/v1/destinations/${oneWayNurse}/passes/${outbound.id}/complete`,
+      url: `/api/v1/rooms/${oneWayNurse}/passes/${outbound.id}/complete`,
       headers: authHeaders(nurseStaff, randomUUID(), etag),
     });
     expect(early.statusCode).toBe(409);
     const checkedIn = await app.inject({
       method: 'POST',
-      url: `/api/v1/destinations/${oneWayNurse}/passes/${outbound.id}/check-in`,
+      url: `/api/v1/rooms/${oneWayNurse}/passes/${outbound.id}/check-in`,
       headers: authHeaders(nurseStaff, randomUUID(), etag),
     });
     expect(checkedIn.statusCode).toBe(200);
     const atDestination = checkedIn.json<{ pass: PassBody }>().pass;
     const completed = await app.inject({
       method: 'POST',
-      url: `/api/v1/destinations/${oneWayNurse}/passes/${outbound.id}/complete`,
+      url: `/api/v1/rooms/${oneWayNurse}/passes/${outbound.id}/complete`,
       headers: authHeaders(
         nurseStaff,
         randomUUID(),
@@ -1123,7 +1093,7 @@ describe('destination station commands', () => {
     expect(completed.json<{ pass: PassBody }>().pass.lifecycleState).toBe('completed');
     const reservation = (
       await pool.query<{ release_reason: string | null }>(
-        `SELECT release_reason FROM destination_reservation WHERE pass_id = $1`,
+        `SELECT release_reason FROM room_reservation WHERE pass_id = $1`,
         [outbound.id],
       )
     ).rows[0];
@@ -1137,13 +1107,13 @@ describe('destination station commands', () => {
     const outbound = await departFor(student, stationOffice);
     const checkedIn = await app.inject({
       method: 'POST',
-      url: `/api/v1/destinations/${stationOffice}/passes/${outbound.id}/check-in`,
+      url: `/api/v1/rooms/${stationOffice}/passes/${outbound.id}/check-in`,
       headers: authHeaders(officeStaff, randomUUID(), `"pass:${outbound.id}:${outbound.revision}"`),
     });
     const atDestination = checkedIn.json<{ pass: PassBody }>().pass;
     const begun = await app.inject({
       method: 'POST',
-      url: `/api/v1/destinations/${stationOffice}/passes/${outbound.id}/begin-return`,
+      url: `/api/v1/rooms/${stationOffice}/passes/${outbound.id}/begin-return`,
       headers: authHeaders(
         officeStaff,
         randomUUID(),
@@ -1154,7 +1124,7 @@ describe('destination station commands', () => {
     expect(begun.json<{ pass: PassBody }>().pass.lifecycleState).toBe('returning');
     const reservation = (
       await pool.query<{ release_reason: string | null }>(
-        `SELECT release_reason FROM destination_reservation WHERE pass_id = $1`,
+        `SELECT release_reason FROM room_reservation WHERE pass_id = $1`,
         [outbound.id],
       )
     ).rows[0];
@@ -1172,7 +1142,7 @@ describe('GET /api/v1/me/passes/:passId/queue-status', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(second, randomUUID()),
-      payload: { destinationId: statusOffice },
+      payload: { destinationRoomId: statusOffice },
     });
     const secondPass = createdSecond.json<{ pass: PassBody }>().pass;
     expect(secondPass.lifecycleState).toBe('queued');
@@ -1181,7 +1151,7 @@ describe('GET /api/v1/me/passes/:passId/queue-status', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(third, randomUUID()),
-      payload: { destinationId: statusOffice },
+      payload: { destinationRoomId: statusOffice },
     });
     const thirdPass = createdThird.json<{ pass: PassBody }>().pass;
     expect(thirdPass.lifecycleState).toBe('queued');
@@ -1238,7 +1208,7 @@ describe('GET /api/v1/me/passes/:passId/queue-status', () => {
   });
 });
 
-describe('GET /api/v1/destinations/:destinationId/station', () => {
+describe('GET /api/v1/rooms//:roomId/station', () => {
   it('serves minimized aggregates to authorized station staff', async () => {
     if (officeStaff === null) throw new Error('office fixture missing');
     const viewOffice = await makeOfficeStation(officeStaff);
@@ -1249,23 +1219,22 @@ describe('GET /api/v1/destinations/:destinationId/station', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(second, randomUUID()),
-      payload: { destinationId: viewOffice },
+      payload: { destinationRoomId: viewOffice },
     });
     const secondPass = created.json<{ pass: PassBody }>().pass;
 
     const view = await app.inject({
       method: 'GET',
-      url: `/api/v1/destinations/${viewOffice}/station`,
+      url: `/api/v1/rooms/${viewOffice}/station`,
       headers: { cookie: `openhall_session_dev=${officeStaff.cookie}` },
     });
     expect(view.statusCode).toBe(200);
     expect(view.headers['cache-control']).toBe('no-store');
     expect(view.headers.etag).toBeUndefined();
     const body = view.json<{
-      destination: {
+      room: {
         id: string;
-        displayName: string;
-        serviceType: string;
+        name: string;
         checkInMode: string;
         capacity: number | null;
       };
@@ -1288,9 +1257,8 @@ describe('GET /api/v1/destinations/:destinationId/station', () => {
         enteredAt: string;
       }[];
     }>();
-    expect(body.destination).toMatchObject({
+    expect(body.room).toMatchObject({
       id: viewOffice,
-      serviceType: 'office',
       checkInMode: 'optional',
       capacity: 1,
     });
@@ -1315,13 +1283,13 @@ describe('GET /api/v1/destinations/:destinationId/station', () => {
     if (teacher === null) throw new Error('teacher fixture missing');
     const denied = await app.inject({
       method: 'GET',
-      url: `/api/v1/destinations/${office}/station`,
+      url: `/api/v1/rooms/${office}/station`,
       headers: { cookie: `openhall_session_dev=${teacher.cookie}` },
     });
     expect(denied.statusCode).toBe(404);
     const crossTenant = await app.inject({
       method: 'GET',
-      url: `/api/v1/destinations/${crossTenantDestination}/station`,
+      url: `/api/v1/rooms/${crossTenantDestination}/station`,
       headers: { cookie: `openhall_session_dev=${teacher.cookie}` },
     });
     expect(crossTenant.statusCode).toBe(404);
@@ -1338,7 +1306,7 @@ describe('flow-aware cancellation', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(second, randomUUID()),
-      payload: { destinationId: cancelOffice },
+      payload: { destinationRoomId: cancelOffice },
     });
     const queued = created.json<{ pass: PassBody }>().pass;
     const cancelled = await app.inject({
@@ -1370,7 +1338,7 @@ describe('flow-aware cancellation', () => {
     expect(cancelled.statusCode).toBe(200);
     const reservation = (
       await pool.query<{ released_at: Date | null; release_reason: string | null }>(
-        `SELECT released_at, release_reason FROM destination_reservation WHERE pass_id = $1`,
+        `SELECT released_at, release_reason FROM room_reservation WHERE pass_id = $1`,
         [pass.id],
       )
     ).rows[0];
@@ -1407,15 +1375,14 @@ describe('scheduling alignment', () => {
     const alignedOffice = await makeOfficeStation(officeStaff);
     const { pass } = await requestReadyPass(student, alignedOffice);
     const row = (
-      await pool.query<{ display_name: string | null; service_type: string }>(
-        `SELECT display_name, service_type FROM destination WHERE id = $1`,
+      await pool.query<{ name: string }>(
+        `SELECT name FROM room WHERE id = $1`,
         [alignedOffice],
       )
     ).rows[0];
     expect(pass.destination).toMatchObject({
       id: alignedOffice,
-      displayName: row?.display_name,
-      serviceType: row?.service_type,
+      name: row?.name,
       checkInMode: 'optional',
     });
     const active = await app.inject({
@@ -1427,16 +1394,15 @@ describe('scheduling alignment', () => {
     expect(activePass.destination).toEqual(pass.destination);
     const view = await app.inject({
       method: 'GET',
-      url: `/api/v1/destinations/${alignedOffice}/station`,
+      url: `/api/v1/rooms/${alignedOffice}/station`,
       headers: { cookie: `openhall_session_dev=${officeStaff.cookie}` },
     });
     const station = view.json<{
-      destination: { id: string; displayName: string; serviceType: string };
-    }>().destination;
+      room: { id: string; name: string };
+    }>().room;
     expect(station).toMatchObject({
       id: alignedOffice,
-      displayName: row?.display_name,
-      serviceType: row?.service_type,
+      name: row?.name,
     });
   });
 });
@@ -1444,7 +1410,7 @@ describe('scheduling alignment', () => {
 describe('movement regression coverage', () => {
   it('keeps the pass ETag stable when another student leaves the queue', async () => {
     const etagOffice = await makeDestination({
-      serviceType: 'office',
+      name: 'office',
       capacity: 1,
       queueEnabled: true,
       checkInMode: 'none',
@@ -1456,7 +1422,7 @@ describe('movement regression coverage', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(first, randomUUID()),
-      payload: { destinationId: etagOffice },
+      payload: { destinationRoomId: etagOffice },
     });
     expect(createdFirst.statusCode).toBe(201);
     expect(createdFirst.json<{ pass: PassBody }>().pass.lifecycleState).toBe('queued');
@@ -1466,7 +1432,7 @@ describe('movement regression coverage', () => {
       method: 'POST',
       url: '/api/v1/me/passes',
       headers: authHeaders(second, randomUUID()),
-      payload: { destinationId: etagOffice },
+      payload: { destinationRoomId: etagOffice },
     });
     expect(createdSecond.statusCode).toBe(201);
     const secondPass = createdSecond.json<{ pass: PassBody }>().pass;
@@ -1504,7 +1470,7 @@ describe('movement regression coverage', () => {
 
   it('snapshots expected return at departure and ignores later config edits', async () => {
     const timed = await makeDestination({
-      serviceType: 'office',
+      
       capacity: 2,
       queueEnabled: false,
       checkInMode: 'none',
@@ -1521,7 +1487,7 @@ describe('movement regression coverage', () => {
     const row = (
       await pool.query<{ claimed_at: Date; expected_return_at: Date | null }>(
         `SELECT r.claimed_at, p.expected_return_at
-         FROM destination_reservation r JOIN pass p ON p.id = r.pass_id
+         FROM room_reservation r JOIN pass p ON p.id = r.pass_id
          WHERE r.pass_id = $1`,
         [pass.id],
       )
@@ -1538,7 +1504,7 @@ describe('movement regression coverage', () => {
     expect(spanSeconds).toBe(300);
     const snapshotted = expectedReturnAt.toISOString();
     // Later destination edits must not reinterpret history.
-    await pool.query(`UPDATE destination SET default_duration_seconds = 3600 WHERE id = $1`, [
+    await pool.query(`UPDATE room SET default_duration_seconds = 3600 WHERE id = $1`, [
       timed,
     ]);
     const reread = (
@@ -1580,30 +1546,29 @@ describe('movement regression coverage', () => {
   });
 });
 
-describe('station display fallback', () => {
-  it('falls back to the service type when display name is missing', async () => {
+describe('station display', () => {
+  it('shows the room name on the station view', async () => {
     if (officeStaff === null) throw new Error('office fixture missing');
     const fallbackOffice = await makeDestination({
-      serviceType: 'office',
+      name: 'Fallback Office',
       capacity: 1,
       queueEnabled: true,
       checkInMode: 'optional',
     });
-    await pool.query(`UPDATE destination SET display_name = NULL WHERE id = $1`, [fallbackOffice]);
     await pool.query(
-      `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id) VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
+      `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id) VALUES ($1, $2, 'room_staff', 'room', $3)`,
       [tenantA, officeStaff.accountId, fallbackOffice],
     );
     const student = await makeStudent(tenantA, schoolA, 'FallbackStudent');
     await requestReadyPass(student, fallbackOffice);
     const view = await app.inject({
       method: 'GET',
-      url: `/api/v1/destinations/${fallbackOffice}/station`,
+      url: `/api/v1/rooms/${fallbackOffice}/station`,
       headers: { cookie: `openhall_session_dev=${officeStaff.cookie}` },
     });
     expect(view.statusCode).toBe(200);
     expect(
-      view.json<{ destination: { displayName: string; serviceType: string } }>().destination,
-    ).toMatchObject({ displayName: 'office', serviceType: 'office' });
+      view.json<{ room: { name: string } }>().room,
+     ).toMatchObject({ name: 'Fallback Office' });
   });
 });

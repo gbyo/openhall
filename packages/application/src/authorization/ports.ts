@@ -1,5 +1,5 @@
 import type { Temporal } from '@js-temporal/polyfill';
-import type { DestinationId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
+import type { RoomId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
 import type { TenantTransactionContext } from '../persistence.js';
 
 export interface AuthorizationOrganizationRecord {
@@ -21,14 +21,12 @@ export interface AuthorizationSectionRecord {
   readonly title: string;
 }
 
-export interface AuthorizationDestinationRecord {
-  readonly id: DestinationId;
+export interface AuthorizationRoomRecord {
+  readonly id: RoomId;
   readonly tenantId: string;
   readonly organizationId: OrganizationId;
-  readonly status: 'active' | 'closed' | 'archived';
-  readonly displayName: string | null;
-  readonly serviceType: string;
-  readonly locationName: string | null;
+  readonly status: 'open' | 'closed' | 'archived';
+  readonly name: string;
 }
 
 export interface OrganizationMembershipFact {
@@ -53,7 +51,7 @@ export interface AuthorizationGrantFact {
   readonly role: string;
   readonly scopeKind: string;
   readonly organizationId: OrganizationId | null;
-  readonly destinationId: DestinationId | null;
+  readonly roomId: RoomId | null;
   readonly status: 'active' | 'revoked';
   readonly validFrom: Temporal.Instant | null;
   readonly validUntil: Temporal.Instant | null;
@@ -65,10 +63,24 @@ export interface TeachingSectionFact {
   readonly title: string;
 }
 
-export interface StaffedDestinationFact {
-  readonly id: DestinationId;
-  readonly displayName: string;
-  readonly serviceType: string;
+export interface StaffedRoomFact {
+  readonly id: RoomId;
+  readonly name: string;
+}
+
+/**
+ * Candidate classroom teacher for a room: a teacher membership on a
+ * section meeting at the room. Status is filtered by the query; date
+ * windows are applied by the caller on the school local date.
+ */
+export interface RoomTeacherFact {
+  readonly personId: PersonId;
+  readonly sectionId: SectionId;
+  readonly membershipStatus: 'active' | 'inactive';
+  readonly startsOn: Temporal.PlainDate | null;
+  readonly endsOn: Temporal.PlainDate | null;
+  readonly meetingEffectiveFrom: Temporal.PlainDate | null;
+  readonly meetingEffectiveUntil: Temporal.PlainDate | null;
 }
 
 /**
@@ -87,10 +99,10 @@ export interface AuthorizationFactsRepository {
     sectionId: SectionId,
   ): Promise<AuthorizationSectionRecord | null>;
 
-  loadDestination(
+  loadRoom(
     context: TenantTransactionContext,
-    destinationId: DestinationId,
-  ): Promise<AuthorizationDestinationRecord | null>;
+    roomId: RoomId,
+  ): Promise<AuthorizationRoomRecord | null>;
 
   /** All organization membership rows (any status) for one person. */
   listPersonMemberships(
@@ -127,11 +139,35 @@ export interface AuthorizationFactsRepository {
     organizationId: OrganizationId,
   ): Promise<readonly TeachingSectionFact[]>;
 
-  /** Explicit destination assignments in one school with active staff membership. */
-  listStaffedDestinations(
+  /** Explicit room assignments in one school with active staff membership. */
+  listStaffedRooms(
     context: TenantTransactionContext,
     accountId: string,
     personId: PersonId,
     organizationId: OrganizationId,
-  ): Promise<readonly StaffedDestinationFact[]>;
+  ): Promise<readonly StaffedRoomFact[]>;
+
+  /**
+   * Candidate classroom teachers for a room: teacher memberships (active
+   * status only) on active sections with a meeting at the room.
+   * Membership and meeting date windows are applied by the caller on the
+   * school local date.
+   */
+  listRoomTeachers(
+    context: TenantTransactionContext,
+    organizationId: OrganizationId,
+    roomId: RoomId,
+  ): Promise<readonly RoomTeacherFact[]>;
+
+  /**
+   * Distinct room ids where the caller's active teacher memberships meet
+   * on active sections. Status-only: membership and meeting date windows
+   * stay the evaluator's job. Feeds realtime request invalidation; the
+   * pending-approvals endpoint remains the exact eligibility gate.
+   */
+  listTeachingMeetingRooms(
+    context: TenantTransactionContext,
+    personId: PersonId,
+    organizationId: OrganizationId,
+  ): Promise<readonly RoomId[]>;
 }

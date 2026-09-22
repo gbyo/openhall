@@ -140,11 +140,11 @@ export function Component() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [creating, setCreating] = useState(false);
   const [studentId, setStudentId] = useState<string | null>(null);
-  const [destinationId, setDestinationId] = useState<string | null>(null);
+  const [destinationRoomId, setDestinationRoomId] = useState<string | null>(null);
   const [validFrom, setValidFrom] = useState('');
   const [validUntil, setValidUntil] = useState('');
   const [origin, setOrigin] = useState<'expected' | 'specific'>('expected');
-  const [locationId, setLocationId] = useState<string | null>(null);
+  const [originRoomId, setOriginRoomId] = useState<string | null>(null);
   const [approvalMode, setApprovalMode] = useState<'preapproved' | 'approval_required'>(
     'preapproved',
   );
@@ -168,22 +168,14 @@ export function Component() {
         }),
       ),
   });
-  const destinations = useQuery({
-    queryKey: queryKeys.destinations(organizationId),
+  // Staff pick from the flat safe catalog of open rooms. Staff are NOT
+  // limited by studentSelfRequestable — that flag is student-only.
+  const rooms = useQuery({
+    queryKey: queryKeys.rooms(organizationId),
     enabled: creating,
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/organizations/{organizationId}/destinations', {
-          params: { path: { organizationId } },
-        }),
-      ),
-  });
-  const locations = useQuery({
-    queryKey: queryKeys.locations(organizationId),
-    enabled: creating && origin === 'specific',
-    queryFn: () =>
-      confirmed(
-        api.GET('/api/v1/organizations/{organizationId}/locations', {
+        api.GET('/api/v1/me/organizations/{organizationId}/rooms', {
           params: { path: { organizationId } },
         }),
       ),
@@ -195,11 +187,11 @@ export function Component() {
       key: string;
       body: {
         studentId: string;
-        destinationId: string;
+        destinationRoomId: string;
         validFrom: string;
         validUntil: string;
         approvalMode: 'preapproved' | 'approval_required';
-        origin: { strategy: 'expected' } | { strategy: 'specific'; locationId: string };
+        origin: { strategy: 'expected' } | { strategy: 'specific'; roomId: string };
       };
     }) => {
       return confirmed(
@@ -245,11 +237,11 @@ export function Component() {
 
   function resetCreate() {
     setStudentId(null);
-    setDestinationId(null);
+    setDestinationRoomId(null);
     setValidFrom('');
     setValidUntil('');
     setOrigin('expected');
-    setLocationId(null);
+    setOriginRoomId(null);
     setApprovalMode('preapproved');
     create.reset();
   }
@@ -270,27 +262,20 @@ export function Component() {
       })) ?? [],
     [students.data],
   );
-  const destinationOptions = useMemo<Option[]>(
+  const destinationRoomOptions = useMemo<Option[]>(
     () =>
-      destinations.data?.destinations
-        .filter((item) => item.status === 'active')
-        .map((item) => ({
-          value: item.id,
-          label: item.displayName ?? item.serviceType,
-        })) ?? [],
-    [destinations.data],
+      rooms.data?.rooms.map((item) => ({
+        value: item.id,
+        label: [item.name, item.code].filter((part) => part).join(' · '),
+      })) ?? [],
+    [rooms.data],
   );
-  const locationOptions = useMemo<Option[]>(
-    () =>
-      locations.data?.locations
-        .filter((item) => item.status !== 'archived')
-        .map((item) => ({ value: item.id, label: item.name })) ?? [],
-    [locations.data],
-  );
+  const originRoomOptions = destinationRoomOptions;
   const selectedStudent = studentOptions.find((option) => option.value === studentId) ?? null;
   const selectedDestination =
-    destinationOptions.find((option) => option.value === destinationId) ?? null;
-  const selectedLocation = locationOptions.find((option) => option.value === locationId) ?? null;
+    destinationRoomOptions.find((option) => option.value === destinationRoomId) ?? null;
+  const selectedOriginRoom =
+    originRoomOptions.find((option) => option.value === originRoomId) ?? null;
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -299,9 +284,7 @@ export function Component() {
       .filter(({ item, status }) => {
         if (
           query.length > 0 &&
-          !`${item.student.displayName} ${item.destination.displayName}`
-            .toLowerCase()
-            .includes(query)
+          !`${item.student.displayName} ${item.destination.name}`.toLowerCase().includes(query)
         )
           return false;
         if (statusFilter !== 'all' && status !== statusFilter) return false;
@@ -319,25 +302,25 @@ export function Component() {
 
   const createValid =
     studentId !== null &&
-    destinationId !== null &&
+    destinationRoomId !== null &&
     validFrom !== '' &&
     validUntil !== '' &&
-    (origin === 'expected' || locationId !== null);
+    (origin === 'expected' || originRoomId !== null);
 
   function submitCreate() {
     if (!createValid) return;
     const originBody =
       origin === 'expected'
         ? { strategy: 'expected' as const }
-        : locationId === null
+        : originRoomId === null
           ? null
-          : { strategy: 'specific' as const, locationId };
+          : { strategy: 'specific' as const, roomId: originRoomId };
     if (originBody === null) return;
     create.mutate({
       key: crypto.randomUUID(),
       body: {
         studentId,
-        destinationId,
+        destinationRoomId,
         validFrom: instant(validFrom, timeZone),
         validUntil: instant(validUntil, timeZone),
         approvalMode,
@@ -410,7 +393,7 @@ export function Component() {
             </InputGroupAddon>
             <InputGroupInput
               aria-label="Search scheduled passes"
-              placeholder="Search students or destinations"
+              placeholder="Search students or rooms"
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
@@ -469,8 +452,7 @@ export function Component() {
                     <Badge variant="secondary">{statusLabel(status)}</Badge>
                   </div>
                   <ItemDescription>
-                    {item.destination.displayName} ·{' '}
-                    <time>{windowLabel(item.validFrom, timeZone)}</time>
+                    {item.destination.name} · <time>{windowLabel(item.validFrom, timeZone)}</time>
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>
@@ -515,11 +497,11 @@ export function Component() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pr-1">
-            {students.isPending || destinations.isPending ? (
+            {students.isPending || rooms.isPending ? (
               <div role="status" aria-label="Loading pass options" className="flex flex-col gap-2">
                 <Skeleton className="h-9 w-full" />
                 <Skeleton className="h-9 w-full" />
-                <span className="sr-only">Loading students and destinations…</span>
+                <span className="sr-only">Loading students and rooms…</span>
               </div>
             ) : (
               <FieldGroup>
@@ -549,18 +531,18 @@ export function Component() {
                   </Combobox>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="scheduled-destination">Destination</FieldLabel>
+                  <FieldLabel htmlFor="scheduled-room">Destination room</FieldLabel>
                   <Combobox
-                    items={destinationOptions}
+                    items={destinationRoomOptions}
                     value={selectedDestination}
                     onValueChange={(option: Option | null) => {
-                      setDestinationId(option?.value ?? null);
+                      setDestinationRoomId(option?.value ?? null);
                     }}
                     filter={(item: Option, query: string) =>
                       item.label.toLowerCase().includes(query.toLowerCase())
                     }
                   >
-                    <ComboboxInput id="scheduled-destination" placeholder="Search destinations" />
+                    <ComboboxInput id="scheduled-room" placeholder="Search open rooms" />
                     <ComboboxContent>
                       <ComboboxList>
                         {(item: Option) => (
@@ -569,7 +551,7 @@ export function Component() {
                           </ComboboxItem>
                         )}
                       </ComboboxList>
-                      <ComboboxEmpty>No matching destination.</ComboboxEmpty>
+                      <ComboboxEmpty>No matching room.</ComboboxEmpty>
                     </ComboboxContent>
                   </Combobox>
                 </Field>
@@ -614,42 +596,38 @@ export function Component() {
                   >
                     <div className="flex items-center gap-2">
                       <RadioGroupItem value="expected" id="origin-expected" />
-                      <Label htmlFor="origin-expected">Use student&apos;s expected location</Label>
+                      <Label htmlFor="origin-expected">Use student&apos;s expected room</Label>
                     </div>
                     <div className="flex items-center gap-2">
                       <RadioGroupItem value="specific" id="origin-specific" />
-                      <Label htmlFor="origin-specific">Specific location</Label>
+                      <Label htmlFor="origin-specific">Specific room</Label>
                     </div>
                   </RadioGroup>
                   {origin === 'specific' && (
                     <Field>
-                      <FieldLabel htmlFor="scheduled-location">Location</FieldLabel>
-                      {locations.isPending ? (
-                        <Skeleton className="h-9 w-full" />
-                      ) : (
-                        <Combobox
-                          items={locationOptions}
-                          value={selectedLocation}
-                          onValueChange={(option: Option | null) => {
-                            setLocationId(option?.value ?? null);
-                          }}
-                          filter={(item: Option, query: string) =>
-                            item.label.toLowerCase().includes(query.toLowerCase())
-                          }
-                        >
-                          <ComboboxInput id="scheduled-location" placeholder="Search locations" />
-                          <ComboboxContent>
-                            <ComboboxList>
-                              {(item: Option) => (
-                                <ComboboxItem key={item.value} value={item}>
-                                  {item.label}
-                                </ComboboxItem>
-                              )}
-                            </ComboboxList>
-                            <ComboboxEmpty>No matching location.</ComboboxEmpty>
-                          </ComboboxContent>
-                        </Combobox>
-                      )}
+                      <FieldLabel htmlFor="scheduled-origin-room">Origin room</FieldLabel>
+                      <Combobox
+                        items={originRoomOptions}
+                        value={selectedOriginRoom}
+                        onValueChange={(option: Option | null) => {
+                          setOriginRoomId(option?.value ?? null);
+                        }}
+                        filter={(item: Option, query: string) =>
+                          item.label.toLowerCase().includes(query.toLowerCase())
+                        }
+                      >
+                        <ComboboxInput id="scheduled-origin-room" placeholder="Search open rooms" />
+                        <ComboboxContent>
+                          <ComboboxList>
+                            {(item: Option) => (
+                              <ComboboxItem key={item.value} value={item}>
+                                {item.label}
+                              </ComboboxItem>
+                            )}
+                          </ComboboxList>
+                          <ComboboxEmpty>No matching room.</ComboboxEmpty>
+                        </ComboboxContent>
+                      </Combobox>
                     </Field>
                   )}
                 </FieldSet>
@@ -676,8 +654,8 @@ export function Component() {
                     Other school policies still apply.
                   </FieldDescription>
                 </FieldSet>
-                {(students.isError || destinations.isError) && (
-                  <FieldError>Students or destinations could not be loaded. Try again.</FieldError>
+                {(students.isError || rooms.isError) && (
+                  <FieldError>Students or rooms could not be loaded. Try again.</FieldError>
                 )}
               </FieldGroup>
             )}

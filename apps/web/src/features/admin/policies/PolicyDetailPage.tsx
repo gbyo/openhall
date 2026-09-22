@@ -34,10 +34,11 @@ interface PolicyBody {
   name: string;
   ruleType: 'schedule_boundary' | 'approval_requirement';
   scope: {
-    kind: 'organization' | 'section' | 'destination';
+    kind: 'organization' | 'section' | 'room' | 'room_category';
     organizationId: string | null;
     sectionId: string | null;
-    destinationId: string | null;
+    roomId: string | null;
+    roomCategoryId: string | null;
   };
   priority: number;
   configuration: Record<string, unknown>;
@@ -100,7 +101,7 @@ function draftFor(rule: PolicyRule, timeZone: string): PolicyDraft {
   return {
     name: rule.name,
     scopeKind: rule.scope.kind,
-    scopeId: rule.scope.sectionId ?? rule.scope.destinationId ?? '',
+    scopeId: rule.scope.sectionId ?? rule.scope.roomId ?? rule.scope.roomCategoryId ?? '',
     priority: rule.priority,
     overrideMode: rule.overrideMode,
     firstMinutes: typeof configuration.firstMinutes === 'number' ? configuration.firstMinutes : 5,
@@ -149,12 +150,22 @@ export function Component() {
   );
   useUnsavedChanges(dirty);
 
-  const destinations = useQuery({
-    queryKey: queryKeys.destinations(organizationId),
-    enabled: draft?.scopeKind === 'destination',
+  const rooms = useQuery({
+    queryKey: queryKeys.rooms(organizationId),
+    enabled: draft?.scopeKind === 'room',
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/organizations/{organizationId}/destinations', {
+        api.GET('/api/v1/organizations/{organizationId}/rooms', {
+          params: { path: { organizationId } },
+        }),
+      ),
+  });
+  const roomCategories = useQuery({
+    queryKey: queryKeys.roomCategories(organizationId),
+    enabled: draft?.scopeKind === 'room_category',
+    queryFn: () =>
+      confirmed(
+        api.GET('/api/v1/organizations/{organizationId}/room-categories', {
           params: { path: { organizationId } },
         }),
       ),
@@ -224,7 +235,8 @@ export function Component() {
       kind: draft.scopeKind,
       organizationId: draft.scopeKind === 'organization' ? organizationId : null,
       sectionId: draft.scopeKind === 'section' ? draft.scopeId : null,
-      destinationId: draft.scopeKind === 'destination' ? draft.scopeId : null,
+      roomId: draft.scopeKind === 'room' ? draft.scopeId : null,
+      roomCategoryId: draft.scopeKind === 'room_category' ? draft.scopeId : null,
     },
     priority: draft.priority,
     configuration:
@@ -338,13 +350,18 @@ export function Component() {
               >
                 <NativeSelectOption value="organization">Whole school</NativeSelectOption>
                 <NativeSelectOption value="section">One class</NativeSelectOption>
-                <NativeSelectOption value="destination">One destination</NativeSelectOption>
+                <NativeSelectOption value="room">One room</NativeSelectOption>
+                <NativeSelectOption value="room_category">One room category</NativeSelectOption>
               </NativeSelect>
             </Field>
             {draft.scopeKind !== 'organization' && (
               <Field>
                 <FieldLabel htmlFor="policy-detail-scope-id">
-                  {draft.scopeKind === 'section' ? 'Class' : 'Destination'}
+                  {draft.scopeKind === 'section'
+                    ? 'Class'
+                    : draft.scopeKind === 'room_category'
+                      ? 'Room category'
+                      : 'Room'}
                 </FieldLabel>
                 <NativeSelect
                   id="policy-detail-scope-id"
@@ -361,11 +378,17 @@ export function Component() {
                           {section.title}
                         </NativeSelectOption>
                       ))
-                    : destinations.data?.destinations.map((destination) => (
-                        <NativeSelectOption key={destination.id} value={destination.id}>
-                          {destination.displayName ?? destination.serviceType}
-                        </NativeSelectOption>
-                      ))}
+                    : draft.scopeKind === 'room_category'
+                      ? roomCategories.data?.categories.map((category) => (
+                          <NativeSelectOption key={category.id} value={category.id}>
+                            {category.name}
+                          </NativeSelectOption>
+                        ))
+                      : rooms.data?.rooms.map((room) => (
+                          <NativeSelectOption key={room.id} value={room.id}>
+                            {room.name}
+                          </NativeSelectOption>
+                        ))}
                 </NativeSelect>
               </Field>
             )}

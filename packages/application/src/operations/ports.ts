@@ -17,9 +17,8 @@ export interface OperationalLivePassRow {
   readonly passRevision: bigint;
   readonly studentId: string;
   readonly studentDisplayName: string;
-  readonly destinationId: string;
-  readonly destinationDisplayName: string;
-  readonly destinationServiceType: string;
+  readonly destinationRoomId: string;
+  readonly destinationRoomName: string;
   readonly lifecycleState:
     'requested' | 'queued' | 'ready' | 'outbound' | 'at_destination' | 'returning';
   readonly requestedAt: Temporal.Instant;

@@ -102,39 +102,42 @@ async function seedControlPlane(scratch: Pool, tag: string) {
       [tenantId, `test-${tag}`],
     ),
   );
-  const location = idOf(
+  // The room tables only exist from migration 011 on; legacy-level
+  // fixtures (007) use the location/destination model.
+  const hasRooms =
+    (
+      await scratch.query<{ reg: string | null }>(
+        `SELECT to_regclass('room') AS reg`,
+      )
+    ).rows[0]?.reg !== null;
+  if (!hasRooms) {
+    const location = idOf(
+      await scratch.query(
+        `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic') RETURNING id`,
+        [tenantId, school],
+      ),
+    );
+    const destination = idOf(
+      await scratch.query(
+        `INSERT INTO destination (tenant_id, organization_id, location_id, service_type) VALUES ($1, $2, $3, 'nurse') RETURNING id`,
+        [tenantId, school, location],
+      ),
+    );
+    return { tenantId, school, district, person, account, provider, room: destination, destination };
+  }
+  const category = idOf(
     await scratch.query(
-      `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic') RETURNING id`,
+      `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse') RETURNING id`,
       [tenantId, school],
     ),
   );
-  // The category table only exists from migration 010 on; legacy-level
-  // fixtures (007) must not reference it, while latest-level fixtures must.
-  const hasCategories =
-    (
-      await scratch.query<{ reg: string | null }>(
-        `SELECT to_regclass('destination_category') AS reg`,
-      )
-    ).rows[0]?.reg !== null;
-  const category = hasCategories
-    ? idOf(
-        await scratch.query(
-          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse') RETURNING id`,
-          [tenantId, school],
-        ),
-      )
-    : null;
-  const destination = idOf(
+  const room = idOf(
     await scratch.query(
-      hasCategories
-        ? `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type) VALUES ($1, $2, $3, $4, 'nurse') RETURNING id`
-        : `INSERT INTO destination (tenant_id, organization_id, location_id, service_type) VALUES ($1, $2, $3, 'nurse') RETURNING id`,
-      hasCategories && category !== null
-        ? [tenantId, school, location, category]
-        : [tenantId, school, location],
+      `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Clinic') RETURNING id`,
+      [tenantId, school, category],
     ),
   );
-  return { tenantId, school, district, person, account, provider, location, destination };
+  return { tenantId, school, district, person, account, provider, room, destination: room };
 }
 
 describe('migration 008 school control plane', () => {
@@ -142,7 +145,7 @@ describe('migration 008 school control plane', () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
-      await migrateToLatest(handle.database);
+      await migrateTo(handle, '010_destination_categories');
       const rows = await scratch.query<{ name: string }>(
         'SELECT name FROM kysely_migration ORDER BY name',
       );
@@ -190,7 +193,7 @@ describe('migration 008 school control plane', () => {
         await scratch.query(
           `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id,
             request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'staff_web', 'requested') RETURNING id`,
-          [seed.tenantId, seed.school, seed.person, seed.destination],
+          [seed.tenantId, seed.school, seed.person, seed.room],
         ),
       );
       const ruleId = idOf(
@@ -225,7 +228,7 @@ describe('migration 008 school control plane', () => {
         [evaluationId],
       );
       expect(legacy.rows.map((row) => row.reason_code)).toEqual(['approval_satisfied']);
-      // The rebuilt CHECK carries the Phase 8 preapproval code.
+      // The rebuilt CHECK carries the Phase 11 preapproval code.
       await scratch.query(
         `INSERT INTO policy_evaluation_result
           (tenant_id, evaluation_id, policy_rule_id, policy_rule_revision, outcome,
@@ -237,7 +240,7 @@ describe('migration 008 school control plane', () => {
         `SELECT conname FROM pg_constraint WHERE conname LIKE 'policy_evaluation_result_phase%_reason_code'`,
       );
       expect(names.rows.map((row) => row.conname)).toEqual([
-        'policy_evaluation_result_phase8_reason_code',
+        'policy_evaluation_result_phase11_reason_code',
       ]);
     } finally {
       await handle.destroy();
@@ -245,26 +248,21 @@ describe('migration 008 school control plane', () => {
     }
   });
 
-  it('versions locations and destinations without rewriting identity', async () => {
+  it('versions rooms without rewriting identity', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
       await migrateToLatest(handle.database);
       const seed = await seedControlPlane(scratch, randomUUID().replaceAll('-', '').slice(0, 8));
-      const location = await scratch.query<{ revision: string }>(
-        'SELECT revision FROM location WHERE id = $1',
-        [seed.location],
+      const room = await scratch.query<{ revision: string; updated_at: string }>(
+        'SELECT revision, updated_at FROM room WHERE id = $1',
+        [seed.room],
       );
-      expect(location.rows[0]?.revision).toBe('1');
+      expect(room.rows[0]?.revision).toBe('1');
+      expect(room.rows[0]?.updated_at).toBeDefined();
       await expect(
-        scratch.query('UPDATE location SET revision = 0 WHERE id = $1', [seed.location]),
+        scratch.query('UPDATE room SET revision = 0 WHERE id = $1', [seed.room]),
       ).rejects.toMatchObject({ code: '23514' });
-      const destination = await scratch.query<{ revision: string; updated_at: string }>(
-        'SELECT revision, updated_at FROM destination WHERE id = $1',
-        [seed.destination],
-      );
-      expect(destination.rows[0]?.revision).toBe('1');
-      expect(destination.rows[0]?.updated_at).toBeDefined();
       await handle.destroy();
     } finally {
       await scratch.end();
@@ -366,15 +364,15 @@ describe('migration 008 school control plane', () => {
         ),
       ).rejects.toMatchObject({ code: '23505' });
       await scratch.query(
-        `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id)
-         VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
-        [seed.tenantId, seed.account, seed.destination],
+        `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id)
+         VALUES ($1, $2, 'room_staff', 'room', $3)`,
+        [seed.tenantId, seed.account, seed.room],
       );
       await expect(
         scratch.query(
-          `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, destination_id)
-           VALUES ($1, $2, 'destination_staff', 'destination', $3)`,
-          [seed.tenantId, seed.account, seed.destination],
+          `INSERT INTO authorization_grant (tenant_id, account_id, role, scope_kind, room_id)
+           VALUES ($1, $2, 'room_staff', 'room', $3)`,
+          [seed.tenantId, seed.account, seed.room],
         ),
       ).rejects.toMatchObject({ code: '23505' });
       const provenance = await scratch.query<{
@@ -398,49 +396,39 @@ describe('migration 008 school control plane', () => {
     try {
       await migrateToLatest(handle.database);
       const seed = await seedControlPlane(scratch, randomUUID().replaceAll('-', '').slice(0, 8));
-      await scratch.query(
-        `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'room', 'Other')`,
-        [seed.tenantId, seed.school],
-      );
       const otherSchool = idOf(
         await scratch.query(
           `INSERT INTO organization (tenant_id, kind, name, slug, time_zone) VALUES ($1, 'school', 'Other', $2, 'America/New_York') RETURNING id`,
           [seed.tenantId, `other-${randomUUID().replaceAll('-', '').slice(0, 8)}`],
         ),
       );
-      const otherLocationB = idOf(
-        await scratch.query(
-          `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'room', 'B') RETURNING id`,
-          [seed.tenantId, otherSchool],
-        ),
-      );
       const otherCategory = idOf(
         await scratch.query(
-          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Other Nurse') RETURNING id`,
+          `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Other Nurse') RETURNING id`,
           [seed.tenantId, otherSchool],
         ),
       );
-      const otherDestination = idOf(
+      const otherRoom = idOf(
         await scratch.query(
-          `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type) VALUES ($1, $2, $3, $4, 'nurse') RETURNING id`,
-          [seed.tenantId, otherSchool, otherLocationB, otherCategory],
+          `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Other Nurse') RETURNING id`,
+          [seed.tenantId, otherSchool, otherCategory],
         ),
       );
       await expect(
         scratch.query(
-          `INSERT INTO scheduled_authorization (tenant_id, organization_id, student_id, destination_id,
+          `INSERT INTO scheduled_authorization (tenant_id, organization_id, student_id, destination_room_id,
             created_by_person_id, valid_from, valid_until, approval_mode, origin_strategy)
            VALUES ($1, $2, $3, $4, $3, statement_timestamp(), statement_timestamp() + interval '1 hour',
             'preapproved', 'expected')`,
-          [seed.tenantId, seed.school, seed.person, otherDestination],
+          [seed.tenantId, seed.school, seed.person, otherRoom],
         ),
       ).rejects.toMatchObject({ code: '23503' });
       const revision = await scratch.query<{ revision: string }>(
-        `INSERT INTO scheduled_authorization (tenant_id, organization_id, student_id, destination_id,
+        `INSERT INTO scheduled_authorization (tenant_id, organization_id, student_id, destination_room_id,
           created_by_person_id, valid_from, valid_until, approval_mode, origin_strategy)
          VALUES ($1, $2, $3, $4, $3, statement_timestamp(), statement_timestamp() + interval '1 hour',
           'preapproved', 'expected') RETURNING revision`,
-        [seed.tenantId, seed.school, seed.person, seed.destination],
+        [seed.tenantId, seed.school, seed.person, seed.room],
       );
       expect(revision.rows[0]?.revision).toBe('1');
     } finally {
@@ -563,9 +551,9 @@ describe('migration 008 school control plane', () => {
       const seed = await seedControlPlane(scratch, randomUUID().replaceAll('-', '').slice(0, 8));
       const pass = idOf(
         await scratch.query(
-          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, lifecycle_state)
+          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, request_source, lifecycle_state)
            VALUES ($1, $2, $3, $4, 'student_web', 'ready') RETURNING id`,
-          [seed.tenantId, seed.school, seed.person, seed.destination],
+          [seed.tenantId, seed.school, seed.person, seed.room],
         ),
       );
       const legacy = await scratch.query<{ departure_check_in_mode: string | null }>(

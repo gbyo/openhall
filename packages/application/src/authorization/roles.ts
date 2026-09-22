@@ -8,7 +8,7 @@ import type { ExplicitRole } from './decisions.js';
  * roles, which exist solely for duties without a canonical relationship.
  */
 export const ROLE_CAPABILITIES: Record<ExplicitRole, readonly Capability[]> = {
-  destination_staff: ['destination.station.manage'],
+  room_staff: ['room.station.manage'],
   counselor: [
     'pass.create.student',
     'pass.depart.student',
@@ -35,8 +35,8 @@ export const ROLE_CAPABILITIES: Record<ExplicitRole, readonly Capability[]> = {
     'pass.view.school_live',
     'pass.view.school_history',
     'scheduled_authorization.manage',
-    'destination.station.manage',
-    'destination.manage',
+    'room.station.manage',
+    'room.manage',
     'schedule.view',
     'schedule.manage',
     'people.view',
@@ -68,8 +68,8 @@ export const SYSTEM_ADMIN_CAPABILITIES: readonly Capability[] = [
   'pass.view.school_live',
   'pass.view.school_history',
   'scheduled_authorization.manage',
-  'destination.station.manage',
-  'destination.manage',
+  'room.station.manage',
+  'room.manage',
   'schedule.view',
   'schedule.manage',
   'people.view',
@@ -86,7 +86,7 @@ export const SYSTEM_ADMIN_CAPABILITIES: readonly Capability[] = [
 ];
 
 const ROLE_SET = new Set<string>([
-  'destination_staff',
+  'room_staff',
   'counselor',
   'office_staff',
   'school_admin',

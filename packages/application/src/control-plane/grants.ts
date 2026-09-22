@@ -19,7 +19,7 @@ import {
 } from './idempotency.js';
 import {
   isSchoolGrantRole,
-  type DestinationRepository,
+  type RoomRepository,
   type GrantAdminRepository,
   type GrantRecord,
   type NewGrant,
@@ -32,7 +32,7 @@ export interface GrantDependencies {
   readonly runner: TenantTransactionRunner;
   readonly authorization: RelationshipAuthorizationService;
   readonly grants: GrantAdminRepository;
-  readonly destinations: DestinationRepository;
+  readonly rooms: RoomRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
   readonly outbox: OutboxWriter;
@@ -46,8 +46,8 @@ export interface GrantView {
   readonly role: string;
   readonly scopeKind: string;
   readonly organizationId: string | null;
-  readonly destinationId: string | null;
-  readonly destination: { readonly id: string; readonly displayName: string } | null;
+  readonly roomId: string | null;
+  readonly room: { readonly id: string; readonly name: string } | null;
   readonly status: string;
   readonly validFrom: string | null;
   readonly validUntil: string | null;
@@ -71,13 +71,13 @@ export function toGrantView(row: GrantRecord): GrantView {
     role: row.role,
     scopeKind: row.scopeKind,
     organizationId: row.organizationId,
-    destinationId: row.destinationId,
-    destination:
-      row.destinationId === null
+    roomId: row.roomId,
+    room:
+      row.roomId === null
         ? null
         : {
-            id: row.destinationId,
-            displayName: row.destinationDisplayName ?? 'Destination',
+            id: row.roomId,
+            name: row.roomName ?? 'Room',
           },
     status: row.status,
     validFrom: row.validFrom === null ? null : row.validFrom.toString(),
@@ -99,7 +99,7 @@ export interface GrantCommandInput {
 export interface GrantIssueBody {
   readonly personId: unknown;
   readonly role: unknown;
-  readonly destinationId: unknown;
+  readonly roomId: unknown;
   readonly validFrom: string | null;
   readonly validUntil: string | null;
 }
@@ -124,8 +124,8 @@ export interface GrantResult {
 interface CanonicalGrantIssue {
   readonly personId: string;
   readonly role: SchoolGrantRole;
-  readonly scopeKind: 'organization' | 'destination';
-  readonly destinationId: string | null;
+  readonly scopeKind: 'organization' | 'room';
+  readonly roomId: string | null;
   readonly validFrom: Temporal.Instant | null;
   readonly validUntil: Temporal.Instant | null;
 }
@@ -148,7 +148,7 @@ function cleanInstant(value: string | null, field: string): Temporal.Instant | n
 
 /**
  * Canonicalizes the closed grant issue body. Scope is derived from role:
- * destination_staff requires a destination; organization-scoped roles reject
+ * room_staff requires a room; organization-scoped roles reject
  * one. accountId/scopeKind/organizationId/tenantId/status/revision are never
  * accepted from the caller.
  */
@@ -166,33 +166,33 @@ function canonicalIssue(body: GrantIssueBody): CanonicalGrantIssue {
   ) {
     throw new ControlPlaneError('invalid_authorization_grant_state', 'Invalid validity interval.');
   }
-  if (body.role === 'destination_staff') {
-    if (typeof body.destinationId !== 'string' || body.destinationId.length === 0) {
+  if (body.role === 'room_staff') {
+    if (typeof body.roomId !== 'string' || body.roomId.length === 0) {
       throw new ControlPlaneError(
         'invalid_authorization_grant_state',
-        'Destination staff requires a destination.',
+        'Room staff requires a room.',
       );
     }
     return {
       personId,
       role: body.role,
-      scopeKind: 'destination',
-      destinationId: body.destinationId,
+      scopeKind: 'room',
+      roomId: body.roomId,
       validFrom,
       validUntil,
     };
   }
-  if (body.destinationId !== null) {
+  if (body.roomId !== null) {
     throw new ControlPlaneError(
       'invalid_authorization_grant_state',
-      'Organization-scoped roles reject a destination.',
+      'Organization-scoped roles reject a room.',
     );
   }
   return {
     personId,
     role: body.role,
     scopeKind: 'organization',
-    destinationId: null,
+    roomId: null,
     validFrom,
     validUntil,
   };
@@ -200,7 +200,7 @@ function canonicalIssue(body: GrantIssueBody): CanonicalGrantIssue {
 
 /**
  * Resolves the canonical school of a grant: organization scope carries it
- * directly; destination scope resolves through the destination.
+ * directly; room scope resolves through the room.
  */
 async function canonicalGrantOrganization(
   context: TenantTransactionContext,
@@ -208,10 +208,10 @@ async function canonicalGrantOrganization(
   row: GrantRecord,
 ): Promise<string | null> {
   if (row.organizationId !== null) return row.organizationId;
-  if (row.destinationId === null) return null;
-  const destination = await dependencies.destinations.loadById(context, row.destinationId);
-  if (destination?.tenantId !== row.tenantId) return null;
-  return destination.organizationId;
+  if (row.roomId === null) return null;
+  const room = await dependencies.rooms.loadById(context, row.roomId);
+  if (room?.tenantId !== row.tenantId) return null;
+  return room.organizationId;
 }
 
 async function appendGrantAudit(
@@ -344,7 +344,7 @@ export async function issueAuthorizationGrant(
     input.organizationId,
     issue.personId,
     issue.role,
-    issue.destinationId ?? '',
+    issue.roomId ?? '',
     issue.validFrom?.toString() ?? '',
     issue.validUntil?.toString() ?? '',
   ]);
@@ -397,19 +397,16 @@ export async function issueAuthorizationGrant(
         throw new ControlPlaneError('target_not_active_staff', 'Grant target is not active staff.');
       }
       let organizationId: string | null = input.organizationId;
-      if (issue.scopeKind === 'destination') {
-        const destination = await dependencies.destinations.loadById(
-          context,
-          issue.destinationId ?? '',
-        );
+      if (issue.scopeKind === 'room') {
+        const room = await dependencies.rooms.loadById(context, issue.roomId ?? '');
         if (
-          destination?.tenantId !== input.principal.tenantId ||
-          destination.organizationId !== input.organizationId ||
-          destination.status === 'archived'
+          room?.tenantId !== input.principal.tenantId ||
+          room.organizationId !== input.organizationId ||
+          room.status === 'archived'
         ) {
           throw new ControlPlaneError(
             'invalid_authorization_grant_state',
-            'Grant destination is not usable.',
+            'Grant room is not usable.',
           );
         }
         organizationId = null;
@@ -425,7 +422,7 @@ export async function issueAuthorizationGrant(
         role: issue.role,
         scopeKind: issue.scopeKind,
         organizationId,
-        destinationId: issue.destinationId,
+        roomId: issue.roomId,
         validFrom: issue.validFrom,
         validUntil: issue.validUntil,
         createdByAccountId: input.principal.accountId,

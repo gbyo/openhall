@@ -11,18 +11,14 @@ export const COOKIE_SECURITY = [{ cookieAuth: [] as string[] }];
 export const COOKIE_CSRF_SECURITY = [{ cookieAuth: [] as string[], csrfHeader: [] as string[] }];
 
 export const TITLE_BY_CODE: Record<ControlPlaneErrorCode, string> = {
-  location_not_found: 'Location not found',
-  location_in_use: 'Location in use',
-  invalid_location_parent: 'Invalid location parent',
-  invalid_location_state: 'Invalid location state',
-  destination_not_found: 'Destination not found',
-  destination_in_use: 'Destination in use',
-  destination_category_not_found: 'Destination category not found',
-  destination_category_in_use: 'Destination category in use',
-  destination_category_exists: 'Destination category exists',
-  destination_already_open: 'Destination already open',
-  destination_already_closed: 'Destination already closed',
-  invalid_destination_state: 'Invalid destination state',
+  room_not_found: 'Room not found',
+  room_in_use: 'Room in use',
+  room_already_open: 'Room already open',
+  room_already_closed: 'Room already closed',
+  invalid_room_state: 'Invalid room state',
+  room_category_not_found: 'Room category not found',
+  room_category_in_use: 'Room category in use',
+  room_category_exists: 'Room category exists',
   schedule_block_not_found: 'Schedule block not found',
   schedule_block_in_use: 'Schedule block in use',
   schedule_block_exists: 'Schedule block exists',
@@ -94,16 +90,12 @@ export const OrganizationIdParamsSchema = Type.Object(
   { organizationId: UuidSchema },
   { additionalProperties: false },
 );
-export const LocationIdParamsSchema = Type.Object(
-  { locationId: UuidSchema },
-  { additionalProperties: false },
-);
-export const DestinationIdParamsSchema = Type.Object(
-  { destinationId: UuidSchema },
+export const RoomIdParamsSchema = Type.Object(
+  { roomId: UuidSchema },
   { additionalProperties: false },
 );
 
-export const DestinationCategoryIdParamsSchema = Type.Object(
+export const RoomCategoryIdParamsSchema = Type.Object(
   { categoryId: UuidSchema },
   { additionalProperties: false },
 );

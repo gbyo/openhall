@@ -63,27 +63,27 @@ test('Base UI task surfaces work from the keyboard and restore focus', async ({ 
   const menuTrigger = page.getByRole('button', { name: 'Open row actions' });
   await menuTrigger.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('menuitem', { name: 'Edit destination' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Edit room' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(menuTrigger).toBeFocused();
 
-  const dialogTrigger = page.getByRole('button', { name: 'New destination' });
+  const dialogTrigger = page.getByRole('button', { name: 'New room' });
   await dialogTrigger.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('dialog', { name: 'New destination' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'New room' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialogTrigger).toBeFocused();
 });
 
 test('pending dialog actions stay in place and prevent duplicate submit', async ({ page }) => {
   await openReference(page);
-  await page.getByRole('button', { name: 'New destination' }).click();
-  const submit = page.getByRole('button', { name: 'Create destination' });
+  await page.getByRole('button', { name: 'New room' }).click();
+  const submit = page.getByRole('button', { name: 'Create room' });
   await submit.click();
   const pending = page.getByRole('button', { name: 'Creating…' });
   await expect(pending).toBeDisabled();
   await expect(pending).toHaveAttribute('aria-busy', 'true');
-  await expect(page.getByRole('dialog', { name: 'New destination' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'New room' })).toBeVisible();
   await expect(page.getByLabel('Name')).toHaveValue('Library');
 });
 
@@ -103,7 +103,7 @@ test('reflows without horizontal page overflow at 320 CSS pixels', async ({ page
     .locator('html')
     .evaluate((element) => element.scrollWidth > element.clientWidth);
   expect(overflow).toBe(false);
-  await expect(page.getByRole('button', { name: 'New destination' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New room' })).toBeVisible();
   await expect(page.getByText('No matching students', { exact: true })).toBeVisible();
 });
 
@@ -141,7 +141,7 @@ test('keeps content and controls usable at 200 percent text size', async ({ page
     element.style.fontSize = '200%';
   });
   await expect(page.getByRole('heading', { name: 'Controls and fields' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'New destination' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New room' })).toBeVisible();
   const overflow = await page
     .locator('html')
     .evaluate((element) => element.scrollWidth > element.clientWidth);

@@ -38,7 +38,7 @@ import {
 import {
   PostgresAuditWriter,
   PostgresAuthorizationRepository,
-  PostgresDestinationFlowRepository,
+  PostgresRoomFlowRepository,
   PostgresExpectedPlacementRepository,
   PostgresIdempotencyRepository,
   PostgresOutboxWriter,
@@ -76,7 +76,7 @@ export function createPassDependencies(database: Kysely<Database>): PassDependen
     new PostgresExpectedPlacementRepository(database),
   );
   const passes = new PostgresPassRepository();
-  const flow = new PostgresDestinationFlowRepository(database);
+  const flow = new PostgresRoomFlowRepository(database);
   const policy = new PostgresPolicyRepository();
   const idempotency = new PostgresIdempotencyRepository();
   const audit = new PostgresAuditWriter();

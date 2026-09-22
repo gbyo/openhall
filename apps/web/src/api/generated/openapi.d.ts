@@ -613,7 +613,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/destinations/{destinationId}/passes/{passId}/check-in": {
+    "/api/v1/rooms/{roomId}/passes/{passId}/check-in": {
         parameters: {
             query?: never;
             header?: never;
@@ -622,7 +622,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Destination station records arrival for optional/required destinations. The pass destination must equal the route destination. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store. */
+        /** @description Room station records arrival for optional/required rooms. The pass destination must equal the route destination. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store. */
         post: operations["stationCheckInPass"];
         delete?: never;
         options?: never;
@@ -630,7 +630,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/destinations/{destinationId}/passes/{passId}/begin-return": {
+    "/api/v1/rooms/{roomId}/passes/{passId}/begin-return": {
         parameters: {
             query?: never;
             header?: never;
@@ -639,7 +639,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Destination station records that the student left the destination. Releases capacity. The pass destination must equal the route destination. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store. */
+        /** @description Room station records that the student left the room. Releases capacity. The pass destination must equal the route destination. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store. */
         post: operations["stationBeginReturnPass"];
         delete?: never;
         options?: never;
@@ -647,7 +647,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/destinations/{destinationId}/passes/{passId}/complete": {
+    "/api/v1/rooms/{roomId}/passes/{passId}/complete": {
         parameters: {
             query?: never;
             header?: never;
@@ -656,7 +656,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Destination staff explicitly ends a movement at the destination (one-way workflows). Requires a prior explicit arrival. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store. */
+        /** @description Room staff explicitly ends a movement at the room (one-way workflows). Requires a prior explicit arrival. Requires Idempotency-Key and the exact strong ETag in If-Match. Success returns the new ETag. Cache-Control: no-store. */
         post: operations["stationCompletePass"];
         delete?: never;
         options?: never;
@@ -681,14 +681,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/destinations/{destinationId}/station": {
+    "/api/v1/rooms/{roomId}/station": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Minimized operational station view for authorized destination staff. No grants, rule JSON, or student schedule history. Dynamic aggregates carry no ETag. Cache-Control: no-store. */
+        /** @description Minimized operational station view for authorized room staff. No grants, rule JSON, or student schedule history. Dynamic aggregates carry no ETag. Cache-Control: no-store. */
         get: operations["getDestinationStation"];
         put?: never;
         post?: never;
@@ -766,35 +766,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/organizations/{organizationId}/locations": {
+    "/api/v1/organizations/{organizationId}/rooms": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description List school locations for administration. Requires destination.manage on the exact school. Cache-Control: no-store. */
-        get: operations["listLocations"];
+        /** @description List school rooms with full admin DTO. Requires room.manage on the exact school. Cache-Control: no-store. */
+        get: operations["listRooms"];
         put?: never;
-        /** @description Create a school location (status active, revision 1). Requires Idempotency-Key. Cache-Control: no-store. */
-        post: operations["createLocation"];
+        /** @description Create a room starting closed (never open) for post-configuration review. Requires Idempotency-Key. Cache-Control: no-store. */
+        post: operations["createRoom"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/locations/{locationId}": {
+    "/api/v1/rooms/{roomId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Read one location with its strong ETag. Authorized against the canonical school. Cache-Control: no-store. */
-        get: operations["getLocation"];
-        /** @description Replace location metadata (full replacement, revision + 1). Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
-        put: operations["updateLocation"];
+        /** @description Read one room with its strong ETag. Authorized against the canonical school. Cache-Control: no-store. */
+        get: operations["getRoom"];
+        /** @description Replace room configuration (never status; revision + 1). Edits are prospective and never rewrite active movement. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
+        put: operations["updateRoom"];
         post?: never;
         delete?: never;
         options?: never;
@@ -802,7 +802,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/locations/{locationId}/archive": {
+    "/api/v1/rooms/{roomId}/open": {
         parameters: {
             query?: never;
             header?: never;
@@ -811,51 +811,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Archive a location (never delete). Rejects with location_in_use while still required. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
-        post: operations["archiveLocation"];
+        /** @description Semantic room open (revision + 1). Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
+        post: operations["openRoom"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/organizations/{organizationId}/destinations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description List school destinations with full admin DTO. Requires destination.manage on the exact school. Cache-Control: no-store. */
-        get: operations["listDestinations"];
-        put?: never;
-        /** @description Create a destination starting closed (never active) for post-configuration review. Requires Idempotency-Key. Cache-Control: no-store. */
-        post: operations["createDestination"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/destinations/{destinationId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Read one destination with its strong ETag. Authorized against the canonical school. Cache-Control: no-store. */
-        get: operations["getDestination"];
-        /** @description Replace destination configuration (never status; revision + 1). Edits are prospective and never rewrite active movement. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
-        put: operations["updateDestination"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/destinations/{destinationId}/open": {
+    "/api/v1/rooms/{roomId}/close": {
         parameters: {
             query?: never;
             header?: never;
@@ -864,15 +828,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Semantic destination open (revision + 1). Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
-        post: operations["openDestination"];
+        /** @description Semantic room close (revision + 1). Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
+        post: operations["closeRoom"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/destinations/{destinationId}/close": {
+    "/api/v1/rooms/{roomId}/archive": {
         parameters: {
             query?: never;
             header?: never;
@@ -881,40 +845,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Semantic destination close (revision + 1). Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
-        post: operations["closeDestination"];
+        /** @description Archive a room (terminal). Rejects with room_in_use while live references remain. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
+        post: operations["archiveRoom"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/destinations/{destinationId}/archive": {
+    "/api/v1/me/organizations/{organizationId}/rooms": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** @description Archive a destination (terminal). Rejects with destination_in_use while live references remain. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
-        post: operations["archiveDestination"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/me/organizations/{organizationId}/destinations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Stable safe destination catalog for organization members (active destinations, picker-safe fields only). Cache-Control: no-store. */
-        get: operations["listMyDestinations"];
+        /** @description Stable safe room catalog for organization members (open rooms, picker-safe fields only). Cache-Control: no-store. */
+        get: operations["listMyRooms"];
         put?: never;
         post?: never;
         delete?: never;
@@ -923,35 +870,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/organizations/{organizationId}/destination-categories": {
+    "/api/v1/organizations/{organizationId}/room-categories": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description List school destination categories with full admin DTO. Requires destination.manage on the exact school. Cache-Control: no-store. */
-        get: operations["listDestinationCategories"];
+        /** @description List school room categories with full admin DTO. Requires room.manage on the exact school. Cache-Control: no-store. */
+        get: operations["listRoomCategories"];
         put?: never;
-        /** @description Create a school destination category (status active, revision 1). Requires Idempotency-Key. Cache-Control: no-store. */
-        post: operations["createDestinationCategory"];
+        /** @description Create a school room category (status active, revision 1). Requires Idempotency-Key. Cache-Control: no-store. */
+        post: operations["createRoomCategory"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/destination-categories/{categoryId}": {
+    "/api/v1/room-categories/{categoryId}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Read one destination category with its strong ETag. Authorized against the canonical school. Cache-Control: no-store. */
-        get: operations["getDestinationCategory"];
-        /** @description Replace category presentation metadata (never status; revision + 1). Renames never mutate destination service types. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
-        put: operations["updateDestinationCategory"];
+        /** @description Read one room category with its strong ETag. Authorized against the canonical school. Cache-Control: no-store. */
+        get: operations["getRoomCategory"];
+        /** @description Replace category presentation metadata (never status; revision + 1). Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
+        put: operations["updateRoomCategory"];
         post?: never;
         delete?: never;
         options?: never;
@@ -959,7 +906,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/destination-categories/{categoryId}/archive": {
+    "/api/v1/room-categories/{categoryId}/archive": {
         parameters: {
             query?: never;
             header?: never;
@@ -968,23 +915,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Archive a destination category (terminal). Rejects with destination_category_in_use while non-archived destinations still reference it. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
-        post: operations["archiveDestinationCategory"];
+        /** @description Archive a room category (terminal). Rejects with room_category_in_use while non-archived rooms still reference it. Requires Idempotency-Key and If-Match. Cache-Control: no-store. */
+        post: operations["archiveRoomCategory"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/organizations/{organizationId}/student-destination-catalog": {
+    "/api/v1/me/organizations/{organizationId}/student-room-catalog": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Purpose-built student launcher catalog: active primary/secondary categories with eligible destinations only. Authorized with pass.request.self semantics. Cache-Control: no-store. */
-        get: operations["listMyStudentDestinationCatalog"];
+        /** @description Purpose-built student launcher catalog: active primary/secondary categories with eligible rooms only. Authorized with pass.request.self semantics. Cache-Control: no-store. */
+        get: operations["listMyStudentRoomCatalog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2543,7 +2490,7 @@ export interface operations {
                             timeZone: string;
                         };
                         affiliations: ("student" | "staff" | "other")[];
-                        capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
+                        capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.approve.room" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "room.station.manage" | "room.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
                         expectedPlacement: ({
                             /** @enum {string} */
                             kind: "resolved";
@@ -2560,12 +2507,11 @@ export interface operations {
                                 code: string | null;
                                 title: string;
                             };
-                            expectedLocation: {
+                            expectedRoom: {
                                 /** Format: uuid */
                                 id: string;
                                 name: string;
                                 code: string | null;
-                                kind: string;
                             } | null;
                             /** Format: date-time */
                             beginsAt: string;
@@ -2616,14 +2562,13 @@ export interface operations {
                             id: string;
                             code: string | null;
                             title: string;
-                            capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
+                            capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.approve.room" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "room.station.manage" | "room.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
                         }[];
-                        staffedDestinations: {
+                        staffedRooms: {
                             /** Format: uuid */
                             id: string;
-                            displayName: string;
-                            serviceType: string;
-                            capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "destination.station.manage" | "destination.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
+                            name: string;
+                            capabilities: ("self.read" | "organization.context.read" | "pass.request.self" | "pass.view.self" | "pass.cancel.self" | "pass.depart.self" | "pass.depart.student" | "pass.progress.self" | "pass.create.student" | "pass.approve.section" | "pass.approve.room" | "pass.override.request.self" | "pass.override.request.student" | "pass.override.resolve.section" | "pass.override.resolve.school" | "pass.view.section_live" | "pass.view.school_live" | "pass.view.school_history" | "scheduled_authorization.manage" | "room.station.manage" | "room.manage" | "schedule.view" | "schedule.manage" | "people.view" | "people.manage" | "policy.manage" | "authorization.manage" | "integration.manage" | "incident.view" | "incident.manage" | "audit.view" | "identity.enroll" | "identity.manage" | "system.manage")[];
                         }[];
                     };
                 };
@@ -2697,7 +2642,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** Format: uuid */
-                    destinationId: string;
+                    destinationRoomId: string;
                 };
             };
         };
@@ -2729,8 +2674,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -2754,7 +2698,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -2886,7 +2830,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** Format: uuid */
-                    destinationId: string;
+                    destinationRoomId: string;
                 };
             };
         };
@@ -2917,8 +2861,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -2942,7 +2885,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -3093,8 +3036,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -3118,7 +3060,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -3220,8 +3162,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -3245,7 +3186,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -3430,15 +3371,19 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                             };
+                            approverKind: "current_section_teacher" | "room_responsible_staff";
                             requiredSection: {
+                                id: string | null;
+                                code: string | null;
+                                title: string | null;
+                            };
+                            requiredRoom: {
                                 /** Format: uuid */
                                 id: string;
-                                code: string | null;
-                                title: string;
-                            };
+                                name: string;
+                            } | null;
                             /** Format: date-time */
                             requestedAt: string;
                         }[];
@@ -3523,8 +3468,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -3548,7 +3492,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -3740,8 +3684,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -3765,7 +3708,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -3963,8 +3906,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -3988,7 +3930,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -4186,8 +4128,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -4211,7 +4152,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -4396,12 +4337,11 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                             };
                             category: "urgent" | "private" | "safety" | "staff_directed";
                             overrideMode: "never" | "authorized" | "approval_required";
-                            reasonCode: "no_violation" | "schedule_boundary_blackout" | "current_section_teacher_approval_required" | "approval_context_unavailable" | "approval_satisfied" | "scheduled_preapproval_satisfied" | "approval_denied" | "override_denied" | "rule_overridden" | "policy_configuration_error";
+                            reasonCode: "no_violation" | "schedule_boundary_blackout" | "current_section_teacher_approval_required" | "room_responsible_staff_approval_required" | "approval_context_unavailable" | "approval_satisfied" | "scheduled_preapproval_satisfied" | "approval_denied" | "override_denied" | "rule_overridden" | "policy_configuration_error";
                             /** Format: date-time */
                             requestedAt: string;
                         }[];
@@ -4486,8 +4426,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -4511,7 +4450,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -4703,8 +4642,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -4728,7 +4666,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -4920,8 +4858,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -4945,7 +4882,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -5023,7 +4960,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed pass, destination, or station resource */
+            /** @description Concealed pass, room, or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5041,7 +4978,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid movement state, expired offer, or destination conflict */
+            /** @description Invalid movement state, expired offer, or room conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5137,8 +5074,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -5162,7 +5098,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -5240,7 +5176,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed pass, destination, or station resource */
+            /** @description Concealed pass, room, or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5258,7 +5194,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid movement state, expired offer, or destination conflict */
+            /** @description Invalid movement state, expired offer, or room conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5354,8 +5290,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -5379,7 +5314,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -5457,7 +5392,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed pass, destination, or station resource */
+            /** @description Concealed pass, room, or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5475,7 +5410,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid movement state, expired offer, or destination conflict */
+            /** @description Invalid movement state, expired offer, or room conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5571,8 +5506,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -5596,7 +5530,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -5674,7 +5608,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed pass, destination, or station resource */
+            /** @description Concealed pass, room, or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5692,7 +5626,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid movement state, expired offer, or destination conflict */
+            /** @description Invalid movement state, expired offer, or room conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5788,8 +5722,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -5813,7 +5746,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -5891,7 +5824,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed pass, destination, or station resource */
+            /** @description Concealed pass, room, or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5909,7 +5842,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid movement state, expired offer, or destination conflict */
+            /** @description Invalid movement state, expired offer, or room conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5973,7 +5906,7 @@ export interface operations {
                 "if-match"?: string;
             };
             path: {
-                destinationId: string;
+                roomId: string;
                 passId: string;
             };
             cookie?: never;
@@ -6006,8 +5939,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -6031,7 +5963,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -6109,7 +6041,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed pass, destination, or station resource */
+            /** @description Concealed pass, room, or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6127,7 +6059,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid movement state, expired offer, or destination conflict */
+            /** @description Invalid movement state, expired offer, or room conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6191,7 +6123,7 @@ export interface operations {
                 "if-match"?: string;
             };
             path: {
-                destinationId: string;
+                roomId: string;
                 passId: string;
             };
             cookie?: never;
@@ -6224,8 +6156,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -6249,7 +6180,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -6327,7 +6258,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed pass, destination, or station resource */
+            /** @description Concealed pass, room, or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6345,7 +6276,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid movement state, expired offer, or destination conflict */
+            /** @description Invalid movement state, expired offer, or room conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6409,7 +6340,7 @@ export interface operations {
                 "if-match"?: string;
             };
             path: {
-                destinationId: string;
+                roomId: string;
                 passId: string;
             };
             cookie?: never;
@@ -6442,8 +6373,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -6467,7 +6397,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;
@@ -6545,7 +6475,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed pass, destination, or station resource */
+            /** @description Concealed pass, room, or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6563,7 +6493,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Invalid movement state, expired offer, or destination conflict */
+            /** @description Invalid movement state, expired offer, or room conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6725,7 +6655,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                destinationId: string;
+                roomId: string;
             };
             cookie?: never;
         };
@@ -6738,11 +6668,10 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        destination: {
+                        room: {
                             /** Format: uuid */
                             id: string;
-                            displayName: string;
-                            serviceType: string;
+                            name: string;
                             checkInMode: "none" | "optional" | "required";
                             capacity: number | null;
                         };
@@ -6842,7 +6771,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description Concealed destination or station resource */
+            /** @description Concealed room or station resource */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6893,8 +6822,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                             };
                             lifecycleState: "requested" | "queued" | "ready" | "outbound" | "at_destination" | "returning";
                             /** Format: date-time */
@@ -7079,8 +7007,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                             };
                             lifecycleState: "requested" | "queued" | "ready" | "outbound" | "at_destination" | "returning";
                             /** Format: date-time */
@@ -7219,7 +7146,7 @@ export interface operations {
             };
         };
     };
-    listLocations: {
+    listRooms: {
         parameters: {
             query?: never;
             header?: never;
@@ -7237,732 +7164,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        locations: {
+                        rooms: {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
                             organizationId: string;
-                            parentLocationId: string | null;
-                            kind: string;
+                            categoryId: string | null;
                             name: string;
                             code: string | null;
                             floorLabel: string | null;
-                            status: "active" | "inactive" | "archived";
-                            revision: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Forbidden or recovery session restricted */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Concealed or missing school resource */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    createLocation: {
-        parameters: {
-            query?: never;
-            header: {
-                "idempotency-key": string;
-            };
-            path: {
-                organizationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    parentLocationId: string | null;
-                    kind: string;
-                    name: string;
-                    code: string | null;
-                    floorLabel: string | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Default Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        location: {
-                            /** Format: uuid */
-                            id: string;
-                            /** Format: uuid */
-                            organizationId: string;
-                            parentLocationId: string | null;
-                            kind: string;
-                            name: string;
-                            code: string | null;
-                            floorLabel: string | null;
-                            status: "active" | "inactive" | "archived";
-                            revision: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                        };
-                    };
-                };
-            };
-            /** @description Malformed input, invalid precondition, or invalid idempotency key */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Forbidden or recovery session restricted */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Concealed or missing school resource */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Resource in use, duplicate, or invalid state */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Stale resource revision */
-            412: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description If-Match required */
-            428: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    getLocation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Default Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        location: {
-                            /** Format: uuid */
-                            id: string;
-                            /** Format: uuid */
-                            organizationId: string;
-                            parentLocationId: string | null;
-                            kind: string;
-                            name: string;
-                            code: string | null;
-                            floorLabel: string | null;
-                            status: "active" | "inactive" | "archived";
-                            revision: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Forbidden or recovery session restricted */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Concealed or missing school resource */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    updateLocation: {
-        parameters: {
-            query?: never;
-            header: {
-                "idempotency-key": string;
-                "if-match"?: string;
-            };
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    parentLocationId: string | null;
-                    kind: string;
-                    name: string;
-                    code: string | null;
-                    floorLabel: string | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Default Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        location: {
-                            /** Format: uuid */
-                            id: string;
-                            /** Format: uuid */
-                            organizationId: string;
-                            parentLocationId: string | null;
-                            kind: string;
-                            name: string;
-                            code: string | null;
-                            floorLabel: string | null;
-                            status: "active" | "inactive" | "archived";
-                            revision: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                        };
-                    };
-                };
-            };
-            /** @description Malformed input, invalid precondition, or invalid idempotency key */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Forbidden or recovery session restricted */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Concealed or missing school resource */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Resource in use, duplicate, or invalid state */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Stale resource revision */
-            412: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description If-Match required */
-            428: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    archiveLocation: {
-        parameters: {
-            query?: never;
-            header: {
-                "idempotency-key": string;
-                "if-match"?: string;
-            };
-            path: {
-                locationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Default Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        location: {
-                            /** Format: uuid */
-                            id: string;
-                            /** Format: uuid */
-                            organizationId: string;
-                            parentLocationId: string | null;
-                            kind: string;
-                            name: string;
-                            code: string | null;
-                            floorLabel: string | null;
-                            status: "active" | "inactive" | "archived";
-                            revision: string;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                        };
-                    };
-                };
-            };
-            /** @description Malformed input, invalid precondition, or invalid idempotency key */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Unauthenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Forbidden or recovery session restricted */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Concealed or missing school resource */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Resource in use, duplicate, or invalid state */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description Stale resource revision */
-            412: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-            /** @description If-Match required */
-            428: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": {
-                        /** Format: uri-reference */
-                        type: string;
-                        title: string;
-                        status: number;
-                        detail?: string;
-                        instance?: string;
-                        code: string;
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    listDestinations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                organizationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Default Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        destinations: {
-                            /** Format: uuid */
-                            id: string;
-                            /** Format: uuid */
-                            organizationId: string;
-                            /** Format: uuid */
-                            locationId: string;
-                            /** Format: uuid */
-                            categoryId: string;
                             studentSelfRequestable: boolean;
-                            serviceType: string;
-                            displayName: string | null;
+                            originSelectable: boolean;
                             capacity: number | null;
                             queueEnabled: boolean;
                             checkInMode: "none" | "optional" | "required";
@@ -7970,8 +7182,10 @@ export interface operations {
                             maxDurationSeconds: number | null;
                             readyClaimTimeoutSeconds: number;
                             queueTimeoutSeconds: number;
-                            status: "active" | "closed" | "archived";
+                            status: "open" | "closed" | "archived";
                             revision: string;
+                            /** Format: date-time */
+                            createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
                         }[];
@@ -8034,7 +7248,7 @@ export interface operations {
             };
         };
     };
-    createDestination: {
+    createRoom: {
         parameters: {
             query?: never;
             header: {
@@ -8048,13 +7262,12 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    locationId: string;
-                    /** Format: uuid */
-                    categoryId: string;
+                    categoryId: string | null;
+                    name: string;
+                    code: string | null;
+                    floorLabel: string | null;
                     studentSelfRequestable: boolean;
-                    serviceType: string;
-                    displayName: string | null;
+                    originSelectable: boolean;
                     capacity: number | null;
                     queueEnabled: boolean;
                     checkInMode: "none" | "optional" | "required";
@@ -8073,18 +7286,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        destination: {
+                        room: {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
                             organizationId: string;
-                            /** Format: uuid */
-                            locationId: string;
-                            /** Format: uuid */
-                            categoryId: string;
+                            categoryId: string | null;
+                            name: string;
+                            code: string | null;
+                            floorLabel: string | null;
                             studentSelfRequestable: boolean;
-                            serviceType: string;
-                            displayName: string | null;
+                            originSelectable: boolean;
                             capacity: number | null;
                             queueEnabled: boolean;
                             checkInMode: "none" | "optional" | "required";
@@ -8092,8 +7304,10 @@ export interface operations {
                             maxDurationSeconds: number | null;
                             readyClaimTimeoutSeconds: number;
                             queueTimeoutSeconds: number;
-                            status: "active" | "closed" | "archived";
+                            status: "open" | "closed" | "archived";
                             revision: string;
+                            /** Format: date-time */
+                            createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
                         };
@@ -8228,12 +7442,12 @@ export interface operations {
             };
         };
     };
-    getDestination: {
+    getRoom: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                destinationId: string;
+                roomId: string;
             };
             cookie?: never;
         };
@@ -8246,18 +7460,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        destination: {
+                        room: {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
                             organizationId: string;
-                            /** Format: uuid */
-                            locationId: string;
-                            /** Format: uuid */
-                            categoryId: string;
+                            categoryId: string | null;
+                            name: string;
+                            code: string | null;
+                            floorLabel: string | null;
                             studentSelfRequestable: boolean;
-                            serviceType: string;
-                            displayName: string | null;
+                            originSelectable: boolean;
                             capacity: number | null;
                             queueEnabled: boolean;
                             checkInMode: "none" | "optional" | "required";
@@ -8265,8 +7478,10 @@ export interface operations {
                             maxDurationSeconds: number | null;
                             readyClaimTimeoutSeconds: number;
                             queueTimeoutSeconds: number;
-                            status: "active" | "closed" | "archived";
+                            status: "open" | "closed" | "archived";
                             revision: string;
+                            /** Format: date-time */
+                            createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
                         };
@@ -8329,7 +7544,7 @@ export interface operations {
             };
         };
     };
-    updateDestination: {
+    updateRoom: {
         parameters: {
             query?: never;
             header: {
@@ -8337,20 +7552,19 @@ export interface operations {
                 "if-match"?: string;
             };
             path: {
-                destinationId: string;
+                roomId: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    locationId: string;
-                    /** Format: uuid */
-                    categoryId: string;
+                    categoryId: string | null;
+                    name: string;
+                    code: string | null;
+                    floorLabel: string | null;
                     studentSelfRequestable: boolean;
-                    serviceType: string;
-                    displayName: string | null;
+                    originSelectable: boolean;
                     capacity: number | null;
                     queueEnabled: boolean;
                     checkInMode: "none" | "optional" | "required";
@@ -8369,18 +7583,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        destination: {
+                        room: {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
                             organizationId: string;
-                            /** Format: uuid */
-                            locationId: string;
-                            /** Format: uuid */
-                            categoryId: string;
+                            categoryId: string | null;
+                            name: string;
+                            code: string | null;
+                            floorLabel: string | null;
                             studentSelfRequestable: boolean;
-                            serviceType: string;
-                            displayName: string | null;
+                            originSelectable: boolean;
                             capacity: number | null;
                             queueEnabled: boolean;
                             checkInMode: "none" | "optional" | "required";
@@ -8388,8 +7601,10 @@ export interface operations {
                             maxDurationSeconds: number | null;
                             readyClaimTimeoutSeconds: number;
                             queueTimeoutSeconds: number;
-                            status: "active" | "closed" | "archived";
+                            status: "open" | "closed" | "archived";
                             revision: string;
+                            /** Format: date-time */
+                            createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
                         };
@@ -8524,7 +7739,7 @@ export interface operations {
             };
         };
     };
-    openDestination: {
+    openRoom: {
         parameters: {
             query?: never;
             header: {
@@ -8532,7 +7747,7 @@ export interface operations {
                 "if-match"?: string;
             };
             path: {
-                destinationId: string;
+                roomId: string;
             };
             cookie?: never;
         };
@@ -8545,18 +7760,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        destination: {
+                        room: {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
                             organizationId: string;
-                            /** Format: uuid */
-                            locationId: string;
-                            /** Format: uuid */
-                            categoryId: string;
+                            categoryId: string | null;
+                            name: string;
+                            code: string | null;
+                            floorLabel: string | null;
                             studentSelfRequestable: boolean;
-                            serviceType: string;
-                            displayName: string | null;
+                            originSelectable: boolean;
                             capacity: number | null;
                             queueEnabled: boolean;
                             checkInMode: "none" | "optional" | "required";
@@ -8564,8 +7778,10 @@ export interface operations {
                             maxDurationSeconds: number | null;
                             readyClaimTimeoutSeconds: number;
                             queueTimeoutSeconds: number;
-                            status: "active" | "closed" | "archived";
+                            status: "open" | "closed" | "archived";
                             revision: string;
+                            /** Format: date-time */
+                            createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
                         };
@@ -8700,7 +7916,7 @@ export interface operations {
             };
         };
     };
-    closeDestination: {
+    closeRoom: {
         parameters: {
             query?: never;
             header: {
@@ -8708,7 +7924,7 @@ export interface operations {
                 "if-match"?: string;
             };
             path: {
-                destinationId: string;
+                roomId: string;
             };
             cookie?: never;
         };
@@ -8721,18 +7937,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        destination: {
+                        room: {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
                             organizationId: string;
-                            /** Format: uuid */
-                            locationId: string;
-                            /** Format: uuid */
-                            categoryId: string;
+                            categoryId: string | null;
+                            name: string;
+                            code: string | null;
+                            floorLabel: string | null;
                             studentSelfRequestable: boolean;
-                            serviceType: string;
-                            displayName: string | null;
+                            originSelectable: boolean;
                             capacity: number | null;
                             queueEnabled: boolean;
                             checkInMode: "none" | "optional" | "required";
@@ -8740,8 +7955,10 @@ export interface operations {
                             maxDurationSeconds: number | null;
                             readyClaimTimeoutSeconds: number;
                             queueTimeoutSeconds: number;
-                            status: "active" | "closed" | "archived";
+                            status: "open" | "closed" | "archived";
                             revision: string;
+                            /** Format: date-time */
+                            createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
                         };
@@ -8876,7 +8093,7 @@ export interface operations {
             };
         };
     };
-    archiveDestination: {
+    archiveRoom: {
         parameters: {
             query?: never;
             header: {
@@ -8884,7 +8101,7 @@ export interface operations {
                 "if-match"?: string;
             };
             path: {
-                destinationId: string;
+                roomId: string;
             };
             cookie?: never;
         };
@@ -8897,18 +8114,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        destination: {
+                        room: {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
                             organizationId: string;
-                            /** Format: uuid */
-                            locationId: string;
-                            /** Format: uuid */
-                            categoryId: string;
+                            categoryId: string | null;
+                            name: string;
+                            code: string | null;
+                            floorLabel: string | null;
                             studentSelfRequestable: boolean;
-                            serviceType: string;
-                            displayName: string | null;
+                            originSelectable: boolean;
                             capacity: number | null;
                             queueEnabled: boolean;
                             checkInMode: "none" | "optional" | "required";
@@ -8916,8 +8132,10 @@ export interface operations {
                             maxDurationSeconds: number | null;
                             readyClaimTimeoutSeconds: number;
                             queueTimeoutSeconds: number;
-                            status: "active" | "closed" | "archived";
+                            status: "open" | "closed" | "archived";
                             revision: string;
+                            /** Format: date-time */
+                            createdAt: string;
                             /** Format: date-time */
                             updatedAt: string;
                         };
@@ -9052,7 +8270,7 @@ export interface operations {
             };
         };
     };
-    listMyDestinations: {
+    listMyRooms: {
         parameters: {
             query?: never;
             header?: never;
@@ -9070,13 +8288,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        destinations: {
+                        rooms: {
                             /** Format: uuid */
                             id: string;
-                            displayName: string;
-                            serviceType: string;
-                            /** Format: uuid */
-                            categoryId: string;
+                            name: string;
+                            code: string | null;
+                            floorLabel: string | null;
+                            categoryId: string | null;
                             checkInMode: "none" | "optional" | "required";
                         }[];
                     };
@@ -9138,7 +8356,7 @@ export interface operations {
             };
         };
     };
-    listDestinationCategories: {
+    listRoomCategories: {
         parameters: {
             query?: never;
             header?: never;
@@ -9165,6 +8383,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9230,7 +8449,7 @@ export interface operations {
             };
         };
     };
-    createDestinationCategory: {
+    createRoomCategory: {
         parameters: {
             query?: never;
             header: {
@@ -9248,6 +8467,7 @@ export interface operations {
                     iconKey: string;
                     toneKey: string;
                     studentSurface: "primary" | "secondary" | "hidden";
+                    pickerMode: "auto" | "list" | "search";
                     sortOrder: number;
                 };
             };
@@ -9269,6 +8489,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9406,7 +8627,7 @@ export interface operations {
             };
         };
     };
-    getDestinationCategory: {
+    getRoomCategory: {
         parameters: {
             query?: never;
             header?: never;
@@ -9433,6 +8654,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9498,7 +8720,7 @@ export interface operations {
             };
         };
     };
-    updateDestinationCategory: {
+    updateRoomCategory: {
         parameters: {
             query?: never;
             header: {
@@ -9517,6 +8739,7 @@ export interface operations {
                     iconKey: string;
                     toneKey: string;
                     studentSurface: "primary" | "secondary" | "hidden";
+                    pickerMode: "auto" | "list" | "search";
                     sortOrder: number;
                 };
             };
@@ -9538,6 +8761,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9675,7 +8899,7 @@ export interface operations {
             };
         };
     };
-    archiveDestinationCategory: {
+    archiveRoomCategory: {
         parameters: {
             query?: never;
             header: {
@@ -9705,6 +8929,7 @@ export interface operations {
                             iconKey: string;
                             toneKey: string;
                             studentSurface: "primary" | "secondary" | "hidden";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
                             status: "active" | "archived";
                             revision: string;
@@ -9842,7 +9067,7 @@ export interface operations {
             };
         };
     };
-    listMyStudentDestinationCatalog: {
+    listMyStudentRoomCatalog: {
         parameters: {
             query?: never;
             header?: never;
@@ -9866,18 +9091,20 @@ export interface operations {
                             name: string;
                             iconKey: string;
                             toneKey: string;
-                            studentSurface: "primary" | "secondary";
+                            pickerMode: "auto" | "list" | "search";
                             sortOrder: number;
-                            destinations: {
+                            rooms: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                location: {
-                                    /** Format: uuid */
-                                    id: string;
-                                    name: string;
-                                };
+                                name: string;
+                                code: string | null;
+                                floorLabel: string | null;
                                 checkInMode: "none" | "optional" | "required";
+                                searchContext: {
+                                    teacherNames: string[];
+                                    sectionLabels: string[];
+                                    roomStaffNames: string[];
+                                };
                             }[];
                         }[];
                     };
@@ -11578,10 +10805,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "room" | "room_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
-                                destinationId: string | null;
+                                roomId: string | null;
+                                roomCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -11675,10 +10903,11 @@ export interface operations {
                     name: string;
                     ruleType: "schedule_boundary" | "approval_requirement";
                     scope: {
-                        kind: "organization" | "section" | "destination";
+                        kind: "organization" | "section" | "room" | "room_category";
                         organizationId: string | null;
                         sectionId: string | null;
-                        destinationId: string | null;
+                        roomId: string | null;
+                        roomCategoryId: string | null;
                     };
                     priority: number;
                     configuration: {
@@ -11706,10 +10935,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "room" | "room_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
-                                destinationId: string | null;
+                                roomId: string | null;
+                                roomCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -11883,10 +11113,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "room" | "room_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
-                                destinationId: string | null;
+                                roomId: string | null;
+                                roomCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -11980,10 +11211,11 @@ export interface operations {
                     name: string;
                     ruleType: "schedule_boundary" | "approval_requirement";
                     scope: {
-                        kind: "organization" | "section" | "destination";
+                        kind: "organization" | "section" | "room" | "room_category";
                         organizationId: string | null;
                         sectionId: string | null;
-                        destinationId: string | null;
+                        roomId: string | null;
+                        roomCategoryId: string | null;
                     };
                     priority: number;
                     configuration: {
@@ -12011,10 +11243,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "room" | "room_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
-                                destinationId: string | null;
+                                roomId: string | null;
+                                roomCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12191,10 +11424,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "room" | "room_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
-                                destinationId: string | null;
+                                roomId: string | null;
+                                roomCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12371,10 +11605,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "room" | "room_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
-                                destinationId: string | null;
+                                roomId: string | null;
+                                roomCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12551,10 +11786,11 @@ export interface operations {
                             name: string;
                             ruleType: "schedule_boundary" | "approval_requirement";
                             scope: {
-                                kind: "organization" | "section" | "destination";
+                                kind: "organization" | "section" | "room" | "room_category";
                                 organizationId: string | null;
                                 sectionId: string | null;
-                                destinationId: string | null;
+                                roomId: string | null;
+                                roomCategoryId: string | null;
                             };
                             priority: number;
                             configuration: {
@@ -12733,14 +11969,14 @@ export interface operations {
                             /** Format: uuid */
                             accountId: string;
                             /** AuthorizationGrantRole */
-                            role: "destination_staff" | "counselor" | "office_staff" | "school_admin";
-                            scopeKind: "organization" | "destination";
+                            role: "room_staff" | "counselor" | "office_staff" | "school_admin";
+                            scopeKind: "organization" | "room";
                             organizationId: string | null;
-                            destinationId: string | null;
-                            destination: {
+                            roomId: string | null;
+                            room: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
+                                name: string;
                             } | null;
                             status: "active" | "revoked";
                             validFrom: string | null;
@@ -12827,8 +12063,8 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     personId: string;
-                    role: "destination_staff" | "counselor" | "office_staff" | "school_admin";
-                    destinationId: string | null;
+                    role: "room_staff" | "counselor" | "office_staff" | "school_admin";
+                    roomId: string | null;
                     validFrom: string | null;
                     validUntil: string | null;
                 };
@@ -12854,14 +12090,14 @@ export interface operations {
                             };
                             /** Format: uuid */
                             accountId: string;
-                            role: "destination_staff" | "counselor" | "office_staff" | "school_admin";
-                            scopeKind: "organization" | "destination";
+                            role: "room_staff" | "counselor" | "office_staff" | "school_admin";
+                            scopeKind: "organization" | "room";
                             organizationId: string | null;
-                            destinationId: string | null;
-                            destination: {
+                            roomId: string | null;
+                            room: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
+                                name: string;
                             } | null;
                             status: "active" | "revoked";
                             validFrom: string | null;
@@ -13034,14 +12270,14 @@ export interface operations {
                             };
                             /** Format: uuid */
                             accountId: string;
-                            role: "destination_staff" | "counselor" | "office_staff" | "school_admin";
-                            scopeKind: "organization" | "destination";
+                            role: "room_staff" | "counselor" | "office_staff" | "school_admin";
+                            scopeKind: "organization" | "room";
                             organizationId: string | null;
-                            destinationId: string | null;
-                            destination: {
+                            roomId: string | null;
+                            room: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
+                                name: string;
                             } | null;
                             status: "active" | "revoked";
                             validFrom: string | null;
@@ -13145,14 +12381,14 @@ export interface operations {
                             };
                             /** Format: uuid */
                             accountId: string;
-                            role: "destination_staff" | "counselor" | "office_staff" | "school_admin";
-                            scopeKind: "organization" | "destination";
+                            role: "room_staff" | "counselor" | "office_staff" | "school_admin";
+                            scopeKind: "organization" | "room";
                             organizationId: string | null;
-                            destinationId: string | null;
-                            destination: {
+                            roomId: string | null;
+                            room: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
+                                name: string;
                             } | null;
                             status: "active" | "revoked";
                             validFrom: string | null;
@@ -13948,12 +13184,11 @@ export interface operations {
                                 gradeLevel: string | null;
                             };
                             /** Format: uuid */
-                            destinationId: string;
+                            destinationRoomId: string;
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                             };
                             /** Format: date-time */
                             validFrom: string;
@@ -13962,8 +13197,8 @@ export interface operations {
                             status: "active" | "used" | "cancelled" | "expired";
                             approvalMode: "preapproved" | "approval_required";
                             originStrategy: "expected" | "specific";
-                            originLocationId: string | null;
-                            originLocation: {
+                            originRoomId: string | null;
+                            originRoom: {
                                 /** Format: uuid */
                                 id: string;
                                 name: string;
@@ -14056,7 +13291,7 @@ export interface operations {
                     /** Format: uuid */
                     studentId: string;
                     /** Format: uuid */
-                    destinationId: string;
+                    destinationRoomId: string;
                     /** Format: date-time */
                     validFrom: string;
                     /** Format: date-time */
@@ -14070,7 +13305,7 @@ export interface operations {
                         /** @enum {string} */
                         strategy: "specific";
                         /** Format: uuid */
-                        locationId: string;
+                        roomId: string;
                     };
                 };
             };
@@ -14097,12 +13332,11 @@ export interface operations {
                                 gradeLevel: string | null;
                             };
                             /** Format: uuid */
-                            destinationId: string;
+                            destinationRoomId: string;
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                             };
                             /** Format: date-time */
                             validFrom: string;
@@ -14111,8 +13345,8 @@ export interface operations {
                             status: "active" | "used" | "cancelled" | "expired";
                             approvalMode: "preapproved" | "approval_required";
                             originStrategy: "expected" | "specific";
-                            originLocationId: string | null;
-                            originLocation: {
+                            originRoomId: string | null;
+                            originRoom: {
                                 /** Format: uuid */
                                 id: string;
                                 name: string;
@@ -14292,12 +13526,11 @@ export interface operations {
                                 gradeLevel: string | null;
                             };
                             /** Format: uuid */
-                            destinationId: string;
+                            destinationRoomId: string;
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                             };
                             /** Format: date-time */
                             validFrom: string;
@@ -14306,8 +13539,8 @@ export interface operations {
                             status: "active" | "used" | "cancelled" | "expired";
                             approvalMode: "preapproved" | "approval_required";
                             originStrategy: "expected" | "specific";
-                            originLocationId: string | null;
-                            originLocation: {
+                            originRoomId: string | null;
+                            originRoom: {
                                 /** Format: uuid */
                                 id: string;
                                 name: string;
@@ -14418,12 +13651,11 @@ export interface operations {
                                 gradeLevel: string | null;
                             };
                             /** Format: uuid */
-                            destinationId: string;
+                            destinationRoomId: string;
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                             };
                             /** Format: date-time */
                             validFrom: string;
@@ -14432,8 +13664,8 @@ export interface operations {
                             status: "active" | "used" | "cancelled" | "expired";
                             approvalMode: "preapproved" | "approval_required";
                             originStrategy: "expected" | "specific";
-                            originLocationId: string | null;
-                            originLocation: {
+                            originRoomId: string | null;
+                            originRoom: {
                                 /** Format: uuid */
                                 id: string;
                                 name: string;
@@ -14702,8 +13934,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 category: {
                                     /** Format: uuid */
                                     id: string;
@@ -14712,7 +13943,7 @@ export interface operations {
                                     toneKey: string;
                                 } | null;
                             };
-                            originLocation: {
+                            originRoom: {
                                 /** Format: uuid */
                                 id: string;
                                 name: string;
@@ -14799,8 +14030,7 @@ export interface operations {
                             destination: {
                                 /** Format: uuid */
                                 id: string;
-                                displayName: string;
-                                serviceType: string;
+                                name: string;
                                 checkInMode: "none" | "optional" | "required";
                                 category: {
                                     /** Format: uuid */
@@ -14824,7 +14054,7 @@ export interface operations {
                                     code: string | null;
                                     title: string;
                                 } | null;
-                                location: {
+                                room: {
                                     /** Format: uuid */
                                     id: string;
                                     name: string;

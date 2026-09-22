@@ -26,8 +26,8 @@ interface GrantRow {
   role: string;
   scope_kind: string;
   organization_id: string | null;
-  destination_id: string | null;
-  destination_display_name: string | null;
+  room_id: string | null;
+  room_name: string | null;
   status: string;
   valid_from: string | null;
   valid_until: string | null;
@@ -48,8 +48,8 @@ function toRecord(row: GrantRow): GrantRecord {
     role: row.role,
     scopeKind: row.scope_kind,
     organizationId: row.organization_id,
-    destinationId: row.destination_id,
-    destinationDisplayName: row.destination_display_name,
+    roomId: row.room_id,
+    roomName: row.room_name,
     status: row.status,
     validFrom: row.valid_from === null ? null : fromDatabaseInstant(row.valid_from),
     validUntil: row.valid_until === null ? null : fromDatabaseInstant(row.valid_until),
@@ -72,8 +72,8 @@ function grantSelection() {
     'authorization_grant.role',
     'authorization_grant.scope_kind',
     'authorization_grant.organization_id',
-    'authorization_grant.destination_id',
-    'destination.display_name as destination_display_name',
+    'authorization_grant.room_id',
+    'room.name as room_name',
     'authorization_grant.status',
     'authorization_grant.valid_from',
     'authorization_grant.valid_until',
@@ -118,17 +118,17 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           .onRef('person.tenant_id', '=', 'account.tenant_id')
           .onRef('person.id', '=', 'account.person_id'),
       )
-      .leftJoin('destination', (join) =>
+      .leftJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'authorization_grant.tenant_id')
-          .onRef('destination.id', '=', 'authorization_grant.destination_id'),
+          .onRef('room.tenant_id', '=', 'authorization_grant.tenant_id')
+          .onRef('room.id', '=', 'authorization_grant.room_id'),
       )
       .select(grantSelection())
       .where('authorization_grant.tenant_id', '=', context.tenantId)
       .where((eb) =>
         eb.or([
           eb('authorization_grant.organization_id', '=', organizationId),
-          eb('destination.organization_id', '=', organizationId),
+          eb('room.organization_id', '=', organizationId),
         ]),
       )
       .orderBy('authorization_grant.created_at', 'desc')
@@ -151,10 +151,10 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           .onRef('person.tenant_id', '=', 'account.tenant_id')
           .onRef('person.id', '=', 'account.person_id'),
       )
-      .leftJoin('destination', (join) =>
+      .leftJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'authorization_grant.tenant_id')
-          .onRef('destination.id', '=', 'authorization_grant.destination_id'),
+          .onRef('room.tenant_id', '=', 'authorization_grant.tenant_id')
+          .onRef('room.id', '=', 'authorization_grant.room_id'),
       )
       .select(grantSelection())
       .where('authorization_grant.tenant_id', '=', context.tenantId)
@@ -180,10 +180,10 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           .onRef('person.tenant_id', '=', 'account.tenant_id')
           .onRef('person.id', '=', 'account.person_id'),
       )
-      .leftJoin('destination', (join) =>
+      .leftJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'authorization_grant.tenant_id')
-          .onRef('destination.id', '=', 'authorization_grant.destination_id'),
+          .onRef('room.tenant_id', '=', 'authorization_grant.tenant_id')
+          .onRef('room.id', '=', 'authorization_grant.room_id'),
       )
       .select(grantSelection())
       .where('authorization_grant.tenant_id', '=', context.tenantId)
@@ -278,7 +278,7 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           role: input.role,
           scope_kind: input.scopeKind,
           organization_id: input.organizationId,
-          destination_id: input.destinationId,
+          room_id: input.roomId,
           status: 'active',
           valid_from: input.validFrom === null ? null : toDatabaseInstant(input.validFrom),
           valid_until: input.validUntil === null ? null : toDatabaseInstant(input.validUntil),
@@ -305,10 +305,10 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           .onRef('person.tenant_id', '=', 'account.tenant_id')
           .onRef('person.id', '=', 'account.person_id'),
       )
-      .leftJoin('destination', (join) =>
+      .leftJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'authorization_grant.tenant_id')
-          .onRef('destination.id', '=', 'authorization_grant.destination_id'),
+          .onRef('room.tenant_id', '=', 'authorization_grant.tenant_id')
+          .onRef('room.id', '=', 'authorization_grant.room_id'),
       )
       .select(grantSelection())
       .where('authorization_grant.tenant_id', '=', context.tenantId)
@@ -321,9 +321,9 @@ export class PostgresGrantAdminRepository implements GrantAdminRepository {
           : eb('authorization_grant.organization_id', '=', input.organizationId),
       )
       .where((eb) =>
-        input.destinationId === null
-          ? eb('authorization_grant.destination_id', 'is', null)
-          : eb('authorization_grant.destination_id', '=', input.destinationId),
+        input.roomId === null
+          ? eb('authorization_grant.room_id', 'is', null)
+          : eb('authorization_grant.room_id', '=', input.roomId),
       )
       .executeTakeFirst();
     if (row === undefined) throw new Error('Grant insert did not persist.');

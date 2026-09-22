@@ -43,7 +43,7 @@ afterAll(async () => {
  * Fresh `pnpm demo` data must satisfy the production invariants the runtime
  * depends on: the seeded student appointment is live immediately, and no
  * seeded policy evaluation collides with its pass's current revision (which
- * previously sent the destination-flow reconciler into a duplicate-key
+ * previously sent the room-flow reconciler into a duplicate-key
  * error loop on every tick).
  */
 describe('demo seed invariants', () => {
@@ -64,7 +64,7 @@ describe('demo seed invariants', () => {
   });
 
   it('keeps reconciler-scoped passes free of current-revision evaluations', async () => {
-    // The destination-flow reconciler reevaluates queued/ready passes at
+    // The room-flow reconciler reevaluates queued/ready passes at
     // their current revision without bumping first, so a seeded evaluation
     // at that same revision fails every tick with
     // `policy_evaluation_one_per_pass_revision`. Requested passes are out of

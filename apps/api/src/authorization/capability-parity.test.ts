@@ -72,7 +72,7 @@ describe('capability vocabulary parity', () => {
       sectionId: 'sec-1',
       studentId: 'person-1',
     });
-    accepts('destination.station.manage', { kind: 'destination', destinationId: 'dest-1' });
+    accepts('room.station.manage', { kind: 'room', roomId: 'room-1' });
     accepts('identity.manage', { kind: 'tenant' });
     // Invalid mappings fail for the capability/resource mismatch, using
     // well-formed resources of the wrong kind.
@@ -94,8 +94,8 @@ describe('capability vocabulary parity', () => {
       organizationId: 'org-1',
       studentId: 'person-1',
     });
-    // @ts-expect-error destination.station.manage requires a destination resource.
-    accepts('destination.station.manage', { kind: 'organization', organizationId: 'org-1' });
+    // @ts-expect-error room.station.manage requires a destination resource.
+    accepts('room.station.manage', { kind: 'organization', organizationId: 'org-1' });
     // @ts-expect-error identity.manage requires a tenant resource.
     accepts('identity.manage', { kind: 'organization', organizationId: 'org-1' });
   });

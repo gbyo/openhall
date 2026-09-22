@@ -20,8 +20,7 @@ export interface LivePassView {
   readonly student: { readonly id: string; readonly displayName: string };
   readonly destination: {
     readonly id: string;
-    readonly displayName: string;
-    readonly serviceType: string;
+    readonly name: string;
   };
   readonly lifecycleState: OperationalLivePassRow['lifecycleState'];
   readonly requestedAt: string;
@@ -39,9 +38,8 @@ function toLivePass(row: OperationalLivePassRow): LivePassView {
     passEtag: etagForPass(row.passId, row.passRevision),
     student: { id: row.studentId, displayName: row.studentDisplayName },
     destination: {
-      id: row.destinationId,
-      displayName: row.destinationDisplayName,
-      serviceType: row.destinationServiceType,
+      id: row.destinationRoomId,
+      name: row.destinationRoomName,
     },
     lifecycleState: row.lifecycleState,
     requestedAt: row.requestedAt.toString(),

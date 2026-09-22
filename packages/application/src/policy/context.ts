@@ -8,10 +8,11 @@ export interface PolicyRuleInput {
   readonly organizationId: string;
   readonly name: string;
   readonly ruleType: string;
-  readonly scopeKind: 'organization' | 'section' | 'destination';
+  readonly scopeKind: 'organization' | 'section' | 'room' | 'room_category';
   readonly scopeOrganizationId: string | null;
   readonly scopeSectionId: string | null;
-  readonly scopeDestinationId: string | null;
+  readonly scopeRoomId: string | null;
+  readonly scopeRoomCategoryId: string | null;
   readonly priority: number;
   readonly configuration: unknown;
   readonly overrideMode: string;
@@ -21,12 +22,16 @@ export interface PolicyRuleInput {
   readonly revision: number;
 }
 
+export type PolicyApproverKind = 'current_section_teacher' | 'room_responsible_staff';
+
 /** Approval evidence visible to the evaluator (any decision state). */
 export interface PolicyApprovalEvidence {
   readonly passId: string;
   readonly policyRuleId: string;
   readonly policyRuleRevision: number;
-  readonly requiredSectionId: string;
+  readonly approverKind: PolicyApproverKind;
+  readonly requiredSectionId: string | null;
+  readonly requiredRoomId: string | null;
   readonly decision: 'pending' | 'approved' | 'denied' | 'cancelled' | 'expired';
 }
 
@@ -47,7 +52,7 @@ export interface PolicyOverrideEvidence {
 export interface ScheduledPreapprovalEvidence {
   readonly scheduledAuthorizationId: string;
   readonly studentId: string;
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
 }
 
 export interface PolicyPassFacts {
@@ -55,11 +60,12 @@ export interface PolicyPassFacts {
   readonly revision: bigint;
   readonly organizationId: string;
   readonly studentId: string;
-  readonly destinationId: string;
+  readonly destinationRoomId: string;
+  readonly destinationRoomCategoryId: string | null;
   readonly requestSource: string;
   readonly originBlockId: string | null;
   readonly originSectionId: string | null;
-  readonly originLocationId: string | null;
+  readonly originRoomId: string | null;
 }
 
 /**

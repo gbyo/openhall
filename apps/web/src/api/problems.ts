@@ -44,8 +44,8 @@ export function productMessage(error: unknown): string {
       : 'WayPass could not connect. Try again.';
   }
   switch (error.code) {
-    case 'destination_capacity_full':
-    case 'destination_unavailable':
+    case 'room_capacity_full':
+    case 'room_unavailable':
       return "That destination isn't available right now.";
     case 'approval_denied':
       return "This request wasn't approved.";

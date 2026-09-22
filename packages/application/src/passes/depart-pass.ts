@@ -4,9 +4,9 @@ import type { Clock } from '@openhall/domain';
 import type { Principal } from '../authentication/principal.js';
 import type { AuditWriter } from '../auditing/audit.js';
 import type { RelationshipAuthorizationService } from '../authorization/index.js';
-import type { DestinationFlowRepository } from '../destination-flow/ports.js';
-import { destinationFlowLockKey } from '../destination-flow/locks.js';
-import { loadMovementForRow } from '../destination-flow/projections.js';
+import type { RoomFlowRepository } from '../room-flow/ports.js';
+import { roomFlowLockKey } from '../room-flow/locks.js';
+import { loadMovementForRow } from '../room-flow/projections.js';
 import type { IdempotencyTransactionStore } from '../idempotency/coordinator.js';
 import { runIdempotentCommand } from '../idempotency/coordinator.js';
 import type {
@@ -37,7 +37,7 @@ export interface DepartPassDependencies {
   readonly authorization: RelationshipAuthorizationService;
   readonly placement: ExpectedPlacementResolver;
   readonly passes: PassRepository;
-  readonly flow: DestinationFlowRepository;
+  readonly flow: RoomFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -66,11 +66,11 @@ function toAggregate(row: PassRow): PassAggregate {
     tenantId: row.tenantId,
     organizationId: row.organizationId,
     studentId: row.studentId,
-    originLocationId: row.originLocationId,
+    originRoomId: row.originRoomId,
     originSectionId: row.originSectionId,
     originScheduleBlockId: row.originScheduleBlockId,
-    destinationId: row.destinationId,
-    returnLocationId: row.returnLocationId,
+    destinationRoomId: row.destinationRoomId,
+    returnRoomId: row.returnRoomId,
     requestSource: row.requestSource as PassAggregate['requestSource'],
     requestedByPersonId: row.requestedByPersonId,
     requestedAt: row.requestedAt,
@@ -138,9 +138,9 @@ async function executeDeparture(
       if (row.lifecycleState !== 'ready') {
         throw new PassApplicationError('invalid_pass_transition', 'Only a ready pass can depart.');
       }
-      await flow.acquireDestinationLock(
+      await flow.acquireRoomLock(
         context,
-        destinationFlowLockKey(principal.tenantId, row.destinationId),
+        roomFlowLockKey(principal.tenantId, row.destinationRoomId),
       );
       const reservation = await flow.loadActiveReservationForPass(context, row.id);
       if (
@@ -151,15 +151,15 @@ async function executeDeparture(
       ) {
         throw new PassApplicationError('ready_offer_expired', 'The ready offer has expired.');
       }
-      const destination = await passes.loadDestination(context, row.destinationId);
+      const destination = await passes.loadRoom(context, row.destinationRoomId);
       if (destination?.tenantId !== principal.tenantId) {
-        throw new PassApplicationError('destination_not_found', 'Destination not found.');
+        throw new PassApplicationError('room_not_found', 'Room not found.');
       }
-      if (destination.status !== 'active') {
+      if (destination.status !== 'open') {
         // No physical state is mutated as part of this error response; the
         // reconciler terminalizes the stale pre-departure flow afterwards.
         throw new PassApplicationError(
-          'destination_unavailable',
+          'room_unavailable',
           'The destination is no longer usable.',
         );
       }
@@ -243,7 +243,7 @@ async function executeDeparture(
           studentId: row.studentId,
           lifecycleState: 'outbound',
           revision: updated.revision.toString(10),
-          destinationId: row.destinationId,
+          destinationRoomId: row.destinationRoomId,
           expectedReturnAt: expectedReturnAt?.toString() ?? null,
         },
       });

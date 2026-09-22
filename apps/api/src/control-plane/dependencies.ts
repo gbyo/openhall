@@ -2,15 +2,14 @@ import { SystemClock } from '@openhall/domain';
 import type {
   AuditDependencies,
   CredentialDigester,
-  DestinationCategoryDependencies,
-  DestinationDependencies,
   EnrollmentDependencies,
   GrantDependencies,
   IdentityDirectory,
-  LocationDependencies,
   PeopleDependencies,
   PolicyDependencies,
   RequestPassDependencies,
+  RoomCategoryDependencies,
+  RoomDependencies,
   ScheduledDependencies,
   ScheduleDependencies,
   SecureRandomSource,
@@ -19,16 +18,15 @@ import {
   PostgresAuditRepository,
   PostgresAuditWriter,
   PostgresAuthorizationRepository,
-  PostgresDestinationCategoryRepository,
-  PostgresDestinationRepository,
-  PostgresDestinationFlowRepository,
   PostgresEnrollmentRepository,
   PostgresGrantAdminRepository,
   PostgresIdempotencyRepository,
-  PostgresLocationRepository,
   PostgresOutboxWriter,
   PostgresPeopleRepository,
   PostgresPolicyAdminRepository,
+  PostgresRoomCategoryRepository,
+  PostgresRoomFlowRepository,
+  PostgresRoomRepository,
   PostgresScheduleAdminRepository,
   PostgresScheduledAuthRepository,
   PostgresTenantTransactionRunner,
@@ -38,9 +36,8 @@ import type { Kysely } from 'kysely';
 import type { DB as Database } from '@openhall/db';
 
 export interface ControlPlaneDependencies {
-  readonly locations: LocationDependencies;
-  readonly destinations: DestinationDependencies;
-  readonly destinationCategories: DestinationCategoryDependencies;
+  readonly rooms: RoomDependencies;
+  readonly roomCategories: RoomCategoryDependencies;
   readonly schedules: ScheduleDependencies;
   readonly policies: PolicyDependencies;
   readonly grants: GrantDependencies;
@@ -66,44 +63,33 @@ export function createControlPlaneDependencies(
 ): ControlPlaneDependencies {
   const clock = new SystemClock();
   const runner = new PostgresTenantTransactionRunner(database);
-  const destinationCategoriesRepo = new PostgresDestinationCategoryRepository();
+  const roomCategoriesRepo = new PostgresRoomCategoryRepository();
   const facts = new PostgresAuthorizationRepository();
   const authorization = new RelationshipAuthorizationService(facts, runner);
-  const locationsRepo = new PostgresLocationRepository();
-  const destinationsRepo = new PostgresDestinationRepository();
+  const roomsRepo = new PostgresRoomRepository();
   const schedulesRepo = new PostgresScheduleAdminRepository();
   const peopleRepo = new PostgresPeopleRepository();
-  const flow = new PostgresDestinationFlowRepository(database);
+  const flow = new PostgresRoomFlowRepository(database);
   const idempotency = new PostgresIdempotencyRepository();
   const audit = new PostgresAuditWriter();
   const outbox = new PostgresOutboxWriter();
   return {
-    locations: {
+    rooms: {
       clock,
       runner,
       authorization,
-      locations: locationsRepo,
-      idempotency,
-      audit,
-      outbox,
-    },
-    destinations: {
-      clock,
-      runner,
-      authorization,
-      destinations: destinationsRepo,
-      categories: destinationCategoriesRepo,
-      locations: locationsRepo,
+      rooms: roomsRepo,
+      categories: roomCategoriesRepo,
       flow,
       idempotency,
       audit,
       outbox,
     },
-    destinationCategories: {
+    roomCategories: {
       clock,
       runner,
       authorization,
-      categories: destinationCategoriesRepo,
+      categories: roomCategoriesRepo,
       idempotency,
       audit,
       outbox,
@@ -113,7 +99,7 @@ export function createControlPlaneDependencies(
       runner,
       authorization,
       schedules: schedulesRepo,
-      locations: locationsRepo,
+      rooms: roomsRepo,
       idempotency,
       audit,
       outbox,
@@ -123,7 +109,8 @@ export function createControlPlaneDependencies(
       runner,
       authorization,
       policies: new PostgresPolicyAdminRepository(),
-      destinations: destinationsRepo,
+      rooms: roomsRepo,
+      categories: roomCategoriesRepo,
       idempotency,
       audit,
       outbox,
@@ -133,7 +120,7 @@ export function createControlPlaneDependencies(
       runner,
       authorization,
       grants: new PostgresGrantAdminRepository(),
-      destinations: destinationsRepo,
+      rooms: roomsRepo,
       idempotency,
       audit,
       outbox,

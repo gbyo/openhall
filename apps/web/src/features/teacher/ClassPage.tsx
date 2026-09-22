@@ -65,7 +65,7 @@ function initials(name: string): string {
   return (first + last).toUpperCase();
 }
 
-interface DestinationOption {
+interface RoomOption {
   value: string;
   label: string;
 }
@@ -77,7 +77,7 @@ export function ClassPage() {
   const section = context.teachingSections.find((entry) => entry.id === sectionId);
   const [search, setSearch] = useState('');
   const [createFor, setCreateFor] = useState<{ id: string; displayName: string } | null>(null);
-  const [destinationId, setDestinationId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
   const roster = useQuery({
     queryKey: queryKeys.sectionStudents(sectionId),
     queryFn: () =>
@@ -93,25 +93,19 @@ export function ClassPage() {
       ),
     staleTime: 5_000,
   });
-  const destinations = useQuery({
-    queryKey: queryKeys.destinations(organizationId),
+  // Staff pick from the flat safe catalog of open rooms. Staff are NOT
+  // limited by studentSelfRequestable — that flag is student-only.
+  const rooms = useQuery({
+    queryKey: queryKeys.rooms(organizationId),
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/me/organizations/{organizationId}/destinations', {
+        api.GET('/api/v1/me/organizations/{organizationId}/rooms', {
           params: { path: { organizationId } },
         }),
       ),
   });
   const create = useMutation({
-    mutationFn: ({
-      studentId,
-      destination,
-      key,
-    }: {
-      studentId: string;
-      destination: string;
-      key: string;
-    }) => {
+    mutationFn: ({ studentId, room, key }: { studentId: string; room: string; key: string }) => {
       return confirmed(
         api.POST('/api/v1/students/{studentId}/passes', {
           params: {
@@ -119,13 +113,13 @@ export function ClassPage() {
             header: { 'idempotency-key': key },
           },
           headers: { 'X-CSRF-Token': getCsrfToken(), 'Idempotency-Key': key },
-          body: { destinationId: destination },
+          body: { destinationRoomId: room },
         }),
       );
     },
     onSuccess: () => {
       setCreateFor(null);
-      setDestinationId(null);
+      setRoomId(null);
       void queryClient.invalidateQueries({ queryKey: queryKeys.sectionLive(sectionId) });
     },
   });
@@ -158,23 +152,22 @@ export function ClassPage() {
     if (query.length === 0) return all;
     return all.filter((student) => student.displayName.toLowerCase().includes(query));
   }, [roster.data, search]);
-  const destinationOptions = useMemo<DestinationOption[]>(
+  const roomOptions = useMemo<RoomOption[]>(
     () =>
-      destinations.data?.destinations.map((destination) => ({
-        value: destination.id,
-        label: destination.displayName,
+      rooms.data?.rooms.map((room) => ({
+        value: room.id,
+        label: [room.name, room.code].filter((part) => part).join(' · '),
       })) ?? [],
-    [destinations.data],
+    [rooms.data],
   );
-  const selectedDestination =
-    destinationOptions.find((option) => option.value === destinationId) ?? null;
+  const selectedRoom = roomOptions.find((option) => option.value === roomId) ?? null;
   const outNow = live.data?.passes ?? [];
   const departActive = depart.isPending ? depart.variables : null;
 
   function closeCreate() {
     if (create.isPending) return;
     setCreateFor(null);
-    setDestinationId(null);
+    setRoomId(null);
     create.reset();
   }
 
@@ -257,7 +250,7 @@ export function ClassPage() {
                       <ItemTitle>{student.displayName}</ItemTitle>
                       {pass ? (
                         <ItemDescription>
-                          {passStateLabel(pass.lifecycleState)} · {pass.destination.displayName}
+                          {passStateLabel(pass.lifecycleState)} · {pass.destination.name}
                         </ItemDescription>
                       ) : null}
                     </ItemContent>
@@ -289,7 +282,7 @@ export function ClassPage() {
                           variant="outline"
                           onClick={() => {
                             create.reset();
-                            setDestinationId(null);
+                            setRoomId(null);
                             setCreateFor({ id: student.id, displayName: student.displayName });
                           }}
                         >
@@ -321,7 +314,7 @@ export function ClassPage() {
                   </Avatar>
                   <ItemContent>
                     <ItemTitle>{pass.student.displayName}</ItemTitle>
-                    <ItemDescription>{pass.destination.displayName}</ItemDescription>
+                    <ItemDescription>{pass.destination.name}</ItemDescription>
                   </ItemContent>
                   <ItemActions>
                     <Badge variant="secondary">{pass.lifecycleState.replace('_', ' ')}</Badge>
@@ -344,41 +337,41 @@ export function ClassPage() {
               {createFor ? `Create pass for ${createFor.displayName}` : 'Create pass'}
             </DialogTitle>
             <DialogDescription>
-              {section?.title} · the student is already selected, choose a destination.
+              {section?.title} · the student is already selected, choose a room.
             </DialogDescription>
           </DialogHeader>
-          {destinations.isPending ? (
-            <div role="status" aria-label="Loading destinations" className="flex flex-col gap-2">
+          {rooms.isPending ? (
+            <div role="status" aria-label="Loading rooms" className="flex flex-col gap-2">
               <Skeleton className="h-9 w-full" />
-              <span className="sr-only">Loading destinations…</span>
+              <span className="sr-only">Loading rooms…</span>
             </div>
           ) : (
             <Field>
-              <FieldLabel htmlFor="create-pass-destination">Destination</FieldLabel>
+              <FieldLabel htmlFor="create-pass-room">Room</FieldLabel>
               <Combobox
-                items={destinationOptions}
-                value={selectedDestination}
-                onValueChange={(option: DestinationOption | null) => {
-                  setDestinationId(option?.value ?? null);
+                items={roomOptions}
+                value={selectedRoom}
+                onValueChange={(option: RoomOption | null) => {
+                  setRoomId(option?.value ?? null);
                 }}
-                filter={(item: DestinationOption, query: string) =>
+                filter={(item: RoomOption, query: string) =>
                   item.label.toLowerCase().includes(query.toLowerCase())
                 }
               >
-                <ComboboxInput id="create-pass-destination" placeholder="Search destinations" />
+                <ComboboxInput id="create-pass-room" placeholder="Search open rooms" />
                 <ComboboxContent>
                   <ComboboxList>
-                    {(item: DestinationOption) => (
+                    {(item: RoomOption) => (
                       <ComboboxItem key={item.value} value={item}>
                         {item.label}
                       </ComboboxItem>
                     )}
                   </ComboboxList>
-                  <ComboboxEmpty>No matching destination.</ComboboxEmpty>
+                  <ComboboxEmpty>No matching room.</ComboboxEmpty>
                 </ComboboxContent>
               </Combobox>
-              {destinations.isError ? (
-                <FieldError>Destinations could not be loaded. Try again.</FieldError>
+              {rooms.isError ? (
+                <FieldError>Rooms could not be loaded. Try again.</FieldError>
               ) : null}
             </Field>
           )}
@@ -404,13 +397,13 @@ export function ClassPage() {
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
             <Button
-              disabled={create.isPending || destinationId === null || createFor === null}
+              disabled={create.isPending || roomId === null || createFor === null}
               aria-busy={create.isPending}
               onClick={() => {
-                if (createFor && destinationId) {
+                if (createFor && roomId) {
                   create.mutate({
                     studentId: createFor.id,
-                    destination: destinationId,
+                    room: roomId,
                     key: crypto.randomUUID(),
                   });
                 }

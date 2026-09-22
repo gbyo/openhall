@@ -129,13 +129,13 @@ export function registerScheduledRoutes(
             organizationId: request.params.organizationId,
             body: {
               studentId: request.body.studentId,
-              destinationId: request.body.destinationId,
+              destinationRoomId: request.body.destinationRoomId,
               validFrom: request.body.validFrom,
               validUntil: request.body.validUntil,
               approvalMode: request.body.approvalMode,
               originStrategy: request.body.origin.strategy,
-              originLocationId:
-                request.body.origin.strategy === 'specific' ? request.body.origin.locationId : null,
+              originRoomId:
+                request.body.origin.strategy === 'specific' ? request.body.origin.roomId : null,
             },
           },
           controlPlane.scheduled,

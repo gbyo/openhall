@@ -14,7 +14,7 @@ import type {
   TenantTransactionRunner,
 } from '../persistence.js';
 import type { ExpectedPlacementResolver } from '../scheduling/index.js';
-import type { DestinationFlowRepository } from '../destination-flow/ports.js';
+import type { RoomFlowRepository } from '../room-flow/ports.js';
 import {
   buildPolicyProjection,
   evaluateAndPersistPolicy,
@@ -33,7 +33,7 @@ import {
   requireIdempotencyKey,
 } from './idempotency.js';
 import type { PassRepository } from './ports.js';
-import { loadMovementForRow } from '../destination-flow/projections.js';
+import { loadMovementForRow } from '../room-flow/projections.js';
 import type { PendingOverrideView } from '../policy/index.js';
 import {
   etagForPass,
@@ -50,7 +50,7 @@ export interface OverrideCommandDependencies {
   readonly facts: AuthorizationFactsRepository;
   readonly placement: ExpectedPlacementResolver;
   readonly passes: PassRepository;
-  readonly flow: DestinationFlowRepository;
+  readonly flow: RoomFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -224,16 +224,18 @@ export async function requestPassOverride(
         }
       }
 
+      const room = await passes.loadRoom(context, row.destinationRoomId);
       const passFacts = {
         id: row.id,
         revision: row.revision,
         organizationId: row.organizationId,
         studentId: row.studentId,
-        destinationId: row.destinationId,
+        destinationRoomId: row.destinationRoomId,
+        destinationRoomCategoryId: room?.categoryId ?? null,
         requestSource: row.requestSource,
         originBlockId: row.originScheduleBlockId,
         originSectionId: row.originSectionId,
-        originLocationId: row.originLocationId,
+        originRoomId: row.originRoomId,
       };
       const rules = await policy.listEnabledRules(context, row.organizationId);
       const approvals = await policy.listApprovalsForPass(context, row.id);
@@ -383,7 +385,7 @@ export async function requestPassOverride(
         passId: row.id,
         schoolId: row.organizationId,
         studentId: row.studentId,
-        destinationId: row.destinationId,
+        destinationRoomId: row.destinationRoomId,
         placement,
         at: now,
         stage: 'override' as const,
@@ -748,7 +750,7 @@ export async function resolvePassOverride(
           passId: row.id,
           schoolId: row.organizationId,
           studentId: row.studentId,
-          destinationId: row.destinationId,
+          destinationRoomId: row.destinationRoomId,
           placement,
           at: now,
           stage: 'override',
@@ -794,8 +796,7 @@ export interface PendingOverrideItem {
   readonly student: { readonly id: string; readonly displayName: string };
   readonly destination: {
     readonly id: string;
-    readonly displayName: string;
-    readonly serviceType: string;
+    readonly name: string;
   };
   readonly category: OverrideCategory;
   readonly overrideMode: PolicyOverrideMode;
@@ -835,9 +836,8 @@ export async function listPendingOverrides(
         passEtag: etagForPass(view.passId, view.passRevision),
         student: { id: view.studentId, displayName: view.studentDisplayName },
         destination: {
-          id: view.destinationId,
-          displayName: view.destinationDisplayName,
-          serviceType: view.destinationServiceType,
+          id: view.destinationRoomId,
+          name: view.destinationRoomName,
         },
         category: view.category,
         overrideMode: view.overrideMode,

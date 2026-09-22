@@ -70,7 +70,7 @@ afterAll(async () => {
   }
 });
 
-/** Minimal school graph: tenant, school, student, destination, requested pass. */
+/** Minimal school graph: tenant, school, student, room, requested pass. */
 async function seedSchool(scratch: Pool, tag: string) {
   const tenantId = idOf(
     await scratch.query(`INSERT INTO tenant (name, slug) VALUES ($1, $2) RETURNING id`, [
@@ -96,45 +96,54 @@ async function seedSchool(scratch: Pool, tag: string) {
       [tenantId],
     ),
   );
-  const location = idOf(
+  // room/room_category exist only from migration 011 on; pinned-version
+  // fixtures use the legacy location/destination model.
+  const hasRooms =
+    (
+      await scratch.query<{ reg: string | null }>(
+        `SELECT to_regclass('room') AS reg`,
+      )
+    ).rows[0]?.reg !== null;
+  if (!hasRooms) {
+    const location = idOf(
+      await scratch.query(
+        `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'C') RETURNING id`,
+        [tenantId, school],
+      ),
+    );
+    const destination = idOf(
+      await scratch.query(
+        `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'N') RETURNING id`,
+        [tenantId, school, location],
+      ),
+    );
+    const legacyPass = idOf(
+      await scratch.query(
+        `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested') RETURNING id`,
+        [tenantId, school, student, destination],
+      ),
+    );
+    return { tenantId, school, otherSchool, student, destination, room: destination, pass: legacyPass };
+  }
+  const category = idOf(
     await scratch.query(
-      `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'C') RETURNING id`,
+      `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse') RETURNING id`,
       [tenantId, school],
     ),
   );
-  // destination_category exists only from migration 010 on; pinned-version
-  // fixtures must not reference it while latest-level fixtures must.
-  const hasCategories =
-    (
-      await scratch.query<{ reg: string | null }>(
-        `SELECT to_regclass('destination_category') AS reg`,
-      )
-    ).rows[0]?.reg !== null;
-  const category = hasCategories
-    ? idOf(
-        await scratch.query(
-          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse') RETURNING id`,
-          [tenantId, school],
-        ),
-      )
-    : null;
-  const destination = idOf(
+  const room = idOf(
     await scratch.query(
-      hasCategories
-        ? `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'N') RETURNING id`
-        : `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'N') RETURNING id`,
-      hasCategories && category !== null
-        ? [tenantId, school, location, category]
-        : [tenantId, school, location],
+      `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Nurse') RETURNING id`,
+      [tenantId, school, category],
     ),
   );
   const pass = idOf(
     await scratch.query(
-      `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested') RETURNING id`,
-      [tenantId, school, student, destination],
+      `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested') RETURNING id`,
+      [tenantId, school, student, room],
     ),
   );
-  return { tenantId, school, otherSchool, student, destination, pass };
+  return { tenantId, school, otherSchool, student, destination: room, room, pass };
 }
 
 async function seedEvaluation(scratch: Pool, school: { tenantId: string; pass: string }) {
@@ -146,12 +155,12 @@ async function seedEvaluation(scratch: Pool, school: { tenantId: string; pass: s
   );
 }
 
-describe('migration 007 destination flow and movement', () => {
+describe('migration 007 room flow and movement', () => {
   it('migrates a blank database 001 -> 010 with flow hardening', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
-      await migrateToLatest(handle.database);
+      await migrateTo(handle, '010_destination_categories');
       expect(await migrationNames(scratch)).toEqual([
         '001_foundation',
         '002_scheduling_expected_placement',
@@ -196,7 +205,7 @@ describe('migration 007 destination flow and movement', () => {
         }>(
           `SELECT ready_claim_timeout_seconds, queue_timeout_seconds, capacity, queue_enabled, check_in_mode
            FROM destination WHERE id = $1`,
-          [school.destination],
+          [school.room],
         )
       ).rows[0];
       expect(destination?.ready_claim_timeout_seconds).toBe(60);
@@ -221,7 +230,7 @@ describe('migration 007 destination flow and movement', () => {
         const school = await seedSchool(scratch, nonce());
         await scratch.query(
           `INSERT INTO ${table} (tenant_id, destination_id, pass_id) VALUES ($1, $2, $3)`,
-          [school.tenantId, school.destination, school.pass],
+          [school.tenantId, school.room, school.pass],
         );
         await expect(migrateTo(handle, '007_destination_flow_and_movement')).rejects.toThrow(
           /predate operational/,
@@ -233,35 +242,35 @@ describe('migration 007 destination flow and movement', () => {
     }
   });
 
-  it('bounds destination flow timeouts at the database boundary', async () => {
+  it('bounds room flow timeouts at the database boundary', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
       await migrateToLatest(handle.database);
       const school = await seedSchool(scratch, nonce());
       await expect(
-        scratch.query(`UPDATE destination SET ready_claim_timeout_seconds = 4 WHERE id = $1`, [
-          school.destination,
+        scratch.query(`UPDATE room SET ready_claim_timeout_seconds = 4 WHERE id = $1`, [
+          school.room,
         ]),
       ).rejects.toMatchObject({ code: '23514' });
       await expect(
-        scratch.query(`UPDATE destination SET ready_claim_timeout_seconds = 601 WHERE id = $1`, [
-          school.destination,
+        scratch.query(`UPDATE room SET ready_claim_timeout_seconds = 601 WHERE id = $1`, [
+          school.room,
         ]),
       ).rejects.toMatchObject({ code: '23514' });
       await expect(
-        scratch.query(`UPDATE destination SET queue_timeout_seconds = 59 WHERE id = $1`, [
-          school.destination,
+        scratch.query(`UPDATE room SET queue_timeout_seconds = 59 WHERE id = $1`, [
+          school.room,
         ]),
       ).rejects.toMatchObject({ code: '23514' });
       await expect(
-        scratch.query(`UPDATE destination SET queue_timeout_seconds = 14401 WHERE id = $1`, [
-          school.destination,
+        scratch.query(`UPDATE room SET queue_timeout_seconds = 14401 WHERE id = $1`, [
+          school.room,
         ]),
       ).rejects.toMatchObject({ code: '23514' });
       await scratch.query(
-        `UPDATE destination SET ready_claim_timeout_seconds = 5, queue_timeout_seconds = 14400 WHERE id = $1`,
-        [school.destination],
+        `UPDATE room SET ready_claim_timeout_seconds = 5, queue_timeout_seconds = 14400 WHERE id = $1`,
+        [school.room],
       );
     } finally {
       await handle.destroy();
@@ -277,38 +286,32 @@ describe('migration 007 destination flow and movement', () => {
       const school = await seedSchool(scratch, nonce());
       const evaluationId = await seedEvaluation(scratch, school);
       // A reservation for another school's destination cannot bind this pass.
-      const foreignLocation = idOf(
-        await scratch.query(
-          `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'F') RETURNING id`,
-          [school.tenantId, school.otherSchool],
-        ),
-      );
       const foreignCategory = idOf(
         await scratch.query(
-          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Foreign Nurse') RETURNING id`,
+          `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Foreign Nurse') RETURNING id`,
           [school.tenantId, school.otherSchool],
         ),
       );
-      const foreignDestination = idOf(
+      const foreignRoom = idOf(
         await scratch.query(
-          `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type) VALUES ($1, $2, $3, $4, 'nurse') RETURNING id`,
-          [school.tenantId, school.otherSchool, foreignLocation, foreignCategory],
+          `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Foreign Nurse') RETURNING id`,
+          [school.tenantId, school.otherSchool, foreignCategory],
         ),
       );
       await expect(
         scratch.query(
-          `INSERT INTO destination_reservation
-             (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
+          `INSERT INTO room_reservation
+             (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
            VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '1 minute', statement_timestamp() + interval '10 minutes')`,
-          [school.tenantId, school.school, foreignDestination, school.pass, evaluationId],
+          [school.tenantId, school.school, foreignRoom, school.pass, evaluationId],
         ),
       ).rejects.toMatchObject({ code: '23503' });
       await expect(
         scratch.query(
           `INSERT INTO queue_entry
-             (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, flow_expires_at)
+             (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, flow_expires_at)
            VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '10 minutes')`,
-          [school.tenantId, school.school, foreignDestination, school.pass, evaluationId],
+          [school.tenantId, school.school, foreignRoom, school.pass, evaluationId],
         ),
       ).rejects.toMatchObject({ code: '23503' });
     } finally {
@@ -331,9 +334,9 @@ describe('migration 007 destination flow and movement', () => {
       );
       const otherPass = idOf(
         await scratch.query(
-          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, lifecycle_state)
+          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, request_source, lifecycle_state)
            VALUES ($1, $2, $3, $4, 'student_web', 'requested') RETURNING id`,
-          [school.tenantId, school.school, otherStudent, school.destination],
+          [school.tenantId, school.school, otherStudent, school.room],
         ),
       );
       const foreignEvaluation = idOf(
@@ -345,10 +348,10 @@ describe('migration 007 destination flow and movement', () => {
       );
       await expect(
         scratch.query(
-          `INSERT INTO destination_reservation
-             (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
+          `INSERT INTO room_reservation
+             (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
            VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '1 minute', statement_timestamp() + interval '10 minutes')`,
-          [school.tenantId, school.school, school.destination, school.pass, foreignEvaluation],
+          [school.tenantId, school.school, school.room, school.pass, foreignEvaluation],
         ),
       ).rejects.toMatchObject({ code: '23503' });
     } finally {
@@ -367,46 +370,46 @@ describe('migration 007 destination flow and movement', () => {
       // Unknown release reason.
       await expect(
         scratch.query(
-          `INSERT INTO destination_reservation
-             (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at, released_at, release_reason)
+          `INSERT INTO room_reservation
+             (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at, released_at, release_reason)
            VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '1 minute', statement_timestamp() + interval '10 minutes', statement_timestamp(), 'mystery')`,
-          [school.tenantId, school.school, school.destination, school.pass, evaluationId],
+          [school.tenantId, school.school, school.room, school.pass, evaluationId],
         ),
       ).rejects.toMatchObject({ code: '23514' });
       // Released without a reason and vice versa.
       await expect(
         scratch.query(
           `INSERT INTO queue_entry
-             (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, flow_expires_at, released_at)
+             (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, flow_expires_at, released_at)
            VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '10 minutes', statement_timestamp())`,
-          [school.tenantId, school.school, school.destination, school.pass, evaluationId],
+          [school.tenantId, school.school, school.room, school.pass, evaluationId],
         ),
       ).rejects.toMatchObject({ code: '23514' });
       await expect(
         scratch.query(
           `INSERT INTO queue_entry
-             (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, flow_expires_at, release_reason)
+             (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, flow_expires_at, release_reason)
            VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '10 minutes', 'cancelled')`,
-          [school.tenantId, school.school, school.destination, school.pass, evaluationId],
+          [school.tenantId, school.school, school.room, school.pass, evaluationId],
         ),
       ).rejects.toMatchObject({ code: '23514' });
       // Ready offer must end no later than the overall flow.
       await expect(
         scratch.query(
-          `INSERT INTO destination_reservation
-             (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
+          `INSERT INTO room_reservation
+             (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
            VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '10 minutes', statement_timestamp() + interval '1 minute')`,
-          [school.tenantId, school.school, school.destination, school.pass, evaluationId],
+          [school.tenantId, school.school, school.room, school.pass, evaluationId],
         ),
       ).rejects.toMatchObject({ code: '23514' });
       // A coherent reservation round-trips.
       const reservation = idOf(
         await scratch.query(
-          `INSERT INTO destination_reservation
-             (tenant_id, organization_id, destination_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
+          `INSERT INTO room_reservation
+             (tenant_id, organization_id, room_id, pass_id, policy_evaluation_id, ready_expires_at, flow_expires_at)
            VALUES ($1, $2, $3, $4, $5, statement_timestamp() + interval '1 minute', statement_timestamp() + interval '10 minutes')
            RETURNING id`,
-          [school.tenantId, school.school, school.destination, school.pass, evaluationId],
+          [school.tenantId, school.school, school.room, school.pass, evaluationId],
         ),
       );
       expect(reservation).toBeDefined();

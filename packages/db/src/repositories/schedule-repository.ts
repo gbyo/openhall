@@ -170,10 +170,10 @@ export class PostgresExpectedPlacementRepository implements ExpectedPlacementRep
       sectionId: string;
       sectionCode: string | null;
       sectionTitle: string;
-      locationId: string | null;
-      locationName: string | null;
-      locationCode: string | null;
-      locationKind: string | null;
+      roomId: string | null;
+      roomName: string | null;
+      roomCode: string | null;
+      
     }>`
       SELECT membership.section_id AS "membershipSectionId",
              membership.person_id AS "membershipPersonId",
@@ -182,9 +182,8 @@ export class PostgresExpectedPlacementRepository implements ExpectedPlacementRep
              meeting.cycle_code AS "cycleCode", meeting.effective_from AS "effectiveFrom",
              meeting.effective_until AS "effectiveUntil",
              section_row.id AS "sectionId", section_row.code AS "sectionCode",
-             section_row.title AS "sectionTitle", location_row.id AS "locationId",
-             location_row.name AS "locationName", location_row.code AS "locationCode",
-             location_row.kind AS "locationKind"
+             section_row.title AS "sectionTitle", room_row.id AS "roomId",
+             room_row.name AS "roomName", room_row.code AS "roomCode"
       FROM section_membership membership
       JOIN section section_row
         ON section_row.tenant_id = membership.tenant_id
@@ -193,10 +192,10 @@ export class PostgresExpectedPlacementRepository implements ExpectedPlacementRep
         ON meeting.tenant_id = section_row.tenant_id
        AND meeting.organization_id = section_row.organization_id
        AND meeting.section_id = section_row.id
-      LEFT JOIN location location_row
-        ON location_row.tenant_id = meeting.tenant_id
-       AND location_row.organization_id = meeting.organization_id
-       AND location_row.id = meeting.location_id
+      LEFT JOIN room room_row
+        ON room_row.tenant_id = meeting.tenant_id
+       AND room_row.organization_id = meeting.organization_id
+       AND room_row.id = meeting.room_id
       WHERE membership.tenant_id = ${context.tenantId}
         AND section_row.organization_id = ${context.organizationId}
         AND meeting.organization_id = ${context.organizationId}
@@ -204,7 +203,7 @@ export class PostgresExpectedPlacementRepository implements ExpectedPlacementRep
         AND membership.role = 'student'
         AND membership.status = 'active'
         AND section_row.status = 'active'
-        AND (location_row.id IS NULL OR location_row.status = 'active')
+        AND (room_row.id IS NULL OR room_row.status = 'open')
       ORDER BY meeting.id
     `.execute(this.database);
     return result.rows.map((row) => ({
@@ -222,14 +221,13 @@ export class PostgresExpectedPlacementRepository implements ExpectedPlacementRep
         cycleCode: row.cycleCode,
         effectiveFrom: date(row.effectiveFrom),
         effectiveUntil: date(row.effectiveUntil),
-        location:
-          row.locationId === null || row.locationName === null || row.locationKind === null
+        room:
+          row.roomId === null || row.roomName === null
             ? null
             : {
-                id: row.locationId,
-                name: row.locationName,
-                code: row.locationCode,
-                kind: row.locationKind,
+                id: row.roomId,
+                name: row.roomName,
+                code: row.roomCode,
               },
       },
     }));

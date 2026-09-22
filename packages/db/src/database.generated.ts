@@ -75,13 +75,13 @@ export interface AuthorizationGrant {
   account_id: string;
   created_at: Generated<string>;
   created_by_account_id: string | null;
-  destination_id: string | null;
   id: Generated<string>;
   organization_id: string | null;
   revision: Generated<Int8>;
   revoked_at: string | null;
   revoked_by_account_id: string | null;
   role: string;
+  room_id: string | null;
   scope_kind: string;
   section_id: string | null;
   status: Generated<string>;
@@ -155,57 +155,6 @@ export interface Course {
   title: string;
 }
 
-export interface Destination {
-  capacity: number | null;
-  category_id: string;
-  check_in_mode: Generated<string>;
-  default_duration_seconds: number | null;
-  display_name: string | null;
-  id: Generated<string>;
-  location_id: string;
-  max_duration_seconds: number | null;
-  organization_id: string;
-  queue_enabled: Generated<boolean>;
-  queue_timeout_seconds: Generated<number>;
-  ready_claim_timeout_seconds: Generated<number>;
-  revision: Generated<Int8>;
-  service_type: string;
-  status: Generated<string>;
-  student_self_requestable: Generated<boolean>;
-  tenant_id: string;
-  updated_at: Generated<string>;
-}
-
-export interface DestinationCategory {
-  created_at: Generated<string>;
-  icon_key: Generated<string>;
-  id: Generated<string>;
-  name: string;
-  organization_id: string;
-  revision: Generated<Int8>;
-  sort_order: Generated<number>;
-  status: Generated<string>;
-  student_surface: Generated<string>;
-  tenant_id: string;
-  tone_key: Generated<string>;
-  updated_at: Generated<string>;
-}
-
-export interface DestinationReservation {
-  claimed_at: string | null;
-  destination_id: string;
-  flow_expires_at: string;
-  id: Generated<string>;
-  organization_id: string;
-  pass_id: string;
-  policy_evaluation_id: string;
-  ready_expires_at: string;
-  release_reason: string | null;
-  released_at: string | null;
-  reserved_at: Generated<string>;
-  tenant_id: string;
-}
-
 export interface ExternalReference {
   canonical_entity_id: string;
   entity_kind: string;
@@ -276,11 +225,11 @@ export interface IncidentAffectedPass {
 export interface IncidentPresenceReport {
   id: Generated<string>;
   incident_id: string;
-  location_id: string;
   person_id: string;
   presence_state: string;
   reported_at: Generated<string>;
   reported_by_person_id: string;
+  room_id: string;
   tenant_id: string;
 }
 
@@ -308,21 +257,6 @@ export interface LocalOperatorGrant {
   revoked_at: string | null;
   tenant_id: string | null;
   token_hash: Buffer;
-}
-
-export interface Location {
-  code: string | null;
-  created_at: Generated<string>;
-  floor_label: string | null;
-  id: Generated<string>;
-  kind: string;
-  name: string;
-  organization_id: string;
-  parent_location_id: string | null;
-  revision: Generated<Int8>;
-  status: Generated<string>;
-  tenant_id: string;
-  updated_at: Generated<string>;
 }
 
 export interface OidcLoginTransaction {
@@ -404,18 +338,18 @@ export interface Pass {
   created_at: Generated<string>;
   departure_check_in_mode: string | null;
   departure_destination_revision: Int8 | null;
-  destination_id: string;
+  destination_room_id: string;
   expected_return_at: string | null;
   id: Generated<string>;
   lifecycle_state: string;
   organization_id: string;
-  origin_location_id: string | null;
+  origin_room_id: string | null;
   origin_schedule_block_id: string | null;
   origin_section_id: string | null;
   request_source: string;
   requested_at: Generated<string>;
   requested_by_person_id: string | null;
-  return_location_id: string | null;
+  return_room_id: string | null;
   revision: Generated<Int8>;
   scheduled_authorization_id: string | null;
   student_id: string;
@@ -424,6 +358,7 @@ export interface Pass {
 }
 
 export interface PassApproval {
+  approver_kind: string;
   created_at: Generated<string>;
   decided_at: string | null;
   decided_by_person_id: string | null;
@@ -435,7 +370,8 @@ export interface PassApproval {
   pass_id: string;
   policy_rule_id: string;
   policy_rule_revision: number;
-  required_section_id: string;
+  required_room_id: string | null;
+  required_section_id: string | null;
   tenant_id: string;
 }
 
@@ -518,9 +454,10 @@ export interface PolicyRule {
   priority: Generated<number>;
   revision: Generated<number>;
   rule_type: string;
-  scope_destination_id: string | null;
   scope_kind: string;
   scope_organization_id: string | null;
+  scope_room_category_id: string | null;
+  scope_room_id: string | null;
   scope_section_id: string | null;
   tenant_id: string;
   updated_at: Generated<string>;
@@ -529,7 +466,6 @@ export interface PolicyRule {
 }
 
 export interface QueueEntry {
-  destination_id: string;
   entered_at: Generated<string>;
   flow_expires_at: string;
   id: Generated<string>;
@@ -539,6 +475,61 @@ export interface QueueEntry {
   priority: Generated<number>;
   release_reason: string | null;
   released_at: string | null;
+  room_id: string;
+  tenant_id: string;
+}
+
+export interface Room {
+  capacity: number | null;
+  category_id: string | null;
+  check_in_mode: Generated<string>;
+  code: string | null;
+  created_at: Generated<string>;
+  default_duration_seconds: number | null;
+  floor_label: string | null;
+  id: Generated<string>;
+  max_duration_seconds: number | null;
+  name: string;
+  organization_id: string;
+  origin_selectable: Generated<boolean>;
+  queue_enabled: Generated<boolean>;
+  queue_timeout_seconds: Generated<number>;
+  ready_claim_timeout_seconds: Generated<number>;
+  revision: Generated<Int8>;
+  status: Generated<string>;
+  student_self_requestable: Generated<boolean>;
+  tenant_id: string;
+  updated_at: Generated<string>;
+}
+
+export interface RoomCategory {
+  created_at: Generated<string>;
+  icon_key: Generated<string>;
+  id: Generated<string>;
+  name: string;
+  organization_id: string;
+  picker_mode: Generated<string>;
+  revision: Generated<Int8>;
+  sort_order: Generated<number>;
+  status: Generated<string>;
+  student_surface: Generated<string>;
+  tenant_id: string;
+  tone_key: Generated<string>;
+  updated_at: Generated<string>;
+}
+
+export interface RoomReservation {
+  claimed_at: string | null;
+  flow_expires_at: string;
+  id: Generated<string>;
+  organization_id: string;
+  pass_id: string;
+  policy_evaluation_id: string;
+  ready_expires_at: string;
+  release_reason: string | null;
+  released_at: string | null;
+  reserved_at: Generated<string>;
+  room_id: string;
   tenant_id: string;
 }
 
@@ -559,12 +550,12 @@ export interface ScheduledAuthorization {
   created_at: Generated<string>;
   created_by_account_id: string | null;
   created_by_person_id: string;
-  destination_id: string;
+  destination_room_id: string;
   display_category: string | null;
   id: Generated<string>;
   last_attempt_at: string | null;
   organization_id: string;
-  origin_location_id: string | null;
+  origin_room_id: string | null;
   origin_strategy: string;
   revision: Generated<Int8>;
   status: Generated<string>;
@@ -621,8 +612,8 @@ export interface SectionMeeting {
   effective_from: string | null;
   effective_until: string | null;
   id: Generated<string>;
-  location_id: string | null;
   organization_id: string;
+  room_id: string | null;
   schedule_block_id: string;
   section_id: string;
   tenant_id: string;
@@ -672,9 +663,6 @@ export interface DB {
   bootstrap_setup: BootstrapSetup;
   calendar_day: CalendarDay;
   course: Course;
-  destination: Destination;
-  destination_category: DestinationCategory;
-  destination_reservation: DestinationReservation;
   external_reference: ExternalReference;
   idempotency_record: IdempotencyRecord;
   identity_enrollment_grant: IdentityEnrollmentGrant;
@@ -683,7 +671,6 @@ export interface DB {
   incident_presence_report: IncidentPresenceReport;
   integration: Integration;
   local_operator_grant: LocalOperatorGrant;
-  location: Location;
   oidc_login_transaction: OidcLoginTransaction;
   operational_incident: OperationalIncident;
   organization: Organization;
@@ -698,6 +685,9 @@ export interface DB {
   policy_evaluation_result: PolicyEvaluationResult;
   policy_rule: PolicyRule;
   queue_entry: QueueEntry;
+  room: Room;
+  room_category: RoomCategory;
+  room_reservation: RoomReservation;
   schedule_block: ScheduleBlock;
   schedule_slot: ScheduleSlot;
   schedule_template: ScheduleTemplate;

@@ -15,10 +15,12 @@ import { ROLE_CAPABILITIES, SYSTEM_ADMIN_CAPABILITIES } from './roles.js';
 import type {
   AuthorizationFactsRepository,
   AuthorizationGrantFact,
+  AuthorizationOrganizationRecord,
+  AuthorizationRoomRecord,
   OrganizationMembershipFact,
 } from './ports.js';
 import type {
-  DestinationResource,
+  RoomResource,
   OrganizationResource,
   SectionResource,
   StudentInSectionResource,
@@ -34,12 +36,18 @@ export interface OrganizationAuthorizationSnapshot {
     readonly title: string;
     readonly capabilities: readonly Capability[];
   }[];
-  readonly staffedDestinations: readonly {
+  readonly staffedRooms: readonly {
     readonly id: string;
-    readonly displayName: string;
-    readonly serviceType: string;
+    readonly name: string;
     readonly capabilities: readonly Capability[];
   }[];
+  /**
+   * Distinct room ids where the caller's active teacher memberships meet on
+   * active sections. Feeds realtime request invalidation for
+   * room-responsible approvals; the pending-approvals endpoint remains the
+   * exact eligibility gate.
+   */
+  readonly teachingMeetingRoomIds: readonly string[];
   readonly isActiveStudent: boolean;
 }
 
@@ -129,14 +137,16 @@ function capabilityAllowsResourceKind(capability: Capability, kind: string): boo
     case 'pass.approve.section':
     case 'pass.override.resolve.section':
       return kind === 'student_in_section';
+    case 'pass.approve.room':
+      return kind === 'room';
     case 'pass.override.resolve.school':
       return kind === 'student';
     case 'pass.view.section_live':
       return kind === 'section';
-    case 'destination.station.manage':
-      return kind === 'destination';
-    case 'destination.manage':
-      return kind === 'organization' || kind === 'destination';
+    case 'room.station.manage':
+      return kind === 'room';
+    case 'room.manage':
+      return kind === 'organization' || kind === 'room';
     case 'identity.manage':
     case 'system.manage':
       return kind === 'tenant';
@@ -198,14 +208,14 @@ function hasStaffBackedGrant(
   role: ExplicitRole,
   organizationId: string,
   date: Temporal.PlainDate,
-  destinationId?: string,
+  roomId?: string,
 ): AuthorizationGrantFact | null {
   for (const grant of actor.grants) {
     if (!isExplicitRole(grant.role) || grant.role !== role) continue;
-    if (role === 'destination_staff') {
-      if (grant.scopeKind !== 'destination' || grant.destinationId !== (destinationId ?? null))
+    if (role === 'room_staff') {
+      if (grant.scopeKind !== 'room' || grant.roomId !== (roomId ?? null))
         continue;
-      // Staff membership is checked at the destination's school by the caller;
+      // Staff membership is checked at the room's school by the caller;
       // here we only verify the grant shape.
       return grant;
     }
@@ -302,8 +312,8 @@ export class RelationshipAuthorizationService {
         return this.decideStudent(context, actor, principal, capability, resource, at);
       case 'student_in_section':
         return this.decideStudentInSection(context, actor, principal, capability, resource, at);
-      case 'destination':
-        return this.decideDestination(context, actor, principal, capability, resource, at);
+      case 'room':
+        return this.decideRoom(context, actor, principal, capability, resource, at);
       case 'self':
         return deny('capability_not_applicable');
       default:
@@ -349,7 +359,7 @@ export class RelationshipAuthorizationService {
       'pass.view.school_live',
       'pass.view.school_history',
       'scheduled_authorization.manage',
-      'destination.manage',
+      'room.manage',
       'schedule.view',
       'schedule.manage',
       'people.view',
@@ -427,9 +437,9 @@ export class RelationshipAuthorizationService {
       }
     }
 
-    // Candidate explicit destination assignments; only grants effective at
+    // Candidate explicit room assignments; only grants effective at
     // the request instant combined with active staff membership count.
-    const staffedCandidates = await this.repository.listStaffedDestinations(
+    const staffedCandidates = await this.repository.listStaffedRooms(
       context,
       principal.accountId,
       principal.personId,
@@ -437,24 +447,31 @@ export class RelationshipAuthorizationService {
     );
     const staffedWithCaps = staffedCandidates
       .filter(
-        (destination) =>
+        (staffed) =>
           actor.grants.some(
             (grant) =>
-              grant.role === 'destination_staff' &&
-              grant.scopeKind === 'destination' &&
-              grant.destinationId === destination.id,
+              grant.role === 'room_staff' &&
+              grant.scopeKind === 'room' &&
+              grant.roomId === staffed.id,
           ) && isActiveStaffAt(actor, organizationId, date),
       )
-      .map((destination) => ({
-        ...destination,
-        capabilities: ['destination.station.manage'] as Capability[],
+      .map((staffed) => ({
+        ...staffed,
+        capabilities: ['room.station.manage'] as Capability[],
       }));
+
+    const teachingMeetingRoomIds = await this.repository.listTeachingMeetingRooms(
+      context,
+      principal.personId,
+      organizationId,
+    );
 
     return {
       affiliations,
       capabilities: sortCapabilities(orgCapabilities),
       teachingSections: teachingWithCaps,
-      staffedDestinations: staffedWithCaps,
+      staffedRooms: staffedWithCaps,
+      teachingMeetingRoomIds: [...teachingMeetingRoomIds],
       isActiveStudent,
     };
   }
@@ -569,7 +586,7 @@ export class RelationshipAuthorizationService {
           role,
           scopeKind: 'organization',
           organizationId: organization.id,
-          destinationId: null,
+          roomId: null,
         };
         return { allowed: true, basis };
       }
@@ -638,7 +655,7 @@ export class RelationshipAuthorizationService {
           role: 'school_admin',
           scopeKind: 'organization',
           organizationId: organization.id,
-          destinationId: null,
+          roomId: null,
         },
       };
     }
@@ -739,7 +756,7 @@ export class RelationshipAuthorizationService {
             role,
             scopeKind: 'organization',
             organizationId: organization.id,
-            destinationId: null,
+            roomId: null,
           },
         };
       }
@@ -828,7 +845,7 @@ export class RelationshipAuthorizationService {
           role: 'school_admin',
           scopeKind: 'organization',
           organizationId: organization.id,
-          destinationId: null,
+          roomId: null,
         },
       };
     }
@@ -852,7 +869,7 @@ export class RelationshipAuthorizationService {
               role,
               scopeKind: 'organization',
               organizationId: organization.id,
-              destinationId: null,
+              roomId: null,
             },
           };
         }
@@ -888,34 +905,31 @@ export class RelationshipAuthorizationService {
     return { allowed: true, basis: { kind: 'teacher_section_relationship' } };
   }
 
-  private async decideDestination(
+  private async decideRoom(
     context: TenantTransactionContext,
     actor: LoadedActor,
     principal: Principal,
     capability: Capability,
-    resource: DestinationResource,
+    resource: RoomResource,
     at: Temporal.Instant,
   ): Promise<AuthorizationDecision> {
-    const destination = await this.repository.loadDestination(context, resource.destinationId);
-    if (destination === null) return deny('resource_not_found');
-    if (destination.tenantId !== principal.tenantId) return deny('tenant_mismatch');
-    const organization = await this.repository.loadOrganization(
-      context,
-      destination.organizationId,
-    );
+    const room = await this.repository.loadRoom(context, resource.roomId);
+    if (room === null) return deny('resource_not_found');
+    if (room.tenantId !== principal.tenantId) return deny('tenant_mismatch');
+    const organization = await this.repository.loadOrganization(context, room.organizationId);
     if (organization === null) return deny('resource_not_found');
     if (organization.tenantId !== principal.tenantId) return deny('tenant_mismatch');
     if (organization.kind !== 'school') return deny('organization_not_school');
     if (organization.status !== 'active') return deny('resource_inactive');
-    if (destination.status === 'archived') return deny('resource_inactive');
+    if (room.status === 'archived') return deny('resource_inactive');
     if (organization.timeZone === null || !isUsableTimeZone(organization.timeZone)) {
       return deny('invalid_school_time_zone');
     }
     const date = schoolDateFor(at, organization.timeZone);
     if (date === null) return deny('invalid_school_time_zone');
 
-    if (capability === 'destination.manage') {
-      // destination.manage on a destination resource: school/system admin only.
+    if (capability === 'room.manage') {
+      // room.manage on a room resource: school/system admin only.
       if (actor.systemAdminGrantId !== null) {
         return {
           allowed: true,
@@ -932,14 +946,19 @@ export class RelationshipAuthorizationService {
             role: 'school_admin',
             scopeKind: 'organization',
             organizationId: organization.id,
-            destinationId: null,
+            roomId: null,
           },
         };
       }
       return deny('no_applicable_grant');
     }
 
-    // destination.station.manage: exact destination assignment + staff membership.
+    // room.station.manage and pass.approve.room share the explicit-grant
+    // foundation: system/school administrators plus exactly assigned room
+    // staff with active staff membership. Approvals never consult category
+    // names. Only pass.approve.room additionally recognizes schedule-derived
+    // classroom teachers meeting at the room (path B below); station
+    // management stays explicit-only.
     if (actor.systemAdminGrantId !== null) {
       return {
         allowed: true,
@@ -956,29 +975,70 @@ export class RelationshipAuthorizationService {
           role: 'school_admin',
           scopeKind: 'organization',
           organizationId: organization.id,
-          destinationId: null,
+          roomId: null,
         },
       };
     }
     const staffGrant = actor.grants.find(
       (grant) =>
-        grant.role === 'destination_staff' &&
-        grant.scopeKind === 'destination' &&
-        grant.destinationId === destination.id,
+        grant.role === 'room_staff' &&
+        grant.scopeKind === 'room' &&
+        grant.roomId === room.id,
     );
+    if (staffGrant !== undefined && isActiveStaffAt(actor, organization.id, date)) {
+      return {
+        allowed: true,
+        basis: {
+          kind: 'explicit_grant',
+          grantId: staffGrant.id,
+          role: 'room_staff',
+          scopeKind: 'room',
+          organizationId: null,
+          roomId: room.id,
+        },
+      };
+    }
+    if (capability === 'pass.approve.room') {
+      return this.decideRoomTeacherApproval(context, actor, principal, organization, room, date);
+    }
     if (staffGrant === undefined) return deny('no_applicable_grant');
+    return deny('staff_membership_required');
+  }
+
+  /**
+   * Path B for pass.approve.room: active teacher memberships on active
+   * sections meeting at the room, with membership and meeting windows
+   * covering the school date. Deduplication by person is inherent: one
+   * qualifying row suffices. No category-role hardcoding.
+   */
+  private async decideRoomTeacherApproval(
+    context: TenantTransactionContext,
+    actor: LoadedActor,
+    principal: Principal,
+    organization: AuthorizationOrganizationRecord,
+    room: AuthorizationRoomRecord,
+    date: Temporal.PlainDate,
+  ): Promise<AuthorizationDecision> {
     if (!isActiveStaffAt(actor, organization.id, date)) return deny('staff_membership_required');
-    return {
-      allowed: true,
-      basis: {
-        kind: 'explicit_grant',
-        grantId: staffGrant.id,
-        role: 'destination_staff',
-        scopeKind: 'destination',
-        organizationId: null,
-        destinationId: destination.id,
-      },
-    };
+    const candidates = await this.repository.listRoomTeachers(
+      context,
+      organization.id,
+      room.id,
+    );
+    const responsible = candidates.some(
+      (candidate) =>
+        candidate.personId === principal.personId &&
+        candidate.membershipStatus === 'active' &&
+        (candidate.startsOn === null ||
+          Temporal.PlainDate.compare(candidate.startsOn, date) <= 0) &&
+        (candidate.endsOn === null || Temporal.PlainDate.compare(date, candidate.endsOn) <= 0) &&
+        (candidate.meetingEffectiveFrom === null ||
+          Temporal.PlainDate.compare(candidate.meetingEffectiveFrom, date) <= 0) &&
+        (candidate.meetingEffectiveUntil === null ||
+          Temporal.PlainDate.compare(date, candidate.meetingEffectiveUntil) <= 0),
+    );
+    if (responsible) return { allowed: true, basis: { kind: 'teacher_section_relationship' } };
+    return deny('no_applicable_grant');
   }
 }
 

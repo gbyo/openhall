@@ -9,7 +9,7 @@ import {
   ItemTitle,
 } from '@/components/ui/item';
 import { Spinner } from '@/components/ui/spinner';
-import { iconForCategoryKey } from '../../lib/destination-category-presentation.js';
+import { iconForCategoryKey } from '../../lib/room-category-presentation.js';
 import type { ScheduledAuthorization } from './scheduled-presentation.js';
 import { formatSchoolTime, formatScheduledWhen } from './student-time.js';
 
@@ -39,7 +39,7 @@ export function ScheduledPassItem({
           <HugeiconsIcon icon={icon} strokeWidth={2} aria-hidden="true" />
         </ItemMedia>
         <ItemContent>
-          <ItemTitle>{authorization.destination.displayName}</ItemTitle>
+          <ItemTitle>{authorization.destination.name}</ItemTitle>
           <ItemDescription>
             {formatScheduledWhen(authorization.validFrom, timeZone)}
           </ItemDescription>
@@ -54,7 +54,7 @@ export function ScheduledPassItem({
         <HugeiconsIcon icon={icon} strokeWidth={2} aria-hidden="true" />
       </ItemMedia>
       <ItemContent>
-        <ItemTitle>{authorization.destination.displayName}</ItemTitle>
+        <ItemTitle>{authorization.destination.name}</ItemTitle>
         <ItemDescription>
           {availableUntil ? `Available until ${availableUntil}` : 'Available now'}
         </ItemDescription>

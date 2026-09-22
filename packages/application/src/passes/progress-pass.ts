@@ -4,9 +4,9 @@ import type { Clock } from '@openhall/domain';
 import type { Principal } from '../authentication/principal.js';
 import type { AuditWriter } from '../auditing/audit.js';
 import type { RelationshipAuthorizationService } from '../authorization/index.js';
-import type { DestinationFlowRepository } from '../destination-flow/ports.js';
-import { destinationFlowLockKey } from '../destination-flow/locks.js';
-import { loadMovementForRow } from '../destination-flow/projections.js';
+import type { RoomFlowRepository } from '../room-flow/ports.js';
+import { roomFlowLockKey } from '../room-flow/locks.js';
+import { loadMovementForRow } from '../room-flow/projections.js';
 import type { IdempotencyTransactionStore } from '../idempotency/coordinator.js';
 import { runIdempotentCommand } from '../idempotency/coordinator.js';
 import type {
@@ -39,7 +39,7 @@ export interface ProgressPassDependencies {
   readonly runner: TenantTransactionRunner;
   readonly authorization: RelationshipAuthorizationService;
   readonly passes: PassRepository;
-  readonly flow: DestinationFlowRepository;
+  readonly flow: RoomFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -56,7 +56,7 @@ export interface ProgressPassInput {
 }
 
 export interface StationProgressInput extends ProgressPassInput {
-  readonly destinationId: string;
+  readonly roomId: string;
 }
 
 export interface ProgressPassResult {
@@ -72,11 +72,11 @@ function toAggregate(row: PassRow): PassAggregate {
     tenantId: row.tenantId,
     organizationId: row.organizationId,
     studentId: row.studentId,
-    originLocationId: row.originLocationId,
+    originRoomId: row.originRoomId,
     originSectionId: row.originSectionId,
     originScheduleBlockId: row.originScheduleBlockId,
-    destinationId: row.destinationId,
-    returnLocationId: row.returnLocationId,
+    destinationRoomId: row.destinationRoomId,
+    returnRoomId: row.returnRoomId,
     requestSource: row.requestSource as PassAggregate['requestSource'],
     requestedByPersonId: row.requestedByPersonId,
     requestedAt: row.requestedAt,
@@ -215,7 +215,7 @@ async function appendMovementEvent(
       studentId: input.row.studentId,
       lifecycleState: input.updated.lifecycleState,
       revision: input.updated.revision.toString(10),
-      destinationId: input.row.destinationId,
+      destinationRoomId: input.row.destinationRoomId,
       expectedReturnAt: input.updated.expectedReturnAt?.toString() ?? null,
     },
   });
@@ -254,7 +254,7 @@ async function loadStationPass(
   context: TenantTransactionContext,
   dependencies: Pick<ProgressPassDependencies, 'authorization' | 'passes'>,
   principal: Principal,
-  destinationId: string,
+  roomId: string,
   passId: string,
   expectedRevision: bigint,
   verb: string,
@@ -269,8 +269,8 @@ async function loadStationPass(
   }
   const decision = await authorization.decideWithContext(context, {
     principal,
-    capability: 'destination.station.manage',
-    resource: { kind: 'destination', destinationId },
+    capability: 'room.station.manage',
+    resource: { kind: 'room', roomId },
     at: now,
   });
   if (!decision.allowed) {
@@ -282,15 +282,15 @@ async function loadStationPass(
     }
     throw new PassApplicationError('pass_not_found', 'Pass not found.');
   }
-  const destination = await passes.loadDestination(context, destinationId);
+  const destination = await passes.loadRoom(context, roomId);
   if (destination?.tenantId !== principal.tenantId) {
-    throw new PassApplicationError('destination_not_found', 'Destination not found.');
+    throw new PassApplicationError('room_not_found', 'Destination not found.');
   }
   const row = await passes.loadPassForUpdate(context, passId);
   if (row?.tenantId !== principal.tenantId) {
     throw new PassApplicationError('pass_not_found', 'Pass not found.');
   }
-  if (row.destinationId !== destinationId) {
+  if (row.destinationRoomId !== roomId) {
     // A valid pass for another destination is not operable from this station.
     throw new PassApplicationError('pass_not_found', 'Pass not found.');
   }
@@ -313,9 +313,9 @@ async function checkInModeFor(
   if (row.departureCheckInMode !== null) {
     return row.departureCheckInMode;
   }
-  const destination = await passes.loadDestination(context, row.destinationId);
+  const destination = await passes.loadRoom(context, row.destinationRoomId);
   if (destination?.tenantId !== principal.tenantId) {
-    throw new PassApplicationError('destination_not_found', 'Destination not found.');
+    throw new PassApplicationError('room_not_found', 'Destination not found.');
   }
   return destination.checkInMode;
 }
@@ -465,9 +465,9 @@ export async function returnSelfPass(
             'Only a pass at the destination can begin returning.',
           );
         }
-        await flow.acquireDestinationLock(
+        await flow.acquireRoomLock(
           context,
-          destinationFlowLockKey(input.principal.tenantId, row.destinationId),
+          roomFlowLockKey(input.principal.tenantId, row.destinationRoomId),
         );
         const updated = await passes.updatePassToReturning(
           context,
@@ -475,7 +475,7 @@ export async function returnSelfPass(
           row.revision,
           now,
           // Return to the origin location when it is known; never invent one.
-          row.originLocationId,
+          row.originRoomId,
         );
         if (updated === null) throw staleRevision();
         const reservation = await flow.loadActiveReservationForPass(context, row.id);
@@ -574,9 +574,9 @@ export async function completeSelfPass(
             'This pass cannot be completed.',
           );
         }
-        await flow.acquireDestinationLock(
+        await flow.acquireRoomLock(
           context,
-          destinationFlowLockKey(input.principal.tenantId, row.destinationId),
+          roomFlowLockKey(input.principal.tenantId, row.destinationRoomId),
         );
         const updated = await passes.updatePassToCompleted(context, row.id, row.revision, now);
         if (updated === null) throw staleRevision();
@@ -599,7 +599,7 @@ export async function completeSelfPass(
 }
 
 /**
- * POST /api/v1/destinations/:destinationId/passes/:passId/check-in —
+ * POST /api/v1/destinations/:destinationRoomId/passes/:passId/check-in —
  * station arrival for optional/required destinations.
  */
 export async function stationCheckInPass(
@@ -615,7 +615,7 @@ export async function stationCheckInPass(
       principal: input.principal,
       passId: input.passId,
       command: 'pass.station.check_in:v1',
-      fingerprint: fingerprintStationCheckIn(input.destinationId, input.passId, expected.revision),
+      fingerprint: fingerprintStationCheckIn(input.roomId, input.passId, expected.revision),
       key,
       expectedRevision: expected.revision,
       requestId: input.requestId,
@@ -625,7 +625,7 @@ export async function stationCheckInPass(
           context,
           dependencies,
           input.principal,
-          input.destinationId,
+          input.roomId,
           input.passId,
           expected.revision,
           'record station check-in',
@@ -670,7 +670,7 @@ export async function stationCheckInPass(
 }
 
 /**
- * POST /api/v1/destinations/:destinationId/passes/:passId/begin-return —
+ * POST /api/v1/destinations/:destinationRoomId/passes/:passId/begin-return —
  * station records that the student left the destination. Releases capacity.
  */
 export async function stationBeginReturnPass(
@@ -687,7 +687,7 @@ export async function stationBeginReturnPass(
       passId: input.passId,
       command: 'pass.station.begin_return:v1',
       fingerprint: fingerprintStationBeginReturn(
-        input.destinationId,
+        input.roomId,
         input.passId,
         expected.revision,
       ),
@@ -700,7 +700,7 @@ export async function stationBeginReturnPass(
           context,
           dependencies,
           input.principal,
-          input.destinationId,
+          input.roomId,
           input.passId,
           expected.revision,
           'begin station return',
@@ -721,16 +721,16 @@ export async function stationBeginReturnPass(
             'Only a pass at the destination can begin returning.',
           );
         }
-        await flow.acquireDestinationLock(
+        await flow.acquireRoomLock(
           context,
-          destinationFlowLockKey(input.principal.tenantId, row.destinationId),
+          roomFlowLockKey(input.principal.tenantId, row.destinationRoomId),
         );
         const updated = await passes.updatePassToReturning(
           context,
           row.id,
           row.revision,
           now,
-          row.originLocationId,
+          row.originRoomId,
         );
         if (updated === null) throw staleRevision();
         const reservation = await flow.loadActiveReservationForPass(context, row.id);
@@ -752,7 +752,7 @@ export async function stationBeginReturnPass(
 }
 
 /**
- * POST /api/v1/destinations/:destinationId/passes/:passId/complete —
+ * POST /api/v1/destinations/:destinationRoomId/passes/:passId/complete —
  * destination staff explicitly ends a movement at the destination (one-way
  * workflows: nurse stays, office supervision transfers). Never from
  * outbound: arrival stays an explicit fact.
@@ -770,7 +770,7 @@ export async function stationCompletePass(
       principal: input.principal,
       passId: input.passId,
       command: 'pass.station.complete:v1',
-      fingerprint: fingerprintStationComplete(input.destinationId, input.passId, expected.revision),
+      fingerprint: fingerprintStationComplete(input.roomId, input.passId, expected.revision),
       key,
       expectedRevision: expected.revision,
       requestId: input.requestId,
@@ -780,7 +780,7 @@ export async function stationCompletePass(
           context,
           dependencies,
           input.principal,
-          input.destinationId,
+          input.roomId,
           input.passId,
           expected.revision,
           'complete station movement',
@@ -808,9 +808,9 @@ export async function stationCompletePass(
             'This pass cannot be completed.',
           );
         }
-        await flow.acquireDestinationLock(
+        await flow.acquireRoomLock(
           context,
-          destinationFlowLockKey(input.principal.tenantId, row.destinationId),
+          roomFlowLockKey(input.principal.tenantId, row.destinationRoomId),
         );
         const updated = await passes.updatePassToCompleted(context, row.id, row.revision, now);
         if (updated === null) throw staleRevision();

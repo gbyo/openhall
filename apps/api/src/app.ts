@@ -15,7 +15,7 @@ import type { Kysely } from 'kysely';
 import { createAuthDependencies } from './auth/dependencies.js';
 import { createAuthorizationDependencies } from './authorization/dependencies.js';
 import { registerSessionContext } from './auth/session-context.js';
-import { startDestinationFlowWorker } from './destination-flow/reconciler-runner.js';
+import { startDestinationFlowWorker } from './room-flow/reconciler-runner.js';
 import { carriedStatus, safeRequestPath, scrubForLog } from './http-privacy.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerBootstrapRoutes } from './routes/bootstrap.js';

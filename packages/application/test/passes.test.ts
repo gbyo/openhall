@@ -106,7 +106,7 @@ describe('pass ETag and If-Match', () => {
 
 describe('pass error mapping', () => {
   it('maps stable errors to HTTP statuses', () => {
-    expect(passHttpStatus('destination_not_found')).toBe(404);
+    expect(passHttpStatus('room_not_found')).toBe(404);
     expect(passHttpStatus('student_not_found')).toBe(404);
     expect(passHttpStatus('pass_not_found')).toBe(404);
     expect(passHttpStatus('forbidden')).toBe(403);
@@ -114,7 +114,7 @@ describe('pass error mapping', () => {
     expect(passHttpStatus('active_pass_exists')).toBe(409);
     expect(passHttpStatus('idempotency_key_reused')).toBe(409);
     expect(passHttpStatus('invalid_pass_transition')).toBe(409);
-    expect(passHttpStatus('destination_unavailable')).toBe(409);
+    expect(passHttpStatus('room_unavailable')).toBe(409);
     expect(passHttpStatus('stale_pass_revision')).toBe(412);
     expect(passHttpStatus('precondition_required')).toBe(428);
     expect(passHttpStatus('invalid_idempotency_key')).toBe(400);

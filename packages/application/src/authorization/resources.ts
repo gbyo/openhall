@@ -1,4 +1,4 @@
-import type { DestinationId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
+import type { RoomId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
 import type { Capability } from './capabilities.js';
 
 export interface SelfResource {
@@ -31,9 +31,9 @@ export interface StudentInSectionResource {
   readonly studentId: PersonId;
 }
 
-export interface DestinationResource {
-  readonly kind: 'destination';
-  readonly destinationId: DestinationId;
+export interface RoomResource {
+  readonly kind: 'room';
+  readonly roomId: RoomId;
 }
 
 export type AuthorizationResource =
@@ -43,7 +43,7 @@ export type AuthorizationResource =
   | SectionResource
   | StudentResource
   | StudentInSectionResource
-  | DestinationResource;
+  | RoomResource;
 
 /**
  * Compile-time capability/resource compatibility. Invalid combinations
@@ -62,6 +62,7 @@ export interface ResourceByCapability {
   'pass.progress.self': SelfResource;
   'pass.create.student': StudentResource | StudentInSectionResource;
   'pass.approve.section': StudentInSectionResource;
+  'pass.approve.room': RoomResource;
   'pass.override.request.self': StudentResource;
   'pass.override.request.student': StudentResource | StudentInSectionResource;
   'pass.override.resolve.section': StudentInSectionResource;
@@ -73,8 +74,8 @@ export interface ResourceByCapability {
 
   'scheduled_authorization.manage': OrganizationResource;
 
-  'destination.station.manage': DestinationResource;
-  'destination.manage': OrganizationResource | DestinationResource;
+  'room.station.manage': RoomResource;
+  'room.manage': OrganizationResource | RoomResource;
 
   'schedule.view': OrganizationResource;
   'schedule.manage': OrganizationResource;

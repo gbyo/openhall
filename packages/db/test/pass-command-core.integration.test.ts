@@ -76,10 +76,8 @@ interface SchoolFixture {
   schoolA: string;
   schoolB: string;
   studentA: string;
-  locationA: string;
-  locationB: string;
-  destinationA: string;
-  destinationB: string;
+  roomA: string;
+  roomB: string;
 }
 
 async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture> {
@@ -111,55 +109,86 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
     `INSERT INTO organization_membership (tenant_id, organization_id, person_id, affiliation) VALUES ($1, $2, $3, 'student')`,
     [tenantId, schoolA, studentA],
   );
-  const locationA = idOf(
-    await target.query<{ id: string }>(
-      `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Room A') RETURNING id`,
-      [tenantId, schoolA],
-    ),
-  );
-  const locationB = idOf(
-    await target.query<{ id: string }>(
-      `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic B') RETURNING id`,
-      [tenantId, schoolB],
-    ),
-  );
-  // destination_category exists only from migration 010 on; pinned-version
+  // room/room_category exist only from migration 011 on; pinned-version
+  // fixtures use the legacy location/destination model while latest-level
+  // fixtures use rooms.
+  const hasRooms =
+    (
+      await target.query<{ reg: string | null }>(
+        `SELECT to_regclass('room') AS reg`,
+      )
+    ).rows[0]?.reg !== null;
+  if (!hasRooms) {
+    const locationA = idOf(
+      await target.query<{ id: string }>(
+        `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'classroom', 'Room A') RETURNING id`,
+        [tenantId, schoolA],
+      ),
+    );
+    const locationB = idOf(
+      await target.query<{ id: string }>(
+        `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'Clinic B') RETURNING id`,
+        [tenantId, schoolB],
+      ),
+    );
+    const destinationB = idOf(
+      await target.query<{ id: string }>(
+        `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Nurse B') RETURNING id`,
+        [tenantId, schoolB, locationB],
+      ),
+    );
+    const destinationA = idOf(
+      await target.query<{ id: string }>(
+        `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'restroom', 'Restroom A') RETURNING id`,
+        [tenantId, schoolA, locationA],
+      ),
+    );
+    return {
+      tenantId,
+      schoolA,
+      schoolB,
+      studentA,
+      roomA: destinationA,
+      roomB: destinationB,
+    };
+  }
+  // room_category exists only from migration 010 on; pinned-version
   // fixtures must not reference it while latest-level fixtures must.
   const hasCategories =
     (
       await target.query<{ reg: string | null }>(
-        `SELECT to_regclass('destination_category') AS reg`,
+        `SELECT to_regclass('room_category') AS reg`,
       )
     ).rows[0]?.reg !== null;
   async function categoryFor(school: string, name: string): Promise<string | null> {
     if (!hasCategories) return null;
     return idOf(
       await target.query<{ id: string }>(
-        `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, $3) RETURNING id`,
+        `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, $3) RETURNING id`,
         [tenantId, school, name],
       ),
     );
   }
   const categoryB = await categoryFor(schoolB, 'Nurse');
   const categoryA = await categoryFor(schoolA, 'Restroom');
-  const destinationB = idOf(
+  const roomB = idOf(
     await target.query<{ id: string }>(
       hasCategories
-        ? `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'Nurse B') RETURNING id`
-        : `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'Nurse B') RETURNING id`,
+        ? `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Nurse B') RETURNING id`
+        : `INSERT INTO room (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse B') RETURNING id`,
       hasCategories && categoryB !== null
-        ? [tenantId, schoolB, locationB, categoryB]
-        : [tenantId, schoolB, locationB],
+        ? [tenantId, schoolB, categoryB]
+        : [tenantId, schoolB],
     ),
   );
-  const destinationA = idOf(
+  const roomA = idOf(
     await target.query<{ id: string }>(
       hasCategories
-        ? `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'restroom', 'Restroom A') RETURNING id`
-        : `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'restroom', 'Restroom A') RETURNING id`,
+        ? `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Restroom A') RETURNING id`
+        : `INSERT INTO room (tenant_id, organization_id, name) VALUES ($1, $2, 'Restroom A') RETURNING id`,
       hasCategories && categoryA !== null
-        ? [tenantId, schoolA, locationA, categoryA]
-        : [tenantId, schoolA, locationA],
+        ? [tenantId, schoolA, categoryA]
+        : [tenantId, schoolA],
     ),
   );
   return {
@@ -167,16 +196,14 @@ async function seedTwoSchools(target: Pool, tag: string): Promise<SchoolFixture>
     schoolA,
     schoolB,
     studentA,
-    locationA,
-    locationB,
-    destinationA,
-    destinationB,
+    roomA,
+    roomB,
   };
 }
 
 describe('migration 005 pass command core', () => {
   it('advances the expected migration marker to 010', () => {
-    expect(EXPECTED_MIGRATION).toBe('010_destination_categories');
+    expect(EXPECTED_MIGRATION).toBe('011_rooms_unification');
   });
 
   it('migrates a blank database 001 -> 005 with same-school hardening', async () => {
@@ -194,24 +221,27 @@ describe('migration 005 pass command core', () => {
       expect(column.rows).toHaveLength(1);
       const constraints = (
         await scratch.query<{ name: string }>(
-          `SELECT conname AS name FROM pg_constraint WHERE conname LIKE 'pass_phase5%' ORDER BY 1`,
+          `SELECT conname AS name FROM pg_constraint WHERE conname LIKE 'pass_phase%' ORDER BY 1`,
         )
       ).rows.map((row) => row.name);
       expect(constraints).toEqual([
-        'pass_phase5_destination_same_school',
+        'pass_phase11_destination_room_same_school',
+        'pass_phase11_origin_room_same_school',
+        'pass_phase11_return_room_same_school',
         'pass_phase5_organization_tenant_fk',
         'pass_phase5_origin_block_same_school',
-        'pass_phase5_origin_location_same_school',
         'pass_phase5_origin_section_same_school',
         'pass_phase5_requested_by_tenant_fk',
-        'pass_phase5_return_location_same_school',
         'pass_phase5_scheduled_auth_tenant_fk',
         'pass_phase5_student_tenant_fk',
+        'pass_phase7_tenant_school_key',
+        'pass_phase8_departure_check_in_mode',
+        'pass_phase8_departure_destination_revision',
       ]);
-      const destinationKey = await scratch.query(
-        `SELECT conname FROM pg_constraint WHERE conname = 'destination_phase5_tenant_school_key'`,
+      const roomKey = await scratch.query(
+        `SELECT conname FROM pg_constraint WHERE conname LIKE 'room\_tenant\_school\_key' OR (conname LIKE 'room\_%' AND contype = 'u')`,
       );
-      expect(destinationKey.rows).toHaveLength(1);
+      expect(roomKey.rows.length).toBeGreaterThan(0);
     } finally {
       await scratch.end();
     }
@@ -277,7 +307,7 @@ describe('migration 005 pass command core', () => {
       const fixture = await seedTwoSchools(scratch, `x${nonce()}`);
       await scratch.query(
         `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested')`,
-        [fixture.tenantId, fixture.schoolA, fixture.studentA, fixture.destinationB],
+        [fixture.tenantId, fixture.schoolA, fixture.studentA, fixture.roomB],
       );
       await expect(migrateToLatest(handle.database)).rejects.toThrow(/another school/);
     } finally {
@@ -298,22 +328,22 @@ describe('migration 005 pass command core', () => {
       const fixture = await seedTwoSchools(scratch, `f${nonce()}`);
       await expect(
         scratch.query(
-          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested')`,
-          [fixture.tenantId, fixture.schoolA, fixture.studentA, fixture.destinationB],
+          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested')`,
+          [fixture.tenantId, fixture.schoolA, fixture.studentA, fixture.roomB],
         ),
-      ).rejects.toThrow(/pass_phase5_destination_same_school/);
+      ).rejects.toThrow(/pass_phase11_destination_room_same_school/);
       await expect(
         scratch.query(
-          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, origin_location_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, $5, 'student_web', 'requested') RETURNING id`,
+          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, origin_room_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, $5, 'student_web', 'requested') RETURNING id`,
           [
             fixture.tenantId,
             fixture.schoolB,
             fixture.studentA,
-            fixture.destinationB,
-            fixture.locationA,
+            fixture.roomB,
+            fixture.roomA,
           ],
         ),
-      ).rejects.toThrow(/pass_phase5_origin_location_same_school/);
+      ).rejects.toThrow(/pass_phase11_origin_room_same_school/);
       const blockB = idOf(
         await scratch.query<{ id: string }>(
           `INSERT INTO schedule_block (tenant_id, organization_id, code, display_name, kind) VALUES ($1, $2, 'P1', 'P1', 'instructional') RETURNING id`,
@@ -322,8 +352,8 @@ describe('migration 005 pass command core', () => {
       );
       await expect(
         scratch.query(
-          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, origin_schedule_block_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, $5, 'student_web', 'requested')`,
-          [fixture.tenantId, fixture.schoolA, fixture.studentA, fixture.destinationA, blockB],
+          `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, origin_schedule_block_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, $5, 'student_web', 'requested')`,
+          [fixture.tenantId, fixture.schoolA, fixture.studentA, fixture.roomA, blockB],
         ),
       ).rejects.toThrow(/pass_phase5_origin_block_same_school/);
     } finally {

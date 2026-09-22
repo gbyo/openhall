@@ -22,7 +22,9 @@ import type { PolicyReasonCode } from './reason-codes.js';
 export interface ApprovalRequirement {
   readonly ruleId: string;
   readonly ruleRevision: number;
-  readonly requiredSectionId: string;
+  readonly approverKind: 'current_section_teacher' | 'room_responsible_staff';
+  readonly requiredSectionId: string | null;
+  readonly requiredRoomId: string | null;
 }
 
 export interface OverrideRequirement {
@@ -52,8 +54,13 @@ function scopeMatches(rule: PolicyRuleInput, context: PolicyEvaluationContext): 
   switch (rule.scopeKind) {
     case 'organization':
       return rule.scopeOrganizationId === context.pass.organizationId;
-    case 'destination':
-      return rule.scopeDestinationId === context.pass.destinationId;
+    case 'room':
+      return rule.scopeRoomId === context.pass.destinationRoomId;
+    case 'room_category':
+      return (
+        context.pass.destinationRoomCategoryId !== null &&
+        rule.scopeRoomCategoryId === context.pass.destinationRoomCategoryId
+      );
     case 'section': {
       const placement = context.currentPlacement;
       if (placement.kind !== 'resolved') return false;
@@ -80,6 +87,7 @@ function notApplicable(rule: PolicyRuleInput): PolicyRuleEvaluation {
     contribution: 'none',
     reasonCode: 'no_violation',
     requiredSectionId: null,
+    requiredRoomId: null,
   };
 }
 
@@ -94,6 +102,7 @@ function configurationError(rule: PolicyRuleInput): PolicyRuleEvaluation {
     contribution: 'deny',
     reasonCode: 'policy_configuration_error',
     requiredSectionId: null,
+    requiredRoomId: null,
   };
 }
 
@@ -138,14 +147,15 @@ function deniedOverrideFor(
 function applyOverrideEvidence(
   rule: PolicyRuleInput,
   context: PolicyEvaluationContext,
-  requiredSectionId: string | null,
+  requirement: { readonly requiredSectionId: string | null; readonly requiredRoomId: string | null },
 ): PolicyRuleEvaluation | null {
   const base = {
     ruleId: rule.id,
     ruleRevision: rule.revision,
     ruleType: rule.ruleType,
     overrideMode: rule.overrideMode,
-    requiredSectionId,
+    requiredSectionId: requirement.requiredSectionId,
+    requiredRoomId: requirement.requiredRoomId,
   };
   if (approvedOverrideFor(context.overrides, rule.id, rule.revision)) {
     return { ...base, outcome: 'pass', contribution: 'none', reasonCode: 'rule_overridden' };
@@ -172,6 +182,7 @@ function evaluateScheduleBoundary(
     ruleType: rule.ruleType,
     overrideMode: rule.overrideMode,
     requiredSectionId: null,
+    requiredRoomId: null,
   };
   if (!config.requestSources.includes(context.pass.requestSource)) return notApplicable(rule);
   const placement = context.currentPlacement;
@@ -193,7 +204,10 @@ function evaluateScheduleBoundary(
     return { ...base, outcome: 'pass', contribution: 'none', reasonCode: 'no_violation' };
   }
   if (isOverrideableMode(rule.overrideMode)) {
-    const overridden = applyOverrideEvidence(rule, context, null);
+    const overridden = applyOverrideEvidence(rule, context, {
+      requiredSectionId: null,
+      requiredRoomId: null,
+    });
     if (overridden !== null) return overridden;
   }
   return {
@@ -204,18 +218,35 @@ function evaluateScheduleBoundary(
   };
 }
 
+interface ApprovalBinding {
+  readonly approverKind: 'current_section_teacher' | 'room_responsible_staff';
+  readonly requiredSectionId: string | null;
+  readonly requiredRoomId: string | null;
+}
+
+function approvalMatches(
+  entry: PolicyApprovalEvidence,
+  ruleId: string,
+  ruleRevision: number,
+  binding: ApprovalBinding,
+): boolean {
+  return (
+    entry.policyRuleId === ruleId &&
+    entry.policyRuleRevision === ruleRevision &&
+    entry.approverKind === binding.approverKind &&
+    entry.requiredSectionId === binding.requiredSectionId &&
+    entry.requiredRoomId === binding.requiredRoomId
+  );
+}
+
 function approvedApprovalFor(
   approvals: readonly PolicyApprovalEvidence[],
   ruleId: string,
   ruleRevision: number,
-  requiredSectionId: string,
+  binding: ApprovalBinding,
 ): boolean {
   return approvals.some(
-    (entry) =>
-      entry.policyRuleId === ruleId &&
-      entry.policyRuleRevision === ruleRevision &&
-      entry.requiredSectionId === requiredSectionId &&
-      entry.decision === 'approved',
+    (entry) => approvalMatches(entry, ruleId, ruleRevision, binding) && entry.decision === 'approved',
   );
 }
 
@@ -223,14 +254,10 @@ function deniedApprovalFor(
   approvals: readonly PolicyApprovalEvidence[],
   ruleId: string,
   ruleRevision: number,
-  requiredSectionId: string,
+  binding: ApprovalBinding,
 ): boolean {
   return approvals.some(
-    (entry) =>
-      entry.policyRuleId === ruleId &&
-      entry.policyRuleRevision === ruleRevision &&
-      entry.requiredSectionId === requiredSectionId &&
-      entry.decision === 'denied',
+    (entry) => approvalMatches(entry, ruleId, ruleRevision, binding) && entry.decision === 'denied',
   );
 }
 
@@ -240,17 +267,26 @@ function evaluateApprovalRequirement(
   config: { readonly requestSources: readonly string[] },
 ): PolicyRuleEvaluation {
   if (!config.requestSources.includes(context.pass.requestSource)) return notApplicable(rule);
+  // Room and room-category scopes bind the destination room's responsible
+  // staff; every other scope binds the current section teacher. Room
+  // approvals always require an explicit decision: scheduled preapprovals
+  // never satisfy them.
+  const roomScoped = rule.scopeKind === 'room' || rule.scopeKind === 'room_category';
   const placement = context.currentPlacement;
-  if (placement.kind !== 'resolved') {
+  if (!roomScoped && placement.kind !== 'resolved') {
     const base = {
       ruleId: rule.id,
       ruleRevision: rule.revision,
       ruleType: rule.ruleType,
       overrideMode: rule.overrideMode,
       requiredSectionId: null,
+      requiredRoomId: null,
     };
     if (isOverrideableMode(rule.overrideMode)) {
-      const overridden = applyOverrideEvidence(rule, context, null);
+      const overridden = applyOverrideEvidence(rule, context, {
+        requiredSectionId: null,
+        requiredRoomId: null,
+      });
       if (overridden !== null) return overridden;
     }
     return {
@@ -260,23 +296,43 @@ function evaluateApprovalRequirement(
       reasonCode: 'approval_context_unavailable',
     };
   }
-  const requiredSectionId = placement.section.id;
+  const binding: ApprovalBinding =
+    roomScoped || placement.kind !== 'resolved'
+      ? {
+          approverKind: 'room_responsible_staff',
+          requiredSectionId: null,
+          requiredRoomId: context.pass.destinationRoomId,
+        }
+      : {
+          approverKind: 'current_section_teacher',
+          requiredSectionId: placement.section.id,
+          requiredRoomId: null,
+        };
   const base = {
     ruleId: rule.id,
     ruleRevision: rule.revision,
     ruleType: rule.ruleType,
     overrideMode: rule.overrideMode,
-    requiredSectionId,
+    requiredSectionId: binding.requiredSectionId,
+    requiredRoomId: binding.requiredRoomId,
   };
-  if (approvedApprovalFor(context.approvals, rule.id, rule.revision, requiredSectionId)) {
+  if (approvedApprovalFor(context.approvals, rule.id, rule.revision, binding)) {
     return { ...base, outcome: 'pass', contribution: 'none', reasonCode: 'approval_satisfied' };
   }
-  if (deniedApprovalFor(context.approvals, rule.id, rule.revision, requiredSectionId)) {
+  if (deniedApprovalFor(context.approvals, rule.id, rule.revision, binding)) {
     return { ...base, outcome: 'fail', contribution: 'deny', reasonCode: 'approval_denied' };
   }
   if (isOverrideableMode(rule.overrideMode)) {
-    const overridden = applyOverrideEvidence(rule, context, requiredSectionId);
+    const overridden = applyOverrideEvidence(rule, context, binding);
     if (overridden !== null) return overridden;
+  }
+  if (binding.approverKind === 'room_responsible_staff') {
+    return {
+      ...base,
+      outcome: 'fail',
+      contribution: 'approval_required',
+      reasonCode: 'room_responsible_staff_approval_required',
+    };
   }
   // A preapproved scheduled authorization satisfies only the classroom
   // approval this rule would otherwise require for the exact scheduled
@@ -286,7 +342,7 @@ function evaluateApprovalRequirement(
     context.scheduledPreapprovals.some(
       (entry) =>
         entry.studentId === context.pass.studentId &&
-        entry.destinationId === context.pass.destinationId,
+        entry.destinationRoomId === context.pass.destinationRoomId,
     )
   ) {
     return {
@@ -335,11 +391,17 @@ export function evaluatePolicy(context: PolicyEvaluationContext): PolicyEvaluati
   const approvalRequirements: ApprovalRequirement[] = [];
   const overrideRequirements: OverrideRequirement[] = [];
   for (const result of results) {
-    if (result.contribution === 'approval_required' && result.requiredSectionId !== null) {
+    if (
+      result.contribution === 'approval_required' &&
+      (result.requiredSectionId !== null || result.requiredRoomId !== null)
+    ) {
       approvalRequirements.push({
         ruleId: result.ruleId,
         ruleRevision: result.ruleRevision,
+        approverKind:
+          result.requiredRoomId !== null ? 'room_responsible_staff' : 'current_section_teacher',
         requiredSectionId: result.requiredSectionId,
+        requiredRoomId: result.requiredRoomId,
       });
     } else if (
       result.contribution === 'override_required' &&

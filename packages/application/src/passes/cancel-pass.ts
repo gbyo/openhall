@@ -3,9 +3,9 @@ import { transitionPass } from '@openhall/domain';
 import type { Clock } from '@openhall/domain';
 import type { Principal } from '../authentication/principal.js';
 import type { AuditWriter } from '../auditing/audit.js';
-import type { DestinationFlowRepository } from '../destination-flow/ports.js';
-import { destinationFlowLockKey } from '../destination-flow/locks.js';
-import { loadMovementForRow } from '../destination-flow/projections.js';
+import type { RoomFlowRepository } from '../room-flow/ports.js';
+import { roomFlowLockKey } from '../room-flow/locks.js';
+import { loadMovementForRow } from '../room-flow/projections.js';
 import type { IdempotencyTransactionStore } from '../idempotency/coordinator.js';
 import { runIdempotentCommand } from '../idempotency/coordinator.js';
 import { buildPolicyProjection, type PolicyRepository } from '../policy/index.js';
@@ -28,7 +28,7 @@ export interface CancelPassDependencies {
   readonly clock: Clock;
   readonly runner: TenantTransactionRunner;
   readonly passes: PassRepository;
-  readonly flow: DestinationFlowRepository;
+  readonly flow: RoomFlowRepository;
   readonly policy: PolicyRepository;
   readonly idempotency: IdempotencyTransactionStore;
   readonly audit: AuditWriter;
@@ -110,11 +110,11 @@ export async function cancelSelfPass(
             tenantId: row.tenantId,
             organizationId: row.organizationId,
             studentId: row.studentId,
-            originLocationId: row.originLocationId,
+            originRoomId: row.originRoomId,
             originSectionId: row.originSectionId,
             originScheduleBlockId: row.originScheduleBlockId,
-            destinationId: row.destinationId,
-            returnLocationId: row.returnLocationId,
+            destinationRoomId: row.destinationRoomId,
+            returnRoomId: row.returnRoomId,
             requestSource: 'student_web',
             requestedByPersonId: row.requestedByPersonId,
             requestedAt: row.requestedAt,
@@ -144,9 +144,9 @@ export async function cancelSelfPass(
       // left to the reconciler so this transaction stays small.
       if (row.lifecycleState === 'queued' || row.lifecycleState === 'ready') {
         const { flow } = dependencies;
-        await flow.acquireDestinationLock(
+        await flow.acquireRoomLock(
           context,
-          destinationFlowLockKey(row.tenantId, row.destinationId),
+          roomFlowLockKey(row.tenantId, row.destinationRoomId),
         );
         if (row.lifecycleState === 'queued') {
           const entry = await flow.loadActiveQueueEntryForPass(context, row.id);
@@ -210,7 +210,7 @@ export async function cancelSelfPass(
           studentId: row.studentId,
           lifecycleState: 'cancelled',
           revision: updated.revision.toString(10),
-          destinationId: row.destinationId,
+          destinationRoomId: row.destinationRoomId,
         },
       });
       const latest = await dependencies.policy.loadLatestEvaluation(context, row.id);

@@ -34,8 +34,8 @@ import { ClassPage } from '../features/teacher/ClassPage';
 import { LiveMovementPage } from '../features/movement/LiveMovementPage';
 import { StationPage } from '../features/station/StationPage';
 import { AdminIndex, AdminLayout } from '../features/admin/AdminLayout';
-import { DestinationWorkspace } from '../features/admin/destinations/DestinationWorkspace';
-import { DestinationDetailPage } from '../features/admin/destinations/DestinationDetailPage';
+import { RoomsPage } from '../features/admin/rooms/RoomsPage';
+import { RoomDetailPage } from '../features/admin/rooms/RoomDetailPage';
 import { DemoPage, demoLoader, type DemoInfo } from '../features/demo/DemoPage';
 
 function DemoRoute() {
@@ -113,16 +113,21 @@ export const router = createBrowserRouter([
         path: 'scheduled-passes',
         lazy: () => import('../features/admin/scheduled-passes/ScheduledPassesPage'),
       },
-      { path: 'stations/:destinationId', element: <StationPage /> },
+      { path: 'stations/:roomId', element: <StationPage /> },
       {
         path: 'admin',
         element: <AdminLayout />,
         children: [
           { index: true, element: <AdminIndex /> },
           { path: 'live', element: <Navigate replace to="../../movement" /> },
-          { path: 'destinations', element: <DestinationWorkspace /> },
-          { path: 'destinations/:destinationId', element: <DestinationDetailPage /> },
-          { path: 'locations', lazy: () => import('../features/admin/locations/LocationsPage') },
+          { path: 'rooms', element: <RoomsPage /> },
+          { path: 'rooms/:roomId', element: <RoomDetailPage /> },
+          { path: 'destinations', element: <Navigate replace to="../rooms" /> },
+          {
+            path: 'destinations/:destinationId',
+            element: <Navigate replace to="../../rooms" />,
+          },
+          { path: 'locations', element: <Navigate replace to="../rooms" /> },
           { path: 'schedules', lazy: () => import('../features/admin/schedules/SchedulesPage') },
           { path: 'policies', lazy: () => import('../features/admin/policies/PoliciesPage') },
           {

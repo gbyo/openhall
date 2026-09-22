@@ -36,7 +36,7 @@ export function presentStudentPass(pass: Pass): StudentPassPresentation {
     if (pass.movement.effectiveCheckInMode === 'required')
       return {
         kind: 'outbound-station-required',
-        title: `On the way to ${pass.destination.displayName}`,
+        title: `On the way to ${pass.destination.name}`,
         action: null,
       };
     if (pass.movement.effectiveCheckInMode === 'optional')
@@ -46,13 +46,13 @@ export function presentStudentPass(pass: Pass): StudentPassPresentation {
   if (pass.lifecycleState === 'at_destination')
     return {
       kind: 'at-destination',
-      title: `At ${pass.destination.displayName}`,
+      title: `At ${pass.destination.name}`,
       action: 'return',
     };
   if (pass.lifecycleState === 'returning')
     return {
       kind: 'returning',
-      title: `Returning${pass.origin.location ? ` to ${pass.origin.location.name}` : ''}`,
+      title: `Returning${pass.origin.room ? ` to ${pass.origin.room.name}` : ''}`,
       action: 'complete',
     };
   return {

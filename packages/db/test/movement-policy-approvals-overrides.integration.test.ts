@@ -71,7 +71,7 @@ const VALID_CONFIG = JSON.stringify({
   requestSources: ['student_web', 'staff_web'],
 });
 
-/** Minimal school graph: tenant, school, section, student, destination. */
+/** Minimal school graph: tenant, school, section, student, room. */
 async function seedSchool(scratch: Pool, tag: string) {
   const tenantId = idOf(
     await scratch.query(`INSERT INTO tenant (name, slug) VALUES ($1, $2) RETURNING id`, [
@@ -115,45 +115,54 @@ async function seedSchool(scratch: Pool, tag: string) {
       [tenantId],
     ),
   );
-  const location = idOf(
+  // room/room_category exist only from migration 011 on; pinned-version
+  // fixtures use the legacy location/destination model.
+  const hasRooms =
+    (
+      await scratch.query<{ reg: string | null }>(
+        `SELECT to_regclass('room') AS reg`,
+      )
+    ).rows[0]?.reg !== null;
+  if (!hasRooms) {
+    const location = idOf(
+      await scratch.query(
+        `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'C') RETURNING id`,
+        [tenantId, school],
+      ),
+    );
+    const destination = idOf(
+      await scratch.query(
+        `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'N') RETURNING id`,
+        [tenantId, school, location],
+      ),
+    );
+    const legacyPass = idOf(
+      await scratch.query(
+        `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested') RETURNING id`,
+        [tenantId, school, student, destination],
+      ),
+    );
+    return { tenantId, school, otherSchool, section, foreignSection, student, destination, room: destination, pass: legacyPass };
+  }
+  const category = idOf(
     await scratch.query(
-      `INSERT INTO location (tenant_id, organization_id, kind, name) VALUES ($1, $2, 'clinic', 'C') RETURNING id`,
+      `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse') RETURNING id`,
       [tenantId, school],
     ),
   );
-  // destination_category exists only from migration 010 on; pinned-version
-  // fixtures must not reference it while latest-level fixtures must.
-  const hasCategories =
-    (
-      await scratch.query<{ reg: string | null }>(
-        `SELECT to_regclass('destination_category') AS reg`,
-      )
-    ).rows[0]?.reg !== null;
-  const category = hasCategories
-    ? idOf(
-        await scratch.query(
-          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse') RETURNING id`,
-          [tenantId, school],
-        ),
-      )
-    : null;
-  const destination = idOf(
+  const room = idOf(
     await scratch.query(
-      hasCategories
-        ? `INSERT INTO destination (tenant_id, organization_id, location_id, category_id, service_type, display_name) VALUES ($1, $2, $3, $4, 'nurse', 'N') RETURNING id`
-        : `INSERT INTO destination (tenant_id, organization_id, location_id, service_type, display_name) VALUES ($1, $2, $3, 'nurse', 'N') RETURNING id`,
-      hasCategories && category !== null
-        ? [tenantId, school, location, category]
-        : [tenantId, school, location],
+      `INSERT INTO room (tenant_id, organization_id, category_id, name) VALUES ($1, $2, $3, 'Nurse') RETURNING id`,
+      [tenantId, school, category],
     ),
   );
   const pass = idOf(
     await scratch.query(
-      `INSERT INTO pass (tenant_id, organization_id, student_id, destination_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested') RETURNING id`,
-      [tenantId, school, student, destination],
+      `INSERT INTO pass (tenant_id, organization_id, student_id, destination_room_id, request_source, lifecycle_state) VALUES ($1, $2, $3, $4, 'student_web', 'requested') RETURNING id`,
+      [tenantId, school, student, room],
     ),
   );
-  return { tenantId, school, otherSchool, section, foreignSection, student, destination, pass };
+  return { tenantId, school, otherSchool, section, foreignSection, student, destination: room, room, pass };
 }
 
 async function seedRule(
@@ -172,7 +181,11 @@ async function seedRule(
       ? 'scope_organization_id'
       : scopeKind === 'section'
         ? 'scope_section_id'
-        : 'scope_destination_id';
+        : scopeKind === 'room'
+          ? 'scope_room_id'
+          : scopeKind === 'room_category'
+            ? 'scope_room_category_id'
+            : 'scope_destination_id';
   return idOf(
     await scratch.query(
       `INSERT INTO policy_rule (tenant_id, organization_id, name, rule_type, scope_kind, ${scopeColumn}, configuration, override_mode)
@@ -340,8 +353,8 @@ describe('migration 006 movement policy approvals overrides', () => {
           [school.tenantId, evaluation, ruleId],
         ),
       );
-      const approval = `INSERT INTO pass_approval (tenant_id, organization_id, pass_id, origin_evaluation_result_id, policy_rule_id, policy_rule_revision, required_section_id)
-        VALUES ($1, $2, $3, $4, $5, 1, $6)`;
+      const approval = `INSERT INTO pass_approval (tenant_id, organization_id, pass_id, origin_evaluation_result_id, policy_rule_id, policy_rule_revision, approver_kind, required_section_id)
+        VALUES ($1, $2, $3, $4, $5, 1, 'current_section_teacher', $6)`;
       await scratch.query(approval, [
         school.tenantId,
         school.school,

@@ -8,6 +8,7 @@ import type {
   PendingOverrideView,
   PersistedPolicyEvaluation,
   PolicyApprovalRecord,
+  PolicyApproverKind,
   PolicyOverrideRecord,
   PolicyRepository,
 } from '@openhall/application';
@@ -41,7 +42,8 @@ function toRuleInput(row: {
   scope_kind: string;
   scope_organization_id: string | null;
   scope_section_id: string | null;
-  scope_destination_id: string | null;
+  scope_room_id: string | null;
+  scope_room_category_id: string | null;
   priority: number;
   configuration: unknown;
   override_mode: string;
@@ -53,7 +55,8 @@ function toRuleInput(row: {
   const scopeKind =
     row.scope_kind === 'organization' ||
     row.scope_kind === 'section' ||
-    row.scope_kind === 'destination'
+    row.scope_kind === 'room' ||
+    row.scope_kind === 'room_category'
       ? row.scope_kind
       : 'organization';
   return {
@@ -64,7 +67,8 @@ function toRuleInput(row: {
     scopeKind,
     scopeOrganizationId: row.scope_organization_id,
     scopeSectionId: row.scope_section_id,
-    scopeDestinationId: row.scope_destination_id,
+    scopeRoomId: row.scope_room_id,
+    scopeRoomCategoryId: row.scope_room_category_id,
     priority: row.priority,
     configuration: row.configuration,
     overrideMode: row.override_mode,
@@ -257,19 +261,31 @@ export class PostgresPolicyRepository implements PolicyRepository {
     passId: string,
     ruleId: string,
     ruleRevision: number,
-    requiredSectionId: string,
+    requirement: {
+      readonly approverKind: PolicyApproverKind;
+      readonly requiredSectionId: string | null;
+      readonly requiredRoomId: string | null;
+    },
   ): Promise<PolicyApprovalRecord | null> {
     const connection = connectionFor(context);
-    const row = await connection
+    let query = connection
       .selectFrom('pass_approval')
       .selectAll()
       .where('tenant_id', '=', context.tenantId)
       .where('pass_id', '=', passId)
       .where('policy_rule_id', '=', ruleId)
       .where('policy_rule_revision', '=', ruleRevision)
-      .where('required_section_id', '=', requiredSectionId)
-      .where('decision', '=', 'pending')
-      .executeTakeFirst();
+      .where('approver_kind', '=', requirement.approverKind)
+      .where('decision', '=', 'pending');
+    query =
+      requirement.requiredSectionId === null
+        ? query.where('required_section_id', 'is', null)
+        : query.where('required_section_id', '=', requirement.requiredSectionId);
+    query =
+      requirement.requiredRoomId === null
+        ? query.where('required_room_id', 'is', null)
+        : query.where('required_room_id', '=', requirement.requiredRoomId);
+    const row = await query.executeTakeFirst();
     return row === undefined ? null : toApprovalRecord(row);
   }
 
@@ -288,7 +304,9 @@ export class PostgresPolicyRepository implements PolicyRepository {
           origin_evaluation_result_id: input.originEvaluationResultId,
           policy_rule_id: input.ruleId,
           policy_rule_revision: input.ruleRevision,
+          approver_kind: input.approverKind,
           required_section_id: input.requiredSectionId,
+          required_room_id: input.requiredRoomId,
           decision: 'pending',
         })
         .returningAll()
@@ -296,13 +314,11 @@ export class PostgresPolicyRepository implements PolicyRepository {
       return toApprovalRecord(row);
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
-      const existing = await this.findPendingApproval(
-        context,
-        input.passId,
-        input.ruleId,
-        input.ruleRevision,
-        input.requiredSectionId,
-      );
+      const existing = await this.findPendingApproval(context, input.passId, input.ruleId, input.ruleRevision, {
+        approverKind: input.approverKind,
+        requiredSectionId: input.requiredSectionId,
+        requiredRoomId: input.requiredRoomId,
+      });
       if (existing === null) throw error;
       return existing;
     }
@@ -568,28 +584,35 @@ export class PostgresPolicyRepository implements PolicyRepository {
           .onRef('person.tenant_id', '=', 'pass_approval.tenant_id')
           .onRef('person.id', '=', 'pass.student_id'),
       )
-      .innerJoin('destination', (join) =>
+      .innerJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'pass_approval.tenant_id')
-          .onRef('destination.id', '=', 'pass.destination_id'),
+          .onRef('room.tenant_id', '=', 'pass_approval.tenant_id')
+          .onRef('room.id', '=', 'pass.destination_room_id'),
       )
-      .innerJoin('section', (join) =>
+      .leftJoin('section', (join) =>
         join
           .onRef('section.tenant_id', '=', 'pass_approval.tenant_id')
           .onRef('section.id', '=', 'pass_approval.required_section_id'),
+      )
+      .leftJoin('room as required_room', (join) =>
+        join
+          .onRef('required_room.tenant_id', '=', 'pass_approval.tenant_id')
+          .onRef('required_room.id', '=', 'pass_approval.required_room_id'),
       )
       .select([
         'pass_approval.id as approval_id',
         'pass_approval.pass_id as pass_id',
         'pass_approval.organization_id as organization_id',
+        'pass_approval.approver_kind as approver_kind',
         'pass_approval.required_section_id as required_section_id',
+        'pass_approval.required_room_id as required_room_id',
         'pass_approval.created_at as requested_at',
         'pass.revision as pass_revision',
         'pass.student_id as student_id',
-        'pass.destination_id as destination_id',
+        'pass.destination_room_id as destination_room_id',
         'person.display_name as student_display_name',
-        'destination.display_name as destination_display_name',
-        'destination.service_type as destination_service_type',
+        'room.name as destination_room_name',
+        'required_room.name as required_room_name',
         'section.code as section_code',
         'section.title as section_title',
       ])
@@ -605,10 +628,12 @@ export class PostgresPolicyRepository implements PolicyRepository {
       organizationId: row.organization_id,
       studentId: row.student_id,
       studentDisplayName: row.student_display_name,
-      destinationId: row.destination_id,
-      destinationDisplayName: row.destination_display_name ?? '',
-      destinationServiceType: row.destination_service_type,
+      destinationRoomId: row.destination_room_id,
+      destinationRoomName: row.destination_room_name,
+      approverKind: toApproverKind(row.approver_kind),
       requiredSectionId: row.required_section_id,
+      requiredRoomId: row.required_room_id,
+      requiredRoomName: row.required_room_name,
       sectionCode: row.section_code,
       sectionTitle: row.section_title,
       requestedAt: fromDatabaseInstant(row.requested_at),
@@ -631,10 +656,10 @@ export class PostgresPolicyRepository implements PolicyRepository {
           .onRef('person.tenant_id', '=', 'pass_override.tenant_id')
           .onRef('person.id', '=', 'pass.student_id'),
       )
-      .innerJoin('destination', (join) =>
+      .innerJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'pass_override.tenant_id')
-          .onRef('destination.id', '=', 'pass.destination_id'),
+          .onRef('room.tenant_id', '=', 'pass_override.tenant_id')
+          .onRef('room.id', '=', 'pass.destination_room_id'),
       )
       .innerJoin('policy_evaluation_result', (join) =>
         join
@@ -650,10 +675,9 @@ export class PostgresPolicyRepository implements PolicyRepository {
         'pass_override.requested_at as requested_at',
         'pass.revision as pass_revision',
         'pass.student_id as student_id',
-        'pass.destination_id as destination_id',
+        'pass.destination_room_id as destination_room_id',
         'person.display_name as student_display_name',
-        'destination.display_name as destination_display_name',
-        'destination.service_type as destination_service_type',
+        'room.name as destination_room_name',
         'policy_evaluation_result.reason_code as reason_code',
       ])
       .where('pass_override.tenant_id', '=', context.tenantId)
@@ -668,15 +692,18 @@ export class PostgresPolicyRepository implements PolicyRepository {
       organizationId: row.organization_id,
       studentId: row.student_id,
       studentDisplayName: row.student_display_name,
-      destinationId: row.destination_id,
-      destinationDisplayName: row.destination_display_name ?? '',
-      destinationServiceType: row.destination_service_type,
+      destinationRoomId: row.destination_room_id,
+      destinationRoomName: row.destination_room_name,
       category: toOverrideCategory(row.category),
       overrideMode: toOverrideMode(row.override_mode),
       reasonCode: toReasonCode(row.reason_code),
       requestedAt: fromDatabaseInstant(row.requested_at),
     }));
   }
+}
+
+function toApproverKind(value: string): PolicyApproverKind {
+  return value === 'room_responsible_staff' ? 'room_responsible_staff' : 'current_section_teacher';
 }
 
 function toApprovalRecord(row: {
@@ -686,7 +713,9 @@ function toApprovalRecord(row: {
   origin_evaluation_result_id: string;
   policy_rule_id: string;
   policy_rule_revision: number;
-  required_section_id: string;
+  approver_kind: string;
+  required_section_id: string | null;
+  required_room_id: string | null;
   decision: string;
   decision_actor_kind: string | null;
   decided_by_person_id: string | null;
@@ -700,7 +729,9 @@ function toApprovalRecord(row: {
     originEvaluationResultId: row.origin_evaluation_result_id,
     policyRuleId: row.policy_rule_id,
     policyRuleRevision: row.policy_rule_revision,
+    approverKind: toApproverKind(row.approver_kind),
     requiredSectionId: row.required_section_id,
+    requiredRoomId: row.required_room_id,
     decision: toEvidenceDecision(row.decision),
     decisionActorKind: toActorKind(row.decision_actor_kind),
     decidedByPersonId: row.decided_by_person_id,

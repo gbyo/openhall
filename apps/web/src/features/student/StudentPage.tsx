@@ -11,7 +11,7 @@ import { StatusAnnouncer } from '../../components/StatusAnnouncer';
 import { useSchool } from '../../app/school/SchoolShell';
 import { ActiveStudentPass, type PassAction } from './ActiveStudentPass';
 import { presentStudentPass } from './presentation';
-import type { StudentCatalogDestination, StudentCategory } from './student-intents.js';
+import type { StudentCatalogRoom, StudentCategory } from './student-room-intents.js';
 import type { ScheduledAuthorization } from './scheduled-presentation.js';
 import { StudentHome, StudentHomeSkeleton } from './StudentHome';
 import {
@@ -68,7 +68,7 @@ const ACTION_COPY: Record<Action, { label: string; pendingLabel: string }> = {
 interface PendingSelection {
   category: StudentCategory | null;
   secondary: StudentCategory[] | null;
-  destinationId: string | null;
+  roomId: string | null;
 }
 
 function toRequestState(
@@ -83,8 +83,7 @@ function toRequestState(
   return {
     kind: 'category',
     category: selection.category,
-    destination:
-      selection.category.destinations.find((entry) => entry.id === selection.destinationId) ?? null,
+    room: selection.category.rooms.find((entry) => entry.id === selection.roomId) ?? null,
     ...status,
   };
 }
@@ -93,7 +92,7 @@ export function StudentPage() {
   const { organizationId, context } = useSchool();
   const queryClient = useQueryClient();
   const commands = useLogicalCommand<Record<string, never>>();
-  const requestCommands = useLogicalCommand<{ destinationId: string }>();
+  const requestCommands = useLogicalCommand<{ destinationRoomId: string }>();
   const scheduledCommands = useLogicalCommand<{ scheduledAuthorizationId: string }>();
   const reviewCommands = useLogicalCommand<{ category: ReviewCategory }>();
   const [announcement, setAnnouncement] = useState('');
@@ -107,10 +106,10 @@ export function StudentPage() {
     staleTime: 5_000,
   });
   const catalog = useQuery({
-    queryKey: queryKeys.studentCatalog(organizationId),
+    queryKey: queryKeys.studentRoomCatalog(organizationId),
     queryFn: () =>
       confirmed(
-        api.GET('/api/v1/me/organizations/{organizationId}/student-destination-catalog', {
+        api.GET('/api/v1/me/organizations/{organizationId}/student-room-catalog', {
           params: { path: { organizationId } },
         }),
       ),
@@ -134,7 +133,7 @@ export function StudentPage() {
     staleTime: 5_000,
   });
   const request = useMutation({
-    mutationFn: async (command: LogicalCommand<{ destinationId: string }>) => {
+    mutationFn: async (command: LogicalCommand<{ destinationRoomId: string }>) => {
       const result = await confirmedResult(
         api.POST('/api/v1/me/passes', {
           params: { header: { 'idempotency-key': command.idempotencyKey } },
@@ -289,27 +288,24 @@ export function StudentPage() {
     const startScheduledError = startScheduled.error;
     const selectCategory = (category: StudentCategory) => {
       request.reset();
-      setSelection({ category, secondary: null, destinationId: null });
+      setSelection({ category, secondary: null, roomId: null });
     };
     const selectMore = (secondary: StudentCategory[]) => {
       request.reset();
-      setSelection({ category: null, secondary, destinationId: null });
+      setSelection({ category: null, secondary, roomId: null });
     };
     const pickCategory = (category: StudentCategory) => {
       request.reset();
-      setSelection({ category, secondary: null, destinationId: null });
+      setSelection({ category, secondary: null, roomId: null });
     };
-    const pickDestination = (destination: StudentCatalogDestination) => {
-      setSelection((current) =>
-        current ? { ...current, destinationId: destination.id } : current,
-      );
+    const pickRoom = (room: StudentCatalogRoom) => {
+      setSelection((current) => (current ? { ...current, roomId: room.id } : current));
     };
     const confirmRequest = () => {
       if (!selection?.category) return;
-      const destinationId =
-        selection.destinationId ?? selection.category.destinations[0]?.id ?? null;
-      if (!destinationId) return;
-      request.mutate(requestCommands.begin({ destinationId }, null));
+      const roomId = selection.roomId ?? selection.category.rooms[0]?.id ?? null;
+      if (!roomId) return;
+      request.mutate(requestCommands.begin({ destinationRoomId: roomId }, null));
     };
     const retryRequest = () => {
       if (request.variables) request.mutate(request.variables);
@@ -319,7 +315,7 @@ export function StudentPage() {
       if (!request.isPending) setSelection(null);
     };
     return (
-      <section aria-labelledby="destination-title" className="flex flex-col gap-6">
+      <section aria-labelledby="room-title" className="flex flex-col gap-6">
         <StatusAnnouncer message={announcement} />
         {startScheduledError && (
           <Alert variant="destructive">
@@ -345,7 +341,7 @@ export function StudentPage() {
         ) : categories.length === 0 && authorizations.length === 0 ? (
           <Empty>
             <EmptyHeader>
-              <EmptyTitle>No destinations available.</EmptyTitle>
+              <EmptyTitle>No rooms available.</EmptyTitle>
               <EmptyDescription>
                 Ask a teacher or the office if you need to leave class.
               </EmptyDescription>
@@ -382,7 +378,7 @@ export function StudentPage() {
             uncertain: request.error instanceof UncertainCommandError,
           })}
           onPickCategory={pickCategory}
-          onPickDestination={pickDestination}
+          onPickRoom={pickRoom}
           onConfirm={confirmRequest}
           onRetry={retryRequest}
           onClose={closeRequest}

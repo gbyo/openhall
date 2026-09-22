@@ -7,9 +7,8 @@ import { ControlPlaneError } from './errors.js';
  * decimal strings on the wire because they are PostgreSQL bigints.
  */
 export const CONTROL_PLANE_ETAG_KINDS = [
-  'location',
-  'destination',
-  'destination-category',
+  'room',
+  'room-category',
   'schedule',
   'policy',
   'grant',

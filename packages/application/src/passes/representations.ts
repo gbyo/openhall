@@ -1,5 +1,5 @@
 import { PassApplicationError } from './errors.js';
-import type { DestinationCheckInMode, PassRow } from './ports.js';
+import type { RoomCheckInMode, PassRow } from './ports.js';
 
 export interface PassDestinationCategoryView {
   readonly id: string;
@@ -10,9 +10,8 @@ export interface PassDestinationCategoryView {
 
 export interface PassDestinationView {
   readonly id: string;
-  readonly displayName: string;
-  readonly serviceType: string;
-  readonly checkInMode: DestinationCheckInMode;
+  readonly name: string;
+  readonly checkInMode: RoomCheckInMode;
   /** Current category presentation; null when the category is unavailable. */
   readonly category: PassDestinationCategoryView | null;
 }
@@ -34,7 +33,7 @@ export interface MovementProjection {
    * departure snapshot, with the same live-destination fallback used by the
    * command layer for legacy rows that predate snapshots.
    */
-  readonly effectiveCheckInMode: DestinationCheckInMode | null;
+  readonly effectiveCheckInMode: RoomCheckInMode | null;
   readonly reasonCode: string | null;
 }
 
@@ -51,7 +50,7 @@ export interface PassOriginView {
   readonly placementKind: string;
   readonly block: { id: string; code: string; displayName: string } | null;
   readonly section: { id: string; code: string | null; title: string } | null;
-  readonly location: { id: string; name: string } | null;
+  readonly room: { id: string; name: string } | null;
 }
 
 export interface PassRepresentation {
@@ -72,7 +71,7 @@ export interface PassRepresentation {
    * predate Phase 6 evaluation: reads never fabricate a historical decision.
    */
   readonly policy: PassPolicyProjection | null;
-  /** Non-dynamic destination-flow facts tied to this pass revision. */
+  /** Non-dynamic room-flow facts tied to this pass revision. */
   readonly movement: MovementProjection;
 }
 
@@ -158,17 +157,16 @@ export function toPassRepresentation(
     organizationId: row.organizationId,
     studentId: row.studentId,
     destination: {
-      id: row.destinationId,
-      displayName: row.destinationDisplayName,
-      serviceType: row.destinationServiceType,
+      id: row.destinationRoomId,
+      name: row.destinationRoomName,
       checkInMode: row.destinationCheckInMode,
-      category: row.destinationCategory,
+      category: row.roomCategory,
     },
     origin: {
       placementKind: placementKindFromRow(row),
       block: row.originBlock,
       section: row.originSection,
-      location: row.originLocation,
+      room: row.originRoom,
     },
     requestSource: row.requestSource,
     scheduledAuthorizationId: row.scheduledAuthorizationId,

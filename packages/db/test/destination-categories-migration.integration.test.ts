@@ -70,7 +70,7 @@ describe('migration 010 destination categories', () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
-      await migrateToLatest(handle.database);
+      await migrateTo(handle, '010_destination_categories');
       const names = (
         await scratch.query<{ name: string }>('SELECT name FROM kysely_migration ORDER BY name')
       ).rows.map((row) => row.name);
@@ -161,7 +161,7 @@ describe('migration 010 destination categories', () => {
       const categories = (
         await scratch.query<CategoryRow>(
           `SELECT name, icon_key, tone_key, student_surface, sort_order, status
-           FROM destination_category WHERE tenant_id = $1 ORDER BY sort_order, lower(name)`,
+           FROM room_category WHERE tenant_id = $1 ORDER BY sort_order, lower(name)`,
           [tenantId],
         )
       ).rows;
@@ -230,32 +230,38 @@ describe('migration 010 destination categories', () => {
         sort_order: 100,
         status: 'active',
       });
-      const planetariumDests = await scratch.query<{ dests: number; cats: number }>(
-        `SELECT count(DISTINCT d.id)::int AS dests, count(DISTINCT d.category_id)::int AS cats
-         FROM destination d JOIN destination_category c ON c.id = d.category_id
-         WHERE d.tenant_id = $1 AND lower(c.name) = 'planetarium'`,
+      const planetariumRooms = await scratch.query<{ rooms: number; cats: number }>(
+        `SELECT count(DISTINCT r.id)::int AS rooms, count(DISTINCT r.category_id)::int AS cats
+         FROM room r JOIN room_category c ON c.id = r.category_id
+         WHERE r.tenant_id = $1 AND lower(c.name) = 'planetarium'`,
         [tenantId],
       );
-      expect(planetariumDests.rows[0]).toMatchObject({ dests: 2, cats: 1 });
+      expect(planetariumRooms.rows[0]).toMatchObject({ rooms: 2, cats: 1 });
 
-      const unassigned = await scratch.query<{ count: number }>(
-        `SELECT count(*)::int AS count FROM destination WHERE tenant_id = $1 AND category_id IS NULL`,
+      // Every destination-derived room keeps a category; the bare
+      // location identity survives as one uncategorized room.
+      const unassigned = await scratch.query<{ count: number; name: string }>(
+        `SELECT count(*)::int AS count, min(name) AS name FROM room WHERE tenant_id = $1 AND category_id IS NULL`,
         [tenantId],
       );
-      expect(unassigned.rows[0]?.count).toBe(0);
-      const notRequestable = await scratch.query<{ count: number }>(
-        `SELECT count(*)::int AS count FROM destination WHERE tenant_id = $1 AND student_self_requestable IS NOT true`,
+      expect(unassigned.rows[0]?.count).toBe(1);
+      expect(unassigned.rows[0]?.name).toBe('C');
+      // Destination-derived rooms stay requestable; the preserved bare
+      // location identity is not student-requestable.
+      const notRequestable = await scratch.query<{ count: number; name: string }>(
+        `SELECT count(*)::int AS count, min(name) AS name FROM room WHERE tenant_id = $1 AND student_self_requestable IS NOT true`,
         [tenantId],
       );
-      expect(notRequestable.rows[0]?.count).toBe(0);
-      // Legacy service_type values are preserved untouched.
-      const types = (
-        await scratch.query<{ service_type: string }>(
-          `SELECT service_type FROM destination WHERE tenant_id = $1 ORDER BY 1`,
+      expect(notRequestable.rows[0]?.count).toBe(1);
+      expect(notRequestable.rows[0]?.name).toBe('C');
+      // Room names carry the legacy display names forward.
+      const names = (
+        await scratch.query<{ name: string }>(
+          `SELECT name FROM room WHERE tenant_id = $1 ORDER BY 1`,
           [tenantId],
         )
-      ).rows.map((row) => row.service_type);
-      expect(types).toContain('makerspace');
+      ).rows.map((row) => row.name);
+      expect(names).toContain('makerspace');
     } finally {
       await handle.destroy();
       await scratch.end();
@@ -276,7 +282,7 @@ describe('migration 010 destination categories', () => {
       );
       await migrateToLatest(handle.database);
       const count = await scratch.query<{ count: number }>(
-        `SELECT count(*)::int AS count FROM destination_category WHERE tenant_id = $1`,
+        `SELECT count(*)::int AS count FROM room_category WHERE tenant_id = $1`,
         [tenantId],
       );
       expect(count.rows[0]?.count).toBe(0);
@@ -301,25 +307,25 @@ describe('migration 010 destination categories', () => {
         ),
       );
       await scratch.query(
-        `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse')`,
+        `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'Nurse')`,
         [tenantId, school],
       );
       await expect(
         scratch.query(
-          `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'nurse')`,
+          `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'nurse')`,
           [tenantId, school],
         ),
       ).rejects.toMatchObject({ code: '23505' });
       await scratch.query(
-        `UPDATE destination_category SET status = 'archived' WHERE tenant_id = $1 AND organization_id = $2`,
+        `UPDATE room_category SET status = 'archived' WHERE tenant_id = $1 AND organization_id = $2`,
         [tenantId, school],
       );
       await scratch.query(
-        `INSERT INTO destination_category (tenant_id, organization_id, name) VALUES ($1, $2, 'NURSE')`,
+        `INSERT INTO room_category (tenant_id, organization_id, name) VALUES ($1, $2, 'NURSE')`,
         [tenantId, school],
       );
       const count = await scratch.query<{ count: number }>(
-        `SELECT count(*)::int AS count FROM destination_category WHERE tenant_id = $1`,
+        `SELECT count(*)::int AS count FROM room_category WHERE tenant_id = $1`,
         [tenantId],
       );
       expect(count.rows[0]?.count).toBe(2);

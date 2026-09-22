@@ -1,17 +1,18 @@
 import { postgresDateToPlainDate } from '../temporal-types.js';
 import { connectionFor, fromDatabaseInstant } from '../transactions.js';
 import type {
-  AuthorizationDestinationRecord,
+  AuthorizationRoomRecord,
   AuthorizationFactsRepository,
   AuthorizationGrantFact,
   AuthorizationOrganizationRecord,
   AuthorizationSectionRecord,
   OrganizationMembershipFact,
+  RoomTeacherFact,
   SectionMembershipFact,
-  StaffedDestinationFact,
+  StaffedRoomFact,
   TeachingSectionFact,
 } from '@openhall/application';
-import type { DestinationId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
+import type { RoomId, OrganizationId, PersonId, SectionId } from '@openhall/domain';
 import type { TenantTransactionContext } from '@openhall/application';
 
 /**
@@ -73,42 +74,25 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
     };
   }
 
-  async loadDestination(
+  async loadRoom(
     context: TenantTransactionContext,
-    destinationId: DestinationId,
-  ): Promise<AuthorizationDestinationRecord | null> {
+    roomId: RoomId,
+  ): Promise<AuthorizationRoomRecord | null> {
     const connection = connectionFor(context);
     const row = await connection
-      .selectFrom('destination')
-      .leftJoin('location', (join) =>
-        join
-          .onRef('location.tenant_id', '=', 'destination.tenant_id')
-          .onRef('location.organization_id', '=', 'destination.organization_id')
-          .onRef('location.id', '=', 'destination.location_id'),
-      )
-      .select([
-        'destination.id',
-        'destination.tenant_id',
-        'destination.organization_id',
-        'destination.status',
-        'destination.display_name',
-        'destination.service_type',
-        'location.name as location_name',
-      ])
-      .where('destination.tenant_id', '=', context.tenantId)
-      .where('destination.id', '=', destinationId)
+      .selectFrom('room')
+      .select(['id', 'tenant_id', 'organization_id', 'status', 'name'])
+      .where('tenant_id', '=', context.tenantId)
+      .where('id', '=', roomId)
       .executeTakeFirst();
     if (row === undefined) return null;
-    const status =
-      row.status === 'closed' ? 'closed' : row.status === 'archived' ? 'archived' : 'active';
+    const status = row.status === 'closed' ? 'closed' : row.status === 'archived' ? 'archived' : 'open';
     return {
       id: row.id,
       tenantId: row.tenant_id,
       organizationId: row.organization_id,
       status,
-      displayName: row.display_name,
-      serviceType: row.service_type,
-      locationName: row.location_name,
+      name: row.name,
     };
   }
 
@@ -171,7 +155,7 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
         'role',
         'scope_kind',
         'organization_id',
-        'destination_id',
+        'room_id',
         'status',
         'valid_from',
         'valid_until',
@@ -185,7 +169,7 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
       role: row.role,
       scopeKind: row.scope_kind,
       organizationId: row.organization_id,
-      destinationId: row.destination_id,
+      roomId: row.room_id,
       status: 'active' as const,
       validFrom: row.valid_from === null ? null : fromDatabaseInstant(row.valid_from),
       validUntil: row.valid_until === null ? null : fromDatabaseInstant(row.valid_until),
@@ -250,60 +234,140 @@ export class PostgresAuthorizationRepository implements AuthorizationFactsReposi
     return rows.map((row) => ({ id: row.id, code: row.code, title: row.title }));
   }
 
-  async listStaffedDestinations(
+  async listStaffedRooms(
     context: TenantTransactionContext,
     accountId: string,
     personId: PersonId,
     organizationId: OrganizationId,
-  ): Promise<readonly StaffedDestinationFact[]> {
+  ): Promise<readonly StaffedRoomFact[]> {
     const connection = connectionFor(context);
     const rows = await connection
       .selectFrom('authorization_grant as grant')
-      .innerJoin('destination', (join) =>
+      .innerJoin('room', (join) =>
         join
-          .onRef('destination.tenant_id', '=', 'grant.tenant_id')
-          .onRef('destination.id', '=', 'grant.destination_id'),
-      )
-      .leftJoin('location', (join) =>
-        join
-          .onRef('location.tenant_id', '=', 'destination.tenant_id')
-          .onRef('location.organization_id', '=', 'destination.organization_id')
-          .onRef('location.id', '=', 'destination.location_id'),
+          .onRef('room.tenant_id', '=', 'grant.tenant_id')
+          .onRef('room.id', '=', 'grant.room_id'),
       )
       .innerJoin('organization_membership as staff_membership', (join) =>
         join
           .onRef('staff_membership.tenant_id', '=', 'grant.tenant_id')
-          .onRef('staff_membership.organization_id', '=', 'destination.organization_id'),
+          .onRef('staff_membership.organization_id', '=', 'room.organization_id'),
       )
-      .select([
-        'destination.id',
-        'destination.display_name',
-        'destination.service_type',
-        'location.name as location_name',
-      ])
+      .select(['room.id', 'room.name'])
       .where('grant.tenant_id', '=', context.tenantId)
       .where('grant.account_id', '=', accountId)
-      .where('grant.role', '=', 'destination_staff')
-      .where('grant.scope_kind', '=', 'destination')
+      .where('grant.role', '=', 'room_staff')
+      .where('grant.scope_kind', '=', 'room')
       .where('grant.status', '=', 'active')
       .where('staff_membership.person_id', '=', personId)
       .where('staff_membership.affiliation', '=', 'staff')
       .where('staff_membership.status', '=', 'active')
-      .where('destination.organization_id', '=', organizationId)
-      .where('destination.status', '!=', 'archived')
-      .orderBy('destination.service_type')
-      .orderBy('destination.id')
+      .where('room.organization_id', '=', organizationId)
+      .where('room.status', '!=', 'archived')
+      .orderBy('room.name')
+      .orderBy('room.id')
       .execute();
-    const seen = new Map<string, StaffedDestinationFact>();
+    const seen = new Map<string, StaffedRoomFact>();
     for (const row of rows) {
       if (!seen.has(row.id)) {
-        seen.set(row.id, {
-          id: row.id,
-          displayName: row.display_name ?? row.location_name ?? row.service_type,
-          serviceType: row.service_type,
-        });
+        seen.set(row.id, { id: row.id, name: row.name });
       }
     }
     return [...seen.values()];
+  }
+
+  async listTeachingMeetingRooms(
+    context: TenantTransactionContext,
+    personId: PersonId,
+    organizationId: OrganizationId,
+  ): Promise<readonly RoomId[]> {
+    const connection = connectionFor(context);
+    const rows = await connection
+      .selectFrom('section_membership as membership')
+      .innerJoin('section as section_row', (join) =>
+        join
+          .onRef('section_row.tenant_id', '=', 'membership.tenant_id')
+          .onRef('section_row.id', '=', 'membership.section_id'),
+      )
+      .innerJoin('section_meeting as meeting', (join) =>
+        join
+          .onRef('meeting.tenant_id', '=', 'section_row.tenant_id')
+          .onRef('meeting.organization_id', '=', 'section_row.organization_id')
+          .onRef('meeting.section_id', '=', 'section_row.id'),
+      )
+      .innerJoin('organization_membership as staff_membership', (join) =>
+        join
+          .onRef('staff_membership.tenant_id', '=', 'membership.tenant_id')
+          .onRef('staff_membership.organization_id', '=', 'section_row.organization_id')
+          .onRef('staff_membership.person_id', '=', 'membership.person_id'),
+      )
+      .select('meeting.room_id')
+      .distinct()
+      .where('membership.tenant_id', '=', context.tenantId)
+      .where('membership.person_id', '=', personId)
+      .where('membership.role', '=', 'teacher')
+      .where('membership.status', '=', 'active')
+      .where('staff_membership.affiliation', '=', 'staff')
+      .where('staff_membership.status', '=', 'active')
+      .where('section_row.organization_id', '=', organizationId)
+      .where('meeting.organization_id', '=', organizationId)
+      .where('section_row.status', '=', 'active')
+      .where('meeting.room_id', 'is not', null)
+      .execute();
+    // IS NOT NULL narrows rows at runtime; the guard below narrows the type.
+    return rows
+      .map((row) => row.room_id)
+      .filter((roomId): roomId is RoomId => roomId !== null);
+  }
+
+  async listRoomTeachers(
+    context: TenantTransactionContext,
+    organizationId: OrganizationId,
+    roomId: RoomId,
+  ): Promise<readonly RoomTeacherFact[]> {
+    const connection = connectionFor(context);
+    const rows = await connection
+      .selectFrom('section_membership as membership')
+      .innerJoin('section as section_row', (join) =>
+        join
+          .onRef('section_row.tenant_id', '=', 'membership.tenant_id')
+          .onRef('section_row.id', '=', 'membership.section_id'),
+      )
+      .innerJoin('section_meeting as meeting', (join) =>
+        join
+          .onRef('meeting.tenant_id', '=', 'section_row.tenant_id')
+          .onRef('meeting.organization_id', '=', 'section_row.organization_id')
+          .onRef('meeting.section_id', '=', 'section_row.id'),
+      )
+      .select([
+        'membership.person_id',
+        'membership.section_id',
+        'membership.status',
+        'membership.starts_on',
+        'membership.ends_on',
+        'meeting.effective_from',
+        'meeting.effective_until',
+      ])
+      .where('membership.tenant_id', '=', context.tenantId)
+      .where('section_row.organization_id', '=', organizationId)
+      .where('meeting.organization_id', '=', organizationId)
+      .where('meeting.room_id', '=', roomId)
+      .where('membership.role', '=', 'teacher')
+      .where('membership.status', '=', 'active')
+      .where('section_row.status', '=', 'active')
+      .execute();
+    // One row per (teacher, section, meeting window); the caller dedupes by
+    // person after applying date windows on the school local date.
+    return rows.map((row) => ({
+      personId: row.person_id,
+      sectionId: row.section_id,
+      membershipStatus: row.status === 'active' ? 'active' : 'inactive',
+      startsOn: row.starts_on === null ? null : postgresDateToPlainDate(row.starts_on),
+      endsOn: row.ends_on === null ? null : postgresDateToPlainDate(row.ends_on),
+      meetingEffectiveFrom:
+        row.effective_from === null ? null : postgresDateToPlainDate(row.effective_from),
+      meetingEffectiveUntil:
+        row.effective_until === null ? null : postgresDateToPlainDate(row.effective_until),
+    }));
   }
 }

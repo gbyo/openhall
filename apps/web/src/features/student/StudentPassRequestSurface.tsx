@@ -21,8 +21,8 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer';
 import { Spinner } from '@/components/ui/spinner';
-import type { StudentCatalogDestination, StudentCategory } from './student-intents.js';
-import { StudentDestinationPicker } from './StudentDestinationPicker.js';
+import type { StudentCatalogRoom, StudentCategory } from './student-room-intents.js';
+import { StudentRoomPicker } from './StudentRoomPicker.js';
 
 function useDesktopViewport(): boolean {
   const [desktop, setDesktop] = useState(() =>
@@ -48,11 +48,11 @@ interface RequestStatus {
   uncertain: boolean;
 }
 
-/** A concrete category choice, optionally narrowed to one destination. */
+/** A concrete category choice, optionally narrowed to one room. */
 export interface StudentCategorySelection extends RequestStatus {
   kind: 'category';
   category: StudentCategory;
-  destination: StudentCatalogDestination | null;
+  room: StudentCatalogRoom | null;
 }
 
 /** The generated More list of secondary categories. */
@@ -66,7 +66,7 @@ export type StudentPassRequestState = StudentCategorySelection | StudentMoreSele
 interface StudentPassRequestSurfaceProps {
   request: StudentPassRequestState | null;
   onPickCategory: (category: StudentCategory) => void;
-  onPickDestination: (destination: StudentCatalogDestination) => void;
+  onPickRoom: (room: StudentCatalogRoom) => void;
   onConfirm: () => void;
   onRetry: () => void;
   onClose: () => void;
@@ -75,7 +75,7 @@ interface StudentPassRequestSurfaceProps {
 function RequestBody({
   request,
   onPickCategory,
-  onPickDestination,
+  onPickRoom,
   onConfirm,
   onRetry,
 }: Omit<StudentPassRequestSurfaceProps, 'request' | 'onClose'> & {
@@ -83,24 +83,27 @@ function RequestBody({
 }) {
   if (request.kind === 'more') {
     return (
-      <StudentDestinationPicker
+      <StudentRoomPicker
         categories={request.secondary}
         onPickCategory={onPickCategory}
-        onPickDestination={onPickDestination}
+        onPickRoom={onPickRoom}
       />
     );
   }
-  const needsChoice = request.category.destinations.length > 1 && !request.destination;
+  // One room skips the picker and goes straight to confirmation. Picking a
+  // room (list or search) records the choice only — nothing POSTs until the
+  // student confirms below.
+  const needsChoice = request.category.rooms.length > 1 && !request.room;
   if (needsChoice) {
     return (
-      <StudentDestinationPicker
+      <StudentRoomPicker
         category={request.category}
         onPickCategory={onPickCategory}
-        onPickDestination={onPickDestination}
+        onPickRoom={onPickRoom}
       />
     );
   }
-  const destination = request.destination ?? request.category.destinations[0];
+  const room = request.room ?? request.category.rooms[0];
   return (
     <div className="flex flex-col items-center gap-2 py-2 text-center">
       <HugeiconsIcon
@@ -109,7 +112,7 @@ function RequestBody({
         aria-hidden="true"
         className="size-12"
       />
-      <p className="text-lg font-semibold">{destination?.displayName ?? request.category.name}</p>
+      <p className="text-lg font-semibold">{room?.name ?? request.category.name}</p>
       {request.error && (
         <Alert variant="destructive">
           <AlertTitle>Request not confirmed</AlertTitle>
@@ -139,7 +142,7 @@ function RequestBody({
 export function StudentPassRequestSurface({
   request,
   onPickCategory,
-  onPickDestination,
+  onPickRoom,
   onConfirm,
   onRetry,
   onClose,
@@ -149,7 +152,7 @@ export function StudentPassRequestSurface({
   const title =
     request?.kind === 'more'
       ? 'More places'
-      : request && request.category.destinations.length > 1 && !request.destination
+      : request && request.category.rooms.length > 1 && !request.room
         ? `Choose a ${request.category.name.toLowerCase()}`
         : 'Request a WayPass';
 
@@ -170,7 +173,7 @@ export function StudentPassRequestSurface({
             <RequestBody
               request={request}
               onPickCategory={onPickCategory}
-              onPickDestination={onPickDestination}
+              onPickRoom={onPickRoom}
               onConfirm={onConfirm}
               onRetry={onRetry}
             />
@@ -200,7 +203,7 @@ export function StudentPassRequestSurface({
             <RequestBody
               request={request}
               onPickCategory={onPickCategory}
-              onPickDestination={onPickDestination}
+              onPickRoom={onPickRoom}
               onConfirm={onConfirm}
               onRetry={onRetry}
             />

@@ -35,11 +35,10 @@ type PublicExpectedPlacement =
       kind: 'resolved';
       block: PlacementBlockBody;
       section: { id: string; code: string | null; title: string };
-      expectedLocation: {
+      expectedRoom: {
         id: string;
         name: string;
         code: string | null;
-        kind: string;
       } | null;
       beginsAt: string;
       endsAt: string;
@@ -93,14 +92,13 @@ export function toPublicExpectedPlacement(
           kind: result.block.kind,
         },
         section: { id: result.section.id, code: result.section.code, title: result.section.title },
-        expectedLocation:
+        expectedRoom:
           result.expectedLocation === null
             ? null
             : {
                 id: result.expectedLocation.id,
                 name: result.expectedLocation.name,
                 code: result.expectedLocation.code,
-                kind: result.expectedLocation.kind,
               },
         beginsAt: result.beginsAt.toString(),
         endsAt: result.endsAt.toString(),
@@ -149,10 +147,9 @@ function toContextBody(context: OrganizationContext): {
     title: string;
     capabilities: Capability[];
   }[];
-  staffedDestinations: {
+  staffedRooms: {
     id: string;
-    displayName: string;
-    serviceType: string;
+    name: string;
     capabilities: Capability[];
   }[];
 } {
@@ -167,11 +164,10 @@ function toContextBody(context: OrganizationContext): {
       title: section.title,
       capabilities: [...section.capabilities],
     })),
-    staffedDestinations: context.staffedDestinations.map((destination) => ({
-      id: destination.id,
-      displayName: destination.displayName,
-      serviceType: destination.serviceType,
-      capabilities: [...destination.capabilities],
+    staffedRooms: context.staffedRooms.map((room) => ({
+      id: room.id,
+      name: room.name,
+      capabilities: [...room.capabilities],
     })),
   };
 }

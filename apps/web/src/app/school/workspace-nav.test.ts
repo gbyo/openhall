@@ -19,7 +19,7 @@ function context(overrides: Partial<OrganizationContext>): OrganizationContext {
     capabilities: [],
     expectedPlacement: null,
     teachingSections: [],
-    staffedDestinations: [],
+    staffedRooms: [],
     ...overrides,
   };
 }
@@ -35,7 +35,7 @@ describe('buildWorkspaceNav', () => {
       capabilities: [
         'pass.view.school_live',
         'scheduled_authorization.manage',
-        'destination.manage',
+        'room.manage',
         'schedule.manage',
         'policy.manage',
         'authorization.manage',
@@ -48,8 +48,7 @@ describe('buildWorkspaceNav', () => {
       'Scheduled passes',
     ]);
     expect(labels(buildWorkspaceNav(administrator), 'administration')).toEqual([
-      'Destinations',
-      'Locations',
+      'Rooms',
       'Schedules',
       'Policies',
       'Staff access',
@@ -63,9 +62,7 @@ describe('buildWorkspaceNav', () => {
       teachingSections: [
         { id: 'science', code: 'SCI-8A', title: 'Physical Science', capabilities: [] },
       ],
-      staffedDestinations: [
-        { id: 'health', displayName: 'Health Office', serviceType: 'health', capabilities: [] },
-      ],
+      staffedRooms: [{ id: 'health', name: 'Health Office', capabilities: [] }],
     });
     expect(labels(buildWorkspaceNav(teacher), 'teaching')).toEqual(['Requests', 'Classes']);
     expect(labels(buildWorkspaceNav(teacher), 'operations')).toEqual(['Station']);
@@ -126,9 +123,7 @@ describe('buildWorkspaceNav', () => {
     const ctx = context({
       affiliations: ['staff'],
       capabilities: ['pass.view.school_live', 'scheduled_authorization.manage'],
-      staffedDestinations: [
-        { id: 'dest-1', displayName: 'Nurse', serviceType: 'nurse', capabilities: [] },
-      ],
+      staffedRooms: [{ id: 'room-1', name: 'Nurse', capabilities: [] }],
     });
     const groups = buildWorkspaceNav(ctx);
     expect(labels(groups, 'operations')).toEqual(['Live movement', 'Scheduled passes', 'Station']);
@@ -138,7 +133,7 @@ describe('buildWorkspaceNav', () => {
     const ctx = context({
       affiliations: ['staff'],
       capabilities: [
-        'destination.manage',
+        'room.manage',
         'schedule.manage',
         'policy.manage',
         'authorization.manage',
@@ -148,8 +143,7 @@ describe('buildWorkspaceNav', () => {
     });
     const groups = buildWorkspaceNav(ctx);
     expect(labels(groups, 'administration')).toEqual([
-      'Destinations',
-      'Locations',
+      'Rooms',
       'Schedules',
       'Policies',
       'Staff access',
