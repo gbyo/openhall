@@ -17,6 +17,7 @@ export const CAPABILITIES = [
   'pass.progress.self',
   'pass.create.student',
   'pass.approve.section',
+  'pass.approve.destination',
   'pass.override.request.self',
   'pass.override.request.student',
   'pass.override.resolve.section',

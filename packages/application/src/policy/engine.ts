@@ -3,6 +3,7 @@ import {
   isPolicyOverrideMode,
   isPolicyRuleType,
   parsePolicyRuleConfiguration,
+  type PolicyApprover,
   type PolicyOverrideMode,
 } from './configurations.js';
 import type {
@@ -22,7 +23,9 @@ import type { PolicyReasonCode } from './reason-codes.js';
 export interface ApprovalRequirement {
   readonly ruleId: string;
   readonly ruleRevision: number;
-  readonly requiredSectionId: string;
+  /** Exactly one requirement binding is non-null. */
+  readonly requiredSectionId: string | null;
+  readonly requiredDestinationId: string | null;
 }
 
 export interface OverrideRequirement {
@@ -54,6 +57,10 @@ function scopeMatches(rule: PolicyRuleInput, context: PolicyEvaluationContext): 
       return rule.scopeOrganizationId === context.pass.organizationId;
     case 'destination':
       return rule.scopeDestinationId === context.pass.destinationId;
+    case 'destination_category': {
+      if (context.destinationCategoryId === null) return false;
+      return rule.scopeDestinationCategoryId === context.destinationCategoryId;
+    }
     case 'section': {
       const placement = context.currentPlacement;
       if (placement.kind !== 'resolved') return false;
@@ -80,6 +87,7 @@ function notApplicable(rule: PolicyRuleInput): PolicyRuleEvaluation {
     contribution: 'none',
     reasonCode: 'no_violation',
     requiredSectionId: null,
+    requiredDestinationId: null,
   };
 }
 
@@ -94,6 +102,7 @@ function configurationError(rule: PolicyRuleInput): PolicyRuleEvaluation {
     contribution: 'deny',
     reasonCode: 'policy_configuration_error',
     requiredSectionId: null,
+    requiredDestinationId: null,
   };
 }
 
@@ -138,14 +147,15 @@ function deniedOverrideFor(
 function applyOverrideEvidence(
   rule: PolicyRuleInput,
   context: PolicyEvaluationContext,
-  requiredSectionId: string | null,
+  requirement: Pick<ApprovalRequirement, 'requiredSectionId' | 'requiredDestinationId'>,
 ): PolicyRuleEvaluation | null {
   const base = {
     ruleId: rule.id,
     ruleRevision: rule.revision,
     ruleType: rule.ruleType,
     overrideMode: rule.overrideMode,
-    requiredSectionId,
+    requiredSectionId: requirement.requiredSectionId,
+    requiredDestinationId: requirement.requiredDestinationId,
   };
   if (approvedOverrideFor(context.overrides, rule.id, rule.revision)) {
     return { ...base, outcome: 'pass', contribution: 'none', reasonCode: 'rule_overridden' };
@@ -172,6 +182,7 @@ function evaluateScheduleBoundary(
     ruleType: rule.ruleType,
     overrideMode: rule.overrideMode,
     requiredSectionId: null,
+    requiredDestinationId: null,
   };
   if (!config.requestSources.includes(context.pass.requestSource)) return notApplicable(rule);
   const placement = context.currentPlacement;
@@ -193,7 +204,10 @@ function evaluateScheduleBoundary(
     return { ...base, outcome: 'pass', contribution: 'none', reasonCode: 'no_violation' };
   }
   if (isOverrideableMode(rule.overrideMode)) {
-    const overridden = applyOverrideEvidence(rule, context, null);
+    const overridden = applyOverrideEvidence(rule, context, {
+      requiredSectionId: null,
+      requiredDestinationId: null,
+    });
     if (overridden !== null) return overridden;
   }
   return {
@@ -208,13 +222,14 @@ function approvedApprovalFor(
   approvals: readonly PolicyApprovalEvidence[],
   ruleId: string,
   ruleRevision: number,
-  requiredSectionId: string,
+  requirement: Pick<ApprovalRequirement, 'requiredSectionId' | 'requiredDestinationId'>,
 ): boolean {
   return approvals.some(
     (entry) =>
       entry.policyRuleId === ruleId &&
       entry.policyRuleRevision === ruleRevision &&
-      entry.requiredSectionId === requiredSectionId &&
+      entry.requiredSectionId === requirement.requiredSectionId &&
+      entry.requiredDestinationId === requirement.requiredDestinationId &&
       entry.decision === 'approved',
   );
 }
@@ -223,23 +238,80 @@ function deniedApprovalFor(
   approvals: readonly PolicyApprovalEvidence[],
   ruleId: string,
   ruleRevision: number,
-  requiredSectionId: string,
+  requirement: Pick<ApprovalRequirement, 'requiredSectionId' | 'requiredDestinationId'>,
 ): boolean {
   return approvals.some(
     (entry) =>
       entry.policyRuleId === ruleId &&
       entry.policyRuleRevision === ruleRevision &&
-      entry.requiredSectionId === requiredSectionId &&
+      entry.requiredSectionId === requirement.requiredSectionId &&
+      entry.requiredDestinationId === requirement.requiredDestinationId &&
       entry.decision === 'denied',
   );
+}
+
+function evaluateDestinationApprovalRequirement(
+  rule: PolicyRuleInput,
+  context: PolicyEvaluationContext,
+): PolicyRuleEvaluation {
+  // Destination responsible-staff approval binds the pass destination
+  // itself, so no classroom placement is required to name the requirement.
+  const requirement = {
+    requiredSectionId: null,
+    requiredDestinationId: context.pass.destinationId,
+  };
+  const base = {
+    ruleId: rule.id,
+    ruleRevision: rule.revision,
+    ruleType: rule.ruleType,
+    overrideMode: rule.overrideMode,
+    ...requirement,
+  };
+  if (approvedApprovalFor(context.approvals, rule.id, rule.revision, requirement)) {
+    return { ...base, outcome: 'pass', contribution: 'none', reasonCode: 'approval_satisfied' };
+  }
+  if (deniedApprovalFor(context.approvals, rule.id, rule.revision, requirement)) {
+    return { ...base, outcome: 'fail', contribution: 'deny', reasonCode: 'approval_denied' };
+  }
+  if (isOverrideableMode(rule.overrideMode)) {
+    const overridden = applyOverrideEvidence(rule, context, requirement);
+    if (overridden !== null) return overridden;
+  }
+  // A preapproved scheduled authorization satisfies only the approval this
+  // rule would otherwise require for the exact scheduled movement. Deny
+  // contributions, overrides, and every other rule type are untouched:
+  // preapproval never bypasses them.
+  if (
+    context.scheduledPreapprovals.some(
+      (entry) =>
+        entry.studentId === context.pass.studentId &&
+        entry.destinationId === context.pass.destinationId,
+    )
+  ) {
+    return {
+      ...base,
+      outcome: 'pass',
+      contribution: 'none',
+      reasonCode: 'scheduled_preapproval_satisfied',
+    };
+  }
+  return {
+    ...base,
+    outcome: 'fail',
+    contribution: 'approval_required',
+    reasonCode: 'destination_responsible_staff_approval_required',
+  };
 }
 
 function evaluateApprovalRequirement(
   rule: PolicyRuleInput,
   context: PolicyEvaluationContext,
-  config: { readonly requestSources: readonly string[] },
+  config: { readonly requestSources: readonly string[]; readonly approver: PolicyApprover },
 ): PolicyRuleEvaluation {
   if (!config.requestSources.includes(context.pass.requestSource)) return notApplicable(rule);
+  if (config.approver === 'destination_responsible_staff') {
+    return evaluateDestinationApprovalRequirement(rule, context);
+  }
   const placement = context.currentPlacement;
   if (placement.kind !== 'resolved') {
     const base = {
@@ -248,9 +320,13 @@ function evaluateApprovalRequirement(
       ruleType: rule.ruleType,
       overrideMode: rule.overrideMode,
       requiredSectionId: null,
+      requiredDestinationId: null,
     };
     if (isOverrideableMode(rule.overrideMode)) {
-      const overridden = applyOverrideEvidence(rule, context, null);
+      const overridden = applyOverrideEvidence(rule, context, {
+        requiredSectionId: null,
+        requiredDestinationId: null,
+      });
       if (overridden !== null) return overridden;
     }
     return {
@@ -261,21 +337,22 @@ function evaluateApprovalRequirement(
     };
   }
   const requiredSectionId = placement.section.id;
+  const requirement = { requiredSectionId, requiredDestinationId: null };
   const base = {
     ruleId: rule.id,
     ruleRevision: rule.revision,
     ruleType: rule.ruleType,
     overrideMode: rule.overrideMode,
-    requiredSectionId,
+    ...requirement,
   };
-  if (approvedApprovalFor(context.approvals, rule.id, rule.revision, requiredSectionId)) {
+  if (approvedApprovalFor(context.approvals, rule.id, rule.revision, requirement)) {
     return { ...base, outcome: 'pass', contribution: 'none', reasonCode: 'approval_satisfied' };
   }
-  if (deniedApprovalFor(context.approvals, rule.id, rule.revision, requiredSectionId)) {
+  if (deniedApprovalFor(context.approvals, rule.id, rule.revision, requirement)) {
     return { ...base, outcome: 'fail', contribution: 'deny', reasonCode: 'approval_denied' };
   }
   if (isOverrideableMode(rule.overrideMode)) {
-    const overridden = applyOverrideEvidence(rule, context, requiredSectionId);
+    const overridden = applyOverrideEvidence(rule, context, requirement);
     if (overridden !== null) return overridden;
   }
   // A preapproved scheduled authorization satisfies only the classroom
@@ -335,11 +412,15 @@ export function evaluatePolicy(context: PolicyEvaluationContext): PolicyEvaluati
   const approvalRequirements: ApprovalRequirement[] = [];
   const overrideRequirements: OverrideRequirement[] = [];
   for (const result of results) {
-    if (result.contribution === 'approval_required' && result.requiredSectionId !== null) {
+    if (
+      result.contribution === 'approval_required' &&
+      (result.requiredSectionId !== null || result.requiredDestinationId !== null)
+    ) {
       approvalRequirements.push({
         ruleId: result.ruleId,
         ruleRevision: result.ruleRevision,
         requiredSectionId: result.requiredSectionId,
+        requiredDestinationId: result.requiredDestinationId,
       });
     } else if (
       result.contribution === 'override_required' &&

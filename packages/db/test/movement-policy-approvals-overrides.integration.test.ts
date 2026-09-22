@@ -340,8 +340,8 @@ describe('migration 006 movement policy approvals overrides', () => {
           [school.tenantId, evaluation, ruleId],
         ),
       );
-      const approval = `INSERT INTO pass_approval (tenant_id, organization_id, pass_id, origin_evaluation_result_id, policy_rule_id, policy_rule_revision, required_section_id)
-        VALUES ($1, $2, $3, $4, $5, 1, $6)`;
+      const approval = `INSERT INTO pass_approval (tenant_id, organization_id, pass_id, origin_evaluation_result_id, policy_rule_id, policy_rule_revision, approver_kind, required_section_id)
+        VALUES ($1, $2, $3, $4, $5, 1, 'current_section_teacher', $6)`;
       await scratch.query(approval, [
         school.tenantId,
         school.school,

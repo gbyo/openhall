@@ -156,16 +156,30 @@ export async function resolvePassApproval(
           'This approval is no longer actionable.',
         );
       }
-      const authDecision = await authorization.decideWithContext(context, {
-        principal: input.principal,
-        capability: 'pass.approve.section',
-        resource: {
-          kind: 'student_in_section',
-          sectionId: approval.requiredSectionId,
-          studentId: row.studentId,
-        },
-        at: now,
-      });
+      // Section approvals resolve through the section roster; destination
+      // approvals resolve through the destination responsible staff. The
+      // persisted approver_kind agrees with exactly one non-null binding.
+      const authDecision =
+        approval.requiredDestinationId !== null
+          ? await authorization.decideWithContext(context, {
+              principal: input.principal,
+              capability: 'pass.approve.destination',
+              resource: {
+                kind: 'destination',
+                destinationId: approval.requiredDestinationId,
+              },
+              at: now,
+            })
+          : await authorization.decideWithContext(context, {
+              principal: input.principal,
+              capability: 'pass.approve.section',
+              resource: {
+                kind: 'student_in_section',
+                sectionId: approval.requiredSectionId ?? '',
+                studentId: row.studentId,
+              },
+              at: now,
+            });
       if (!authDecision.allowed) throw concealAuthDenial(authDecision.reason);
       const resolved = await policy.resolveApproval(context, approval.id, {
         decision: input.decision,
@@ -234,7 +248,9 @@ export async function resolvePassApproval(
           passId: row.id,
           organizationId: row.organizationId,
           studentId: row.studentId,
+          approverKind: approval.approverKind,
           requiredSectionId: approval.requiredSectionId,
+          requiredDestinationId: approval.requiredDestinationId,
           passRevision: bumped.revision.toString(10),
         },
       });
@@ -295,11 +311,14 @@ export interface PendingApprovalItem {
     readonly displayName: string;
     readonly serviceType: string;
   };
+  /** Section requirement; null for destination-staff approvals. */
   readonly requiredSection: {
     readonly id: string;
     readonly code: string | null;
-    readonly title: string;
-  };
+    readonly title: string | null;
+  } | null;
+  /** Destination requirement; null for section-teacher approvals. */
+  readonly requiredDestination: { readonly id: string } | null;
   readonly requestedAt: string;
 }
 
@@ -316,11 +335,16 @@ function toPendingItem(view: PendingApprovalView): PendingApprovalItem {
       displayName: view.destinationDisplayName,
       serviceType: view.destinationServiceType,
     },
-    requiredSection: {
-      id: view.requiredSectionId,
-      code: view.sectionCode,
-      title: view.sectionTitle,
-    },
+    requiredSection:
+      view.requiredSectionId === null
+        ? null
+        : {
+            id: view.requiredSectionId,
+            code: view.sectionCode,
+            title: view.sectionTitle,
+          },
+    requiredDestination:
+      view.requiredDestinationId === null ? null : { id: view.requiredDestinationId },
     requestedAt: view.requestedAt.toString(),
   };
 }
@@ -346,16 +370,30 @@ export async function listPendingApprovals(
   );
   const items: PendingApprovalItem[] = [];
   for (const view of views) {
-    const decision = await dependencies.authorization.decide({
-      principal,
-      capability: 'pass.approve.section',
-      resource: {
-        kind: 'student_in_section',
-        sectionId: view.requiredSectionId,
-        studentId: view.studentId,
-      },
-      at,
-    });
+    // Each candidate authorizes through its own requirement: section
+    // roster for section approvals, destination responsible staff for
+    // destination approvals. Recovery sessions never reach here.
+    const decision =
+      view.requiredDestinationId !== null
+        ? await dependencies.authorization.decide({
+            principal,
+            capability: 'pass.approve.destination',
+            resource: {
+              kind: 'destination',
+              destinationId: view.requiredDestinationId,
+            },
+            at,
+          })
+        : await dependencies.authorization.decide({
+            principal,
+            capability: 'pass.approve.section',
+            resource: {
+              kind: 'student_in_section',
+              sectionId: view.requiredSectionId ?? '',
+              studentId: view.studentId,
+            },
+            at,
+          });
     if (decision.allowed) items.push(toPendingItem(view));
   }
   return items;

@@ -334,6 +334,8 @@ describe('GET /api/v1/me/organizations/:organizationId/context', () => {
       'accountId',
       'session_revision',
       'teacher',
+      // Internal realtime-only field: never part of the public DTO.
+      'teachingMeetingLocationIds',
     ]) {
       expect(raw).not.toContain(leaked);
     }

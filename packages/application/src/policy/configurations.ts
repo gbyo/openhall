@@ -47,10 +47,12 @@ export interface ScheduleBoundaryConfig {
   readonly requestSources: readonly PassRequestSource[];
 }
 
+export type PolicyApprover = 'current_section_teacher' | 'destination_responsible_staff';
+
 export interface ApprovalRequirementConfig {
   readonly schemaVersion: 1;
   readonly requestSources: readonly PassRequestSource[];
-  readonly approver: 'current_section_teacher';
+  readonly approver: PolicyApprover;
 }
 
 export type PolicyRuleConfiguration =
@@ -149,12 +151,21 @@ export function parsePolicyRuleConfiguration(
     }
     const requestSources = parseRequestSources(configuration.requestSources);
     if (requestSources === null) return invalid('invalid_request_sources');
-    if (configuration.approver !== 'current_section_teacher') return invalid('unknown_approver');
+    if (
+      configuration.approver !== 'current_section_teacher' &&
+      configuration.approver !== 'destination_responsible_staff'
+    ) {
+      return invalid('unknown_approver');
+    }
+    const approver: PolicyApprover =
+      configuration.approver === 'destination_responsible_staff'
+        ? 'destination_responsible_staff'
+        : 'current_section_teacher';
     return {
       valid: true,
       configuration: {
         type: 'approval_requirement',
-        config: { schemaVersion: 1, requestSources, approver: 'current_section_teacher' },
+        config: { schemaVersion: 1, requestSources, approver },
       },
     };
   }

@@ -138,7 +138,7 @@ async function seedControlPlane(scratch: Pool, tag: string) {
 }
 
 describe('migration 008 school control plane', () => {
-  it('migrates a blank database 001 -> 010', async () => {
+  it('migrates a blank database 001 -> 011', async () => {
     const { url, pool: scratch } = await freshDatabase();
     const handle = createDatabase(url, { max: 1 });
     try {
@@ -157,6 +157,7 @@ describe('migration 008 school control plane', () => {
         '008_school_control_plane',
         '009_guided_setup_authentication',
         '010_destination_categories',
+        '011_destination_approval_generalization',
       ]);
     } finally {
       await handle.destroy();
@@ -225,7 +226,8 @@ describe('migration 008 school control plane', () => {
         [evaluationId],
       );
       expect(legacy.rows.map((row) => row.reason_code)).toEqual(['approval_satisfied']);
-      // The rebuilt CHECK carries the Phase 8 preapproval code.
+      // The rebuilt CHECK carries the Phase 8 preapproval code plus the
+      // Phase 11 destination responsible-staff code.
       await scratch.query(
         `INSERT INTO policy_evaluation_result
           (tenant_id, evaluation_id, policy_rule_id, policy_rule_revision, outcome,
@@ -233,11 +235,18 @@ describe('migration 008 school control plane', () => {
          VALUES ($1, $2, $3, 1, 'pass', 'scheduled_preapproval_satisfied', 'never', '{}', 'none')`,
         [seed.tenantId, evaluationId, ruleId],
       );
+      await scratch.query(
+        `INSERT INTO policy_evaluation_result
+          (tenant_id, evaluation_id, policy_rule_id, policy_rule_revision, outcome,
+           reason_code, override_mode, rule_snapshot, contribution)
+         VALUES ($1, $2, $3, 1, 'fail', 'destination_responsible_staff_approval_required', 'never', '{}', 'approval_required')`,
+        [seed.tenantId, evaluationId, ruleId],
+      );
       const names = await scratch.query<{ conname: string }>(
         `SELECT conname FROM pg_constraint WHERE conname LIKE 'policy_evaluation_result_phase%_reason_code'`,
       );
       expect(names.rows.map((row) => row.conname)).toEqual([
-        'policy_evaluation_result_phase8_reason_code',
+        'policy_evaluation_result_phase11_reason_code',
       ]);
     } finally {
       await handle.destroy();

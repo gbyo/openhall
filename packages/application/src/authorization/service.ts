@@ -13,8 +13,10 @@ import type {
 import { isExplicitRole } from './roles.js';
 import { ROLE_CAPABILITIES, SYSTEM_ADMIN_CAPABILITIES } from './roles.js';
 import type {
+  AuthorizationDestinationRecord,
   AuthorizationFactsRepository,
   AuthorizationGrantFact,
+  AuthorizationOrganizationRecord,
   OrganizationMembershipFact,
 } from './ports.js';
 import type {
@@ -134,6 +136,7 @@ function capabilityAllowsResourceKind(capability: Capability, kind: string): boo
     case 'pass.view.section_live':
       return kind === 'section';
     case 'destination.station.manage':
+    case 'pass.approve.destination':
       return kind === 'destination';
     case 'destination.manage':
       return kind === 'organization' || kind === 'destination';
@@ -939,6 +942,17 @@ export class RelationshipAuthorizationService {
       return deny('no_applicable_grant');
     }
 
+    if (capability === 'pass.approve.destination') {
+      return this.decideDestinationApproval(
+        context,
+        actor,
+        principal,
+        destination,
+        organization,
+        date,
+      );
+    }
+
     // destination.station.manage: exact destination assignment + staff membership.
     if (actor.systemAdminGrantId !== null) {
       return {
@@ -979,6 +993,94 @@ export class RelationshipAuthorizationService {
         destinationId: destination.id,
       },
     };
+  }
+
+  /**
+   * Destination responsible-staff approval (§24/§26). An actor is eligible
+   * only while currently one of the resolved responsible people for the
+   * exact destination: explicit destination_staff assignees, or classroom
+   * teachers of active sections meeting at the destination's Place
+   * location. Canonical school/system administration retains its existing
+   * approval behavior. An empty responsible set resolves to deny: movement
+   * stays closed and nothing auto-approves.
+   */
+  private async decideDestinationApproval(
+    context: TenantTransactionContext,
+    actor: LoadedActor,
+    principal: Principal,
+    destination: AuthorizationDestinationRecord,
+    organization: AuthorizationOrganizationRecord,
+    date: Temporal.PlainDate,
+  ): Promise<AuthorizationDecision> {
+    if (actor.systemAdminGrantId !== null) {
+      return {
+        allowed: true,
+        basis: { kind: 'system_admin', grantId: actor.systemAdminGrantId },
+      };
+    }
+    const adminGrant = hasStaffBackedGrant(actor, 'school_admin', organization.id, date);
+    if (
+      adminGrant !== null &&
+      (ROLE_CAPABILITIES.school_admin as readonly string[]).includes('pass.approve.destination')
+    ) {
+      return {
+        allowed: true,
+        basis: {
+          kind: 'explicit_grant',
+          grantId: adminGrant.id,
+          role: 'school_admin',
+          scopeKind: 'organization',
+          organizationId: organization.id,
+          destinationId: null,
+        },
+      };
+    }
+    // A. Explicit destination staff: exact destination assignment plus
+    // active staff membership at the destination's school.
+    const staffGrant = actor.grants.find(
+      (grant) =>
+        grant.role === 'destination_staff' &&
+        grant.scopeKind === 'destination' &&
+        grant.destinationId === destination.id,
+    );
+    if (staffGrant !== undefined && isActiveStaffAt(actor, organization.id, date)) {
+      return {
+        allowed: true,
+        basis: {
+          kind: 'explicit_grant',
+          grantId: staffGrant.id,
+          role: 'destination_staff',
+          scopeKind: 'destination',
+          organizationId: null,
+          destinationId: destination.id,
+        },
+      };
+    }
+    // B. Classroom-associated teachers: active teacher memberships on
+    // active sections meeting at the destination's Place location, with
+    // membership and meeting windows covering the school date.
+    // Deduplication by person is inherent: one qualifying row suffices.
+    if (destination.locationId !== null && isActiveStaffAt(actor, organization.id, date)) {
+      const candidates = await this.repository.listLocationTeachers(
+        context,
+        organization.id,
+        destination.locationId,
+      );
+      const responsible = candidates.some(
+        (candidate) =>
+          candidate.personId === principal.personId &&
+          candidate.membershipStatus === 'active' &&
+          (candidate.startsOn === null ||
+            Temporal.PlainDate.compare(candidate.startsOn, date) <= 0) &&
+          (candidate.endsOn === null || Temporal.PlainDate.compare(date, candidate.endsOn) <= 0) &&
+          (candidate.meetingEffectiveFrom === null ||
+            Temporal.PlainDate.compare(candidate.meetingEffectiveFrom, date) <= 0) &&
+          (candidate.meetingEffectiveUntil === null ||
+            Temporal.PlainDate.compare(date, candidate.meetingEffectiveUntil) <= 0),
+      );
+      if (responsible) return { allowed: true, basis: { kind: 'teacher_section_relationship' } };
+    }
+    return deny('no_applicable_grant');
   }
 }
 

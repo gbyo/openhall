@@ -1,6 +1,6 @@
 import type { Temporal } from '@js-temporal/polyfill';
 import type { TenantTransactionContext } from '../persistence.js';
-import type { OverrideCategory, PolicyOverrideMode } from './configurations.js';
+import type { OverrideCategory, PolicyApprover, PolicyOverrideMode } from './configurations.js';
 import type { PolicyApprovalEvidence, PolicyOverrideEvidence, PolicyRuleInput } from './context.js';
 import type { PolicyContribution, PolicyDecision, PolicyRuleOutcome } from './decisions.js';
 import type { PolicyReasonCode } from './reason-codes.js';
@@ -34,6 +34,7 @@ export interface PolicyRuleSnapshotInput {
   readonly scopeOrganizationId: string | null;
   readonly scopeSectionId: string | null;
   readonly scopeDestinationId: string | null;
+  readonly scopeDestinationCategoryId: string | null;
   readonly configuration: unknown;
   readonly overrideMode: string;
   readonly revision: number;
@@ -64,7 +65,11 @@ export interface NewPendingApproval {
   readonly originEvaluationResultId: string;
   readonly ruleId: string;
   readonly ruleRevision: number;
-  readonly requiredSectionId: string;
+  /** Requirement kind; must agree with exactly one non-null binding. */
+  readonly approverKind: PolicyApprover;
+  /** Exactly one of the two requirement bindings is non-null. */
+  readonly requiredSectionId: string | null;
+  readonly requiredDestinationId: string | null;
 }
 
 export interface PolicyApprovalRecord extends PolicyApprovalEvidence {
@@ -138,7 +143,10 @@ export interface PolicyRepository {
     passId: string,
     ruleId: string,
     ruleRevision: number,
-    requiredSectionId: string,
+    requirement: {
+      readonly requiredSectionId: string | null;
+      readonly requiredDestinationId: string | null;
+    },
   ): Promise<PolicyApprovalRecord | null>;
 
   createPendingApproval(
@@ -253,9 +261,11 @@ export interface PendingApprovalView {
   readonly destinationId: string;
   readonly destinationDisplayName: string;
   readonly destinationServiceType: string;
-  readonly requiredSectionId: string;
+  /** Exactly one requirement binding is non-null. */
+  readonly requiredSectionId: string | null;
+  readonly requiredDestinationId: string | null;
   readonly sectionCode: string | null;
-  readonly sectionTitle: string;
+  readonly sectionTitle: string | null;
   readonly requestedAt: Temporal.Instant;
 }
 

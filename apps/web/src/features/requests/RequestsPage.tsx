@@ -115,7 +115,7 @@ export function RequestsPage() {
         student: row.student,
         destination: row.destination,
         requestedAt: row.requestedAt,
-        context: row.requiredSection.title,
+        context: row.requiredSection?.title ?? 'Destination approval',
       })) ?? []),
     ...(overrides.data?.overrides
       .filter((row) => row.organizationId === organizationId)

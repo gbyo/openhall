@@ -65,6 +65,7 @@ export function ClassroomSetupDialog({ open, onOpenChange, onDone }: ClassroomSe
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [initializedFor, setInitializedFor] = useState<string | null>(null);
   const [studentAccess, setStudentAccess] = useState(true);
+  const [requireApproval, setRequireApproval] = useState(false);
   const [checkInMode, setCheckInMode] = useState('none');
   const [duration, setDuration] = useState('600');
   const [capacity, setCapacity] = useState('');
@@ -143,6 +144,82 @@ export function ClassroomSetupDialog({ open, onOpenChange, onDone }: ClassroomSe
           },
         }),
       );
+      // One category-scoped destination-approval rule covers every room
+      // visit: never one rule per classroom.
+      if (requireApproval && chosenCategory) {
+        const listed = await confirmed(
+          api.GET('/api/v1/organizations/{organizationId}/policy-rules', {
+            params: { path: { organizationId } },
+          }),
+        );
+        const existing = listed.rules.find((rule) => {
+          if (
+            rule.archivedAt ||
+            rule.ruleType !== 'approval_requirement' ||
+            rule.scope.kind !== 'destination_category' ||
+            rule.scope.destinationCategoryId !== effectiveCategoryId
+          ) {
+            return false;
+          }
+          // Ensure the destination-staff rule itself, not just any rule on
+          // the category: a classroom-teacher rule does not satisfy the
+          // checkbox promise.
+          const configuration = rule.configuration as {
+            approver?: unknown;
+            requestSources?: unknown;
+          };
+          return (
+            configuration.approver === 'destination_responsible_staff' &&
+            Array.isArray(configuration.requestSources) &&
+            configuration.requestSources.includes('student_web')
+          );
+        });
+        if (!existing) {
+          const policyKey = crypto.randomUUID();
+          const created = await api.POST('/api/v1/organizations/{organizationId}/policy-rules', {
+            params: { path: { organizationId }, header: { 'idempotency-key': policyKey } },
+            headers: { 'X-CSRF-Token': getCsrfToken(), 'Idempotency-Key': policyKey },
+            body: {
+              name: `Destination approval for ${chosenCategory.name}`,
+              ruleType: 'approval_requirement',
+              scope: {
+                kind: 'destination_category',
+                organizationId: null,
+                sectionId: null,
+                destinationId: null,
+                destinationCategoryId: effectiveCategoryId,
+              },
+              priority: 100,
+              configuration: {
+                schemaVersion: 1,
+                requestSources: ['student_web'],
+                approver: 'destination_responsible_staff',
+              },
+              overrideMode: 'never',
+              validFrom: null,
+              validUntil: null,
+            },
+          });
+          requireData(created);
+          // The checkbox promises enforcement: a freshly created rule is
+          // activated at once. A pre-existing disabled rule is left alone.
+          const ruleEtag = created.response.headers.get('etag') ?? '';
+          const activateKey = crypto.randomUUID();
+          await confirmed(
+            api.POST('/api/v1/policy-rules/{policyRuleId}/activate', {
+              params: {
+                path: { policyRuleId: created.data.rule.id },
+                header: { 'idempotency-key': activateKey, 'if-match': ruleEtag },
+              },
+              headers: {
+                'X-CSRF-Token': getCsrfToken(),
+                'Idempotency-Key': activateKey,
+                'If-Match': ruleEtag,
+              },
+            }),
+          );
+        }
+      }
       // The setup flow keeps the chosen category on search: with dozens of
       // classroom destinations a list picker would be unusable.
       if (chosenCategory && chosenCategory.pickerMode !== 'search') {
@@ -312,6 +389,23 @@ export function ClassroomSetupDialog({ open, onOpenChange, onDone }: ClassroomSe
                 />
                 <FieldLabel htmlFor="setup-requestable">Students can request</FieldLabel>
               </div>
+              <FieldDescription>
+                Destination approval is a separate policy, not a per-room setting.
+              </FieldDescription>
+            </Field>
+            <Field>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="setup-approval"
+                  checked={requireApproval}
+                  onCheckedChange={setRequireApproval}
+                />
+                <FieldLabel htmlFor="setup-approval">Require destination approval</FieldLabel>
+              </div>
+              <FieldDescription>
+                Ensures one approval policy for this pass category so room visits need destination
+                responsible-staff approval. No rule is created per classroom.
+              </FieldDescription>
             </Field>
             <div className="grid grid-cols-3 gap-3">
               <Field>

@@ -516,6 +516,7 @@ export class DestinationFlowReconciler {
       if (config.status === 'closed' || config.status === 'archived') return 'deferred';
       const consuming = await flow.countConsumingReservations(context, destinationId, now);
       if (config.capacity !== null && consuming >= config.capacity) return 'deferred';
+      const reevaluateDestination = await passes.loadDestination(context, pass.destinationId);
       const decided = await evaluateAndPersistPolicy(context, policy, {
         pass: {
           id: pass.id,
@@ -529,6 +530,7 @@ export class DestinationFlowReconciler {
           originLocationId: pass.originLocationId,
         },
         placement: current,
+        destinationCategoryId: reevaluateDestination?.categoryId ?? null,
         at: now,
         stage: 'reevaluation',
       });

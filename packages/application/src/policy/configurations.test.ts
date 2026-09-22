@@ -29,6 +29,17 @@ describe('parsePolicyRuleConfiguration', () => {
     expect(parsed.valid).toBe(true);
   });
 
+  it('accepts the destination responsible-staff approver', () => {
+    const parsed = parsePolicyRuleConfiguration('approval_requirement', {
+      ...approvalBase,
+      approver: 'destination_responsible_staff',
+    });
+    expect(parsed.valid).toBe(true);
+    if (parsed.valid && parsed.configuration.type === 'approval_requirement') {
+      expect(parsed.configuration.config.approver).toBe('destination_responsible_staff');
+    }
+  });
+
   it.each([
     ['missing schemaVersion', 'schedule_boundary', { ...boundaryBase, schemaVersion: undefined }],
     ['unsupported schemaVersion', 'schedule_boundary', { ...boundaryBase, schemaVersion: 2 }],

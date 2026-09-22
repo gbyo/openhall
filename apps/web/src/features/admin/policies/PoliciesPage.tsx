@@ -39,10 +39,11 @@ interface PolicyBody {
   name: string;
   ruleType: 'schedule_boundary' | 'approval_requirement';
   scope: {
-    kind: 'organization' | 'section' | 'destination';
+    kind: 'organization' | 'section' | 'destination' | 'destination_category';
     organizationId: string | null;
     sectionId: string | null;
     destinationId: string | null;
+    destinationCategoryId: string | null;
   };
   priority: number;
   configuration: Record<string, unknown>;
@@ -60,7 +61,7 @@ const BLOCK_KIND_CHOICES = [
 ] as const;
 
 function ruleTypeLabel(ruleType: string): string {
-  return ruleType === 'schedule_boundary' ? 'Schedule boundary' : 'Teacher approval';
+  return ruleType === 'schedule_boundary' ? 'Schedule boundary' : 'Approval';
 }
 
 function scopeLabel(kind: string): string {
@@ -69,6 +70,8 @@ function scopeLabel(kind: string): string {
       return 'One class';
     case 'destination':
       return 'One destination';
+    case 'destination_category':
+      return 'One pass category';
     default:
       return 'Whole school';
   }
@@ -85,6 +88,9 @@ export function Component() {
   const queryClient = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [ruleType, setRuleType] = useState<PolicyBody['ruleType']>('schedule_boundary');
+  const [approver, setApprover] = useState<
+    'current_section_teacher' | 'destination_responsible_staff'
+  >('current_section_teacher');
   const [scopeKind, setScopeKind] = useState<PolicyBody['scope']['kind']>('organization');
   const policies = useQuery({
     queryKey: queryKeys.policies(organizationId),
@@ -101,6 +107,16 @@ export function Component() {
     queryFn: () =>
       confirmed(
         api.GET('/api/v1/organizations/{organizationId}/destinations', {
+          params: { path: { organizationId } },
+        }),
+      ),
+  });
+  const categories = useQuery({
+    queryKey: queryKeys.destinationCategories(organizationId),
+    enabled: creating && scopeKind === 'destination_category',
+    queryFn: () =>
+      confirmed(
+        api.GET('/api/v1/organizations/{organizationId}/destination-categories', {
           params: { path: { organizationId } },
         }),
       ),
@@ -145,6 +161,7 @@ export function Component() {
           organizationId: scopeKind === 'organization' ? organizationId : null,
           sectionId: scopeKind === 'section' ? scopeId : null,
           destinationId: scopeKind === 'destination' ? scopeId : null,
+          destinationCategoryId: scopeKind === 'destination_category' ? scopeId : null,
         },
         priority: Number(data.get('priority')),
         configuration:
@@ -159,7 +176,7 @@ export function Component() {
             : {
                 schemaVersion: 1,
                 requestSources: sources,
-                approver: 'current_section_teacher',
+                approver,
               },
         overrideMode: formString(data, 'overrideMode') as PolicyBody['overrideMode'],
         validFrom: optionalInstant(formString(data, 'validFrom'), context.organization.timeZone),
@@ -282,7 +299,7 @@ export function Component() {
                     Protect the beginning and end of class
                   </NativeSelectOption>
                   <NativeSelectOption value="approval_requirement">
-                    Require classroom teacher approval
+                    Require approval
                   </NativeSelectOption>
                 </NativeSelect>
               </Field>
@@ -299,13 +316,20 @@ export function Component() {
                   <NativeSelectOption value="organization">Whole school</NativeSelectOption>
                   <NativeSelectOption value="section">One class</NativeSelectOption>
                   <NativeSelectOption value="destination">One destination</NativeSelectOption>
+                  <NativeSelectOption value="destination_category">
+                    One pass category
+                  </NativeSelectOption>
                 </NativeSelect>
               </Field>
             </div>
             {scopeKind !== 'organization' && (
               <Field>
                 <FieldLabel htmlFor="policy-scope-id">
-                  {scopeKind === 'section' ? 'Class' : 'Destination'}
+                  {scopeKind === 'section'
+                    ? 'Class'
+                    : scopeKind === 'destination_category'
+                      ? 'Pass category'
+                      : 'Destination'}
                 </FieldLabel>
                 <NativeSelect id="policy-scope-id" name="scopeId" required>
                   {scopeKind === 'section'
@@ -314,11 +338,17 @@ export function Component() {
                           {section.title}
                         </NativeSelectOption>
                       ))
-                    : destinations.data?.destinations.map((destination) => (
-                        <NativeSelectOption key={destination.id} value={destination.id}>
-                          {destination.displayName ?? destination.serviceType}
-                        </NativeSelectOption>
-                      ))}
+                    : scopeKind === 'destination_category'
+                      ? categories.data?.categories.map((category) => (
+                          <NativeSelectOption key={category.id} value={category.id}>
+                            {category.name}
+                          </NativeSelectOption>
+                        ))
+                      : destinations.data?.destinations.map((destination) => (
+                          <NativeSelectOption key={destination.id} value={destination.id}>
+                            {destination.displayName ?? destination.serviceType}
+                          </NativeSelectOption>
+                        ))}
                 </NativeSelect>
               </Field>
             )}
@@ -359,6 +389,29 @@ export function Component() {
                   ))}
                 </fieldset>
               </div>
+            )}
+            {ruleType === 'approval_requirement' && (
+              <Field>
+                <FieldLabel htmlFor="policy-approver">Approver</FieldLabel>
+                <NativeSelect
+                  id="policy-approver"
+                  name="approver"
+                  value={approver}
+                  onChange={(event) => {
+                    setApprover(
+                      event.target.value as
+                        'current_section_teacher' | 'destination_responsible_staff',
+                    );
+                  }}
+                >
+                  <NativeSelectOption value="current_section_teacher">
+                    Current classroom teacher
+                  </NativeSelectOption>
+                  <NativeSelectOption value="destination_responsible_staff">
+                    Destination responsible staff
+                  </NativeSelectOption>
+                </NativeSelect>
+              </Field>
             )}
             <fieldset className="grid gap-2">
               <legend className="text-sm font-medium">Requests this policy affects</legend>

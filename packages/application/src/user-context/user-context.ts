@@ -28,6 +28,12 @@ export interface OrganizationContext {
   readonly capabilities: OrganizationAuthorizationSnapshot['capabilities'];
   readonly teachingSections: OrganizationAuthorizationSnapshot['teachingSections'];
   readonly staffedDestinations: OrganizationAuthorizationSnapshot['staffedDestinations'];
+  /**
+   * Internal only: Place locations where the caller's active teaching
+   * sections meet. Feeds realtime request invalidation; never mapped to
+   * the public DTO.
+   */
+  readonly teachingMeetingLocationIds: readonly string[];
   /** Raw resolver result; the HTTP layer maps it to the minimized public DTO. */
   readonly expectedPlacement: ExpectedPlacementResult | null;
 }
@@ -98,6 +104,11 @@ export class UserContextService {
     const organization = await runner.run(principal.tenantId, (context) =>
       facts.loadOrganization(context, organizationId),
     );
+    // Own teaching locations for realtime invalidation. Runs only after
+    // the context.read gate above: no inaccessible school is probed.
+    const teachingMeetingLocationIds = await runner.run(principal.tenantId, (context) =>
+      facts.listTeachingMeetingLocations(context, principal.personId, organizationId),
+    );
     if (organization === null) {
       throw new UserContextError(
         'organization_not_found',
@@ -128,6 +139,7 @@ export class UserContextService {
       capabilities: snapshot.capabilities,
       teachingSections: snapshot.teachingSections,
       staffedDestinations: snapshot.staffedDestinations,
+      teachingMeetingLocationIds,
       expectedPlacement,
     };
   }

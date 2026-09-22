@@ -22,8 +22,9 @@ export interface PolicyRuleEvaluation {
   readonly outcome: PolicyRuleOutcome;
   readonly contribution: PolicyContribution;
   readonly reasonCode: PolicyReasonCode;
-  /** Present when an approval requirement names an exact section. */
+  /** Present when an approval requirement names an exact requirement. */
   readonly requiredSectionId: string | null;
+  readonly requiredDestinationId: string | null;
 }
 
 /**

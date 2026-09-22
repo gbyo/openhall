@@ -40,6 +40,7 @@ export function buildRuleSnapshot(rule: PolicyRuleInput): Readonly<Record<string
       organizationId: rule.scopeOrganizationId,
       sectionId: rule.scopeSectionId,
       destinationId: rule.scopeDestinationId,
+      destinationCategoryId: rule.scopeDestinationCategoryId,
     },
     configuration: rule.configuration,
     overrideMode: rule.overrideMode,
@@ -98,6 +99,12 @@ export async function evaluateAndPersistPolicy(
   input: {
     readonly pass: PolicyPassInput;
     readonly placement: ExpectedPlacementResult;
+    /**
+     * Category of the pass destination at evaluation time. Callers that
+     * already hold the destination row pass its category; all others pass
+     * null and `destination_category` rules stay not_applicable.
+     */
+    readonly destinationCategoryId?: string | null;
     readonly at: Temporal.Instant;
     readonly stage: PolicyEvaluationStage;
     readonly scheduledPreapprovals?: readonly ScheduledPreapprovalEvidence[];
@@ -108,6 +115,7 @@ export async function evaluateAndPersistPolicy(
   const overrides = await policy.listOverridesForPass(context, input.pass.id);
   const evaluationContext: PolicyEvaluationContext = {
     pass: input.pass,
+    destinationCategoryId: input.destinationCategoryId ?? null,
     at: input.at,
     currentPlacement: input.placement,
     rules,
@@ -180,7 +188,10 @@ export async function reconcilePendingApprovals(
       input.passId,
       requirement.ruleId,
       requirement.ruleRevision,
-      requirement.requiredSectionId,
+      {
+        requiredSectionId: requirement.requiredSectionId,
+        requiredDestinationId: requirement.requiredDestinationId,
+      },
     );
     if (existing !== null) {
       kept.push(existing);
@@ -194,7 +205,12 @@ export async function reconcilePendingApprovals(
       originEvaluationResultId: originResultId,
       ruleId: requirement.ruleId,
       ruleRevision: requirement.ruleRevision,
+      approverKind:
+        requirement.requiredDestinationId !== null
+          ? 'destination_responsible_staff'
+          : 'current_section_teacher',
       requiredSectionId: requirement.requiredSectionId,
+      requiredDestinationId: requirement.requiredDestinationId,
     });
     kept.push(row);
     if (!created.some((approval) => approval.id === row.id)) created.push(row);

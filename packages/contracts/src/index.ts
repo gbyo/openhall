@@ -231,6 +231,7 @@ export const CapabilitySchema = Type.Union(
     Type.Literal('pass.progress.self'),
     Type.Literal('pass.create.student'),
     Type.Literal('pass.approve.section'),
+    Type.Literal('pass.approve.destination'),
     Type.Literal('pass.override.request.self'),
     Type.Literal('pass.override.request.student'),
     Type.Literal('pass.override.resolve.section'),
@@ -569,8 +570,13 @@ const PendingApprovalSectionSchema = Type.Object(
   {
     id: UuidSchema,
     code: Type.Union([Type.String(), Type.Null()]),
-    title: Type.String(),
+    title: Type.Union([Type.String(), Type.Null()]),
   },
+  { additionalProperties: false },
+);
+
+const PendingApprovalDestinationSchema = Type.Object(
+  { id: UuidSchema },
   { additionalProperties: false },
 );
 
@@ -601,7 +607,8 @@ export const PendingApprovalSchema = Type.Object(
     passEtag: Type.String({ minLength: 1 }),
     student: PersonDisplaySchema,
     destination: DestinationDisplaySchema,
-    requiredSection: PendingApprovalSectionSchema,
+    requiredSection: Type.Union([PendingApprovalSectionSchema, Type.Null()]),
+    requiredDestination: Type.Union([PendingApprovalDestinationSchema, Type.Null()]),
     requestedAt: InstantSchema,
   },
   { $id: 'PendingApproval', additionalProperties: false },
@@ -637,6 +644,7 @@ export const PendingOverrideSchema = Type.Object(
       Type.Literal('no_violation'),
       Type.Literal('schedule_boundary_blackout'),
       Type.Literal('current_section_teacher_approval_required'),
+      Type.Literal('destination_responsible_staff_approval_required'),
       Type.Literal('approval_context_unavailable'),
       Type.Literal('approval_satisfied'),
       Type.Literal('scheduled_preapproval_satisfied'),
@@ -1098,6 +1106,7 @@ const PolicyScopeKindSchema = Type.Union([
   Type.Literal('organization'),
   Type.Literal('section'),
   Type.Literal('destination'),
+  Type.Literal('destination_category'),
 ]);
 
 const PolicyScopeSchema = Type.Object(
@@ -1106,6 +1115,7 @@ const PolicyScopeSchema = Type.Object(
     organizationId: Type.Union([UuidSchema, Type.Null()]),
     sectionId: Type.Union([UuidSchema, Type.Null()]),
     destinationId: Type.Union([UuidSchema, Type.Null()]),
+    destinationCategoryId: Type.Union([UuidSchema, Type.Null()]),
   },
   { additionalProperties: false },
 );

@@ -62,6 +62,7 @@ export interface ResourceByCapability {
   'pass.progress.self': SelfResource;
   'pass.create.student': StudentResource | StudentInSectionResource;
   'pass.approve.section': StudentInSectionResource;
+  'pass.approve.destination': DestinationResource;
   'pass.override.request.self': StudentResource;
   'pass.override.request.student': StudentResource | StudentInSectionResource;
   'pass.override.resolve.section': StudentInSectionResource;

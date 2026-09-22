@@ -425,6 +425,7 @@ export interface Pass {
 }
 
 export interface PassApproval {
+  approver_kind: string;
   created_at: Generated<string>;
   decided_at: string | null;
   decided_by_person_id: string | null;
@@ -436,7 +437,8 @@ export interface PassApproval {
   pass_id: string;
   policy_rule_id: string;
   policy_rule_revision: number;
-  required_section_id: string;
+  required_destination_id: string | null;
+  required_section_id: string | null;
   tenant_id: string;
 }
 
@@ -519,6 +521,7 @@ export interface PolicyRule {
   priority: Generated<number>;
   revision: Generated<number>;
   rule_type: string;
+  scope_destination_category_id: string | null;
   scope_destination_id: string | null;
   scope_kind: string;
   scope_organization_id: string | null;
